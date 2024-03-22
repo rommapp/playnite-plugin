@@ -23,6 +23,9 @@ namespace RomM.Games
         [ProtoMember(3)]
         public string FileName { get; set; }
 
+        [ProtoMember(4)]
+        public bool IsMulti { get; set; }
+
         public EmulatorMapping Mapping
         {
             get

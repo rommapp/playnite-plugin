@@ -190,6 +190,7 @@ namespace RomM
                             MappingId = mapping.MappingId,
                             FileName = fileName,
                             DownloadUrl = $"{Settings.RomMHost}/api/roms/{item["id"].ToObject<int>()}/content/{fileName}",
+                            IsMulti = item["multi"].ToObject<bool>()
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);

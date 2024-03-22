@@ -43,23 +43,22 @@ namespace RomM.Games
             {
                 try
                 {
-                    var destination = new DirectoryInfo(dstPath);
-
                     // Fetch file from content endpoint
                     HttpResponseMessage response = await RomM.GetAsync(info.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
                     response.EnsureSuccessStatusCode();
-                    
-                    var installDir = dstPath;
-                    var gamePath = Path.Combine(dstPath, info.FileName);
+
+                    string installDir = dstPath;
+                    string gamePath = Path.Combine(dstPath, info.FileName);
+                    if (info.IsMulti)
+                    {
+                        gamePath = Path.Combine(dstPath, info.FileName + ".zip");
+                    }
 
                     if (_romM.Playnite.ApplicationInfo.IsPortable)
                     {
                         installDir = installDir.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
                         gamePath = gamePath.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
                     }
-
-                    // Ensure the directory exists
-                    Directory.CreateDirectory(Path.GetDirectoryName(gamePath));
 
                     Logger.Debug($"Downloading {Game.Name} to {gamePath}.");
 
@@ -75,19 +74,22 @@ namespace RomM.Games
                     // Extract compressed files
                     if (info.Mapping.AutoExtract && IsFileCompressed(gamePath))
                     {
+                        // Create the install directory if it doesn't exist
+                        installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
+                        Directory.CreateDirectory(installDir);
+
+                        // Extract the archive to the install directory
                         ExtractArchive(gamePath, installDir);
+                        if (info.IsMulti)
+                        {
+                            ExtractNestedArchives(installDir);
+                        }
 
                         // Delete the compressed file
                         File.Delete(gamePath);
 
                         // Update the game path to the extracted game
-                        gamePath = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
-
-                        // If the gamePath is a directory, we need to find the actual game file
-                        if (Directory.Exists(gamePath))
-                        {
-                            gamePath = Path.Combine(gamePath, Directory.GetFiles(gamePath, "*", SearchOption.AllDirectories)[0]);
-                        }
+                        gamePath = Path.Combine(installDir, Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)[0]);
 
                         // Update the game's installation status
                         var game = _romM.Playnite.Database.Games[Game.Id];
@@ -140,6 +142,18 @@ namespace RomM.Games
                             Overwrite = true
                         });
                     }
+                }
+            }
+        }
+
+        void ExtractNestedArchives(string directoryPath)
+        {
+            foreach (var file in Directory.GetFiles(directoryPath))
+            {   
+                if (IsFileCompressed(file))
+                {
+                    ExtractArchive(file, directoryPath);
+                    File.Delete(file);
                 }
             }
         }
