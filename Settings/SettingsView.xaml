@@ -14,20 +14,23 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="200"/>
                     </Grid.ColumnDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="200"/>
-                    </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+
+                    <!-- RomM Host Label and TextBox -->
                     <Label Content="RomM Host" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
-                    <TextBox x:Name="RomMHost" Grid.Row="0" Grid.Column="1" Margin="0,0,0,5" Text="{Binding RomMHost, Mode=TwoWay}" />
-                    <Label Content="Username" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
-                    <TextBox x:Name="RomMUsername" Grid.Row="0" Grid.Column="1" Margin="0,0,0,5" Text="{Binding RomMUsername, Mode=TwoWay}" />
-                    <Label Content="Password" Grid.Row="1" Grid.Column="0" Margin="0,5,5,0"/>
-                    <TextBox x:Name="RomMPassword" Grid.Row="1" Grid.Column="1" Margin="0,5,0,0" Text="{Binding RomMPassword, Mode=TwoWay}"/>
+                    <TextBox x:Name="RomMHost" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMHost, Mode=TwoWay}" />
+
+                    <!-- Username Label and TextBox -->
+                    <Label Content="Username" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
+                    <TextBox x:Name="RomMUsername" Grid.Row="1" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMUsername, Mode=TwoWay}" />
+
+                    <!-- Password Label and TextBox -->
+                    <Label Content="Password" Grid.Row="2" Grid.Column="0" Margin="0,5,5,0"/>
+                    <TextBox x:Name="RomMPassword" Grid.Row="2" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMPassword, Mode=TwoWay}"/>
                 </Grid>
                 <Label Content="Emulator path mappings" FontWeight="Bold" />
                 <TextBlock HorizontalAlignment="Right" Margin="0,-16,0,0">
@@ -109,6 +112,7 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
+                            <DataGridCheckBoxColumn Header="Auto-extract" Binding="{Binding AutoExtract}" />
                             <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding Enabled}" />
                             <DataGridTextColumn Header="Mapping ID" IsReadOnly="True" Binding="{Binding MappingId}" />
                         </DataGrid.Columns>

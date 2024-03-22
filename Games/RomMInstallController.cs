@@ -62,7 +62,7 @@ namespace RomM.Games
                     File.WriteAllBytes(gamePath, body);
 
                     // Extract compressed files
-                    if (IsFileCompressed(gamePath))
+                    if (info.Mapping.AutoExtract && IsFileCompressed(gamePath))
                     {
                         ExtractArchive(gamePath, installDir);
 

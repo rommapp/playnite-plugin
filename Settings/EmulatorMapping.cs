@@ -24,6 +24,10 @@ namespace RomM.Settings
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool Enabled { get; set; }
 
+        [DefaultValue(false)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
+        public bool AutoExtract { get; set; }
+
         [JsonIgnore]
         public Emulator Emulator
         {

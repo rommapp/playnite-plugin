@@ -107,6 +107,13 @@ namespace RomM
                 yield break;
             }
 
+            // Return early if host, username or password is not set
+            if (string.IsNullOrEmpty(Settings.RomMHost) || string.IsNullOrEmpty(Settings.RomMUsername) || string.IsNullOrEmpty(Settings.RomMPassword))
+            {
+                Logger.Warn("RomM host, username or password is not set.");
+                yield break;
+            }
+
             string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
             JArray apiPlatforms = new JArray();
             List<GameMetadata> games = new List<GameMetadata>();
@@ -220,8 +227,19 @@ namespace RomM
                                     Path = $"{Settings.RomMHost}/rom/{item["id"].ToObject<int>()}",
                                     IsPlayAction = false
                                 }
-    }
+                            }
                         });
+                    }
+
+                    // Find games in the database that are not in the response
+                    var gamesInDatabase = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() && g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any());
+                    foreach (var game in gamesInDatabase)
+                    {
+                        if (args.CancelToken.IsCancellationRequested)
+                            break;
+
+                        // Remove from the playnite database
+                        Playnite.Database.Games.Remove(game.Id);
                     }
                 }
                 catch (HttpRequestException e)
