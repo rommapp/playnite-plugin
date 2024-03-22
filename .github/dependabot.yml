@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    reviewers:
+      - "gantoine"

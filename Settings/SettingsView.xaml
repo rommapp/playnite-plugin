@@ -1,11 +1,9 @@
 ﻿<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    x:Class="RomM.Settings.SettingsView"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="RomM.Settings.SettingsView"
     xmlns:local="clr-namespace:RomM.Settings"
-    xmlns:sys="clr-namespace:System;assembly=mscorlib"
-    mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="600" Padding="2,0,2,4">
+    xmlns:sys="clr-namespace:System;assembly=mscorlib" mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="600" Padding="2,0,2,4">
     <DockPanel Margin="20">
         <ScrollViewer DockPanel.Dock="Top">
             <StackPanel x:Name="EmulatorSettingsPanel">
@@ -33,7 +31,7 @@
                 </Grid>
                 <Label Content="Emulator path mappings" FontWeight="Bold" />
                 <TextBlock HorizontalAlignment="Right" Margin="0,-16,0,0">
-                    <Hyperlink NavigateUri="" RequestNavigate="Hyperlink_RequestNavigate">
+                    <Hyperlink NavigateUri="https://github.com/rommapp/playnite-plugin/blob/main/README.md" RequestNavigate="Hyperlink_RequestNavigate">
                         Help
                     </Hyperlink>
                 </TextBlock>
