@@ -80,9 +80,9 @@ namespace RomM
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
         }
 
-        public static async Task<HttpResponseMessage> GetAsync(string baseUrl)
+        public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
         {
-            return await HttpClientSingleton.Instance.GetAsync(baseUrl);
+            return await HttpClientSingleton.Instance.GetAsync(baseUrl, completionOption);
         }
 
         public static async Task<HttpResponseMessage> GetAsyncWithParams(string baseUrl, NameValueCollection queryParams)
@@ -164,6 +164,8 @@ namespace RomM
                     { "platform_id", apiPlatforms.FirstOrDefault(p => p["igdb_id"].ToObject<ulong>() == mapping.Platform.IgdbId)["id"].ToString() }
                 };
 
+                var responseGameIDs = new List<string>();
+
                 try
                 {
                     // Make the request and get the response
@@ -190,6 +192,7 @@ namespace RomM
                             DownloadUrl = $"{Settings.RomMHost}/api/roms/{item["id"].ToObject<int>()}/content/{fileName}",
                         };
                         var gameId = info.AsGameId();
+                        responseGameIDs.Add(gameId);
 
                         // Check if the game is already installed
                         if (Playnite.Database.Games.Where(g => g.GameId == gameId).Any())
@@ -237,6 +240,11 @@ namespace RomM
                     {
                         if (args.CancelToken.IsCancellationRequested)
                             break;
+
+                        if (responseGameIDs.Contains(game.GameId))
+                        {
+                            continue;
+                        }
 
                         // Remove from the playnite database
                         Playnite.Database.Games.Remove(game.Id);

@@ -46,9 +46,9 @@ namespace RomM.Games
                     var destination = new DirectoryInfo(dstPath);
 
                     // Fetch file from content endpoint
-                    HttpResponseMessage response = await RomM.GetAsync(info.DownloadUrl);
-                    var body = await response.Content.ReadAsByteArrayAsync();
-
+                    HttpResponseMessage response = await RomM.GetAsync(info.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
+                    
                     var installDir = dstPath;
                     var gamePath = Path.Combine(dstPath, info.FileName);
 
@@ -58,8 +58,19 @@ namespace RomM.Games
                         gamePath = gamePath.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
                     }
 
-                    // Write the file to disk
-                    File.WriteAllBytes(gamePath, body);
+                    // Ensure the directory exists
+                    Directory.CreateDirectory(Path.GetDirectoryName(gamePath));
+
+                    Logger.Debug($"Downloading {Game.Name} to {gamePath}.");
+
+                    // Stream the file directly to disk
+                    using (var fileStream = new FileStream(gamePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    using (var httpStream = await response.Content.ReadAsStreamAsync())
+                    {
+                        await httpStream.CopyToAsync(fileStream);
+                    }
+
+                    Logger.Debug($"Download of {Game.Name} complete!");
 
                     // Extract compressed files
                     if (info.Mapping.AutoExtract && IsFileCompressed(gamePath))
