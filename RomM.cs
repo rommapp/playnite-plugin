@@ -73,11 +73,56 @@ namespace RomM
             };
         }
 
+        internal void HandleRommUri(PlayniteUriEventArgs args)
+        {
+            var action = args.Arguments[0];
+            var platformIgdbId = args.Arguments[1];
+            var gameName = args.Arguments[2];
+
+            Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{gameName}");
+
+            // Playnite url is in the format playnite://romm/<action>/<platform_igdb_id>/<game_name>
+            foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
+            {
+                if (mapping.Platform.IgdbId.ToString() == platformIgdbId)
+                {
+                    var game = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() &&
+                        g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any() &&
+                        g.Name == gameName).FirstOrDefault();
+
+                    if (game == null)
+                    {
+                        Logger.Warn($"Game {gameName} not found in the database.");
+                        return;
+                    }
+
+                    PlayniteApi.MainView.SwitchToLibraryView();
+                    PlayniteApi.MainView.SelectGame(game.Id);
+
+                    if (action == "view")
+                    {
+                        // We always open the game in the webview
+                        return;
+                    }
+                    else if (action == "install")
+                    {
+                        InstallController installController = game.GetRomMGameInfo().GetInstallController(game, this);
+                        installController.Install(new InstallActionArgs() { });
+                    }
+                    else if (action == "play")
+                    {
+                        PlayniteApi.StartGame(game.Id);
+                    }
+                }
+            }
+        }
+
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             base.OnApplicationStarted(args);
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
+            Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
         }
 
         public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
@@ -302,3 +347,4 @@ namespace RomM
         }
     }
 }
+
