@@ -48,13 +48,13 @@ Join us on discord, where you can ask questions, submit ideas, get help, showcas
 
 ### Acknowledgement
 
-This plugin is **heavily** inspired by the excellent [Playnite EmuLibrary](https://github.com/psychonic/Playnite-EmuLibrary) by @psychonic.
+This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](https://github.com/psychonic/Playnite-EmuLibrary) by @.
 
 <!-- Badges -->
 
-[license-badge]: https://img.shields.io/github/license/rommapp/playnite-plugin?style=for-the-badge&color=a32d2a
+[license-badge]: https://img.shields.io/github/license/rommapp/playnite-plugin?style=for-the-badge&color=a32d2a&kill_cache=1
 [license-badge-url]: LICENSE
-[release-badge]: https://img.shields.io/github/v/release/rommapp/playnite-plugin?style=for-the-badge
+[release-badge]: https://img.shields.io/github/v/release/rommapp/playnite-plugin?style=for-the-badge&kill_cache=1
 [release-badge-url]: https://github.com/rommapp/playnite-plugin/releases
 [discord-badge]: https://img.shields.io/badge/discord-7289da?style=for-the-badge
 [discord-badge-url]: https://discord.gg/P5HtHnhUDH
