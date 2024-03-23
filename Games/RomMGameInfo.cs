@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using ProtoBuf;
-using Playnite.SDK;
 
 namespace RomM.Games
 {
@@ -30,7 +29,7 @@ namespace RomM.Games
         {
             get
             {
-                return Settings.SettingsViewModel.Instance.Mappings.FirstOrDefault(m => m.MappingId == MappingId);
+                return SettingsViewModel.Instance.Mappings.FirstOrDefault(m => m.MappingId == MappingId);
             }
         }
 

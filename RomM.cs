@@ -13,12 +13,10 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Reflection;
 using System.Linq;
-using System.Threading;
 using Newtonsoft.Json.Linq;
 using RomM.Settings;
 using Playnite.SDK.Events;
 using RomM.Games;
-using System.Security;
 
 
 namespace RomM
@@ -78,6 +76,7 @@ namespace RomM
             base.OnApplicationStarted(args);
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
+            this.Searches = new List<SearchSupport> { new SearchSupport("romm", "RomM", new RomMSearchContext()) };
         }
 
         public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
