@@ -20,7 +20,7 @@ namespace RomM.Games
 
         internal RomMInstallController(Game game, IRomM romM) : base(game)
         {
-            Name = "Install";
+            Name = "Download";
             _romM = romM;
         }
 

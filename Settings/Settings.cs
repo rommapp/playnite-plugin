@@ -1,14 +1,11 @@
 ﻿using Newtonsoft.Json;
 using Playnite.SDK;
-using Playnite.SDK.Data;
 using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Security;
-using System.Web.UI.WebControls;
 
 namespace RomM.Settings
 {

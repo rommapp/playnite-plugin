@@ -11,8 +11,6 @@ namespace RomM.Settings
 {
     public class EmulatorMapping : ObservableObject
     {
-        public ILogger Logger => LogManager.GetLogger();
-
         public EmulatorMapping()
         {
             MappingId = Guid.NewGuid();

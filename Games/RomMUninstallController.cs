@@ -1,8 +1,6 @@
-﻿using Playnite.SDK;
-using Playnite.SDK.Models;
+﻿using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using System.IO;
-using System.Linq;
 using System.Windows;
 
 namespace RomM.Games
@@ -19,14 +17,13 @@ namespace RomM.Games
 
         public override void Uninstall(UninstallActionArgs args)
         {
-            var gameImagePathResolved = Game.Roms.First().Path.Replace(ExpandableVariables.PlayniteDirectory, _romM.Playnite.Paths.ApplicationPath);
-            if (new FileInfo(gameImagePathResolved).Exists)
+            if (new DirectoryInfo(Game.InstallDirectory).Exists)
             {
-                File.Delete(gameImagePathResolved);
+                Directory.Delete(Game.InstallDirectory, true);
             }
             else
             {
-                _romM.Playnite.Dialogs.ShowMessage($"\"{Game.Name}\" does not appear to be installed. Marking as uninstalled.", "Game not installed", MessageBoxButton.OK);
+                _romM.Playnite.Dialogs.ShowMessage($"\"{Game.Name}\" folder could not be found. Marking as uninstalled.", "Game not found", MessageBoxButton.OK);
             }
             Game.Roms.Clear();
             InvokeOnUninstalled(new GameUninstalledEventArgs());
