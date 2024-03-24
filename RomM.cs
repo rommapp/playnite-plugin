@@ -132,7 +132,7 @@ namespace RomM
 
             if (rom == null || !rom.HasValues)
             {
-                Logger.Warn($"Rom {romId} not found in RomM.");
+                Logger.Warn($"Game {romId} not found in RomM.");
                 return;
             }
 
@@ -141,7 +141,6 @@ namespace RomM
                 if (mapping.Platform.IgdbId.ToString() == platformIgdbId)
                 {
                     var gameName = rom["name"].ToString();
-                    var fileName = rom["file_name"].ToString();
 
                     var game = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() &&
                         g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any() &&
@@ -149,53 +148,7 @@ namespace RomM
 
                     if (game == null)
                     {
-                        // Create game info
-                        var installDir = PlayniteApi.Paths.IsPortable ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory) : mapping.DestinationPathResolved;
-                        var pathToGame = Path.Combine(installDir, fileName);
-                        var info = new RomMGameInfo()
-                        {
-                            MappingId = mapping.MappingId,
-                            FileName = fileName,
-                            DownloadUrl = $"{Settings.RomMHost}/api/roms/{rom["id"].ToObject<int>()}/content/{fileName}",
-                            IsMulti = rom["multi"].ToObject<bool>()
-                        };
-                        var gameId = info.AsGameId();
-
-                        // Add new game to Playnite database
-                        PlayniteApi.Database.ImportGame(new GameMetadata
-                        {
-                            Source = RomM.SourceName,
-                            Name = gameName,
-                            Roms = new List<GameRom>() { new GameRom(gameName, pathToGame) },
-                            InstallDirectory = installDir,
-                            IsInstalled = File.Exists(pathToGame),
-                            GameId = gameId,
-                            Platforms = new HashSet<MetadataProperty>() { new MetadataNameProperty(mapping.Platform.Name) },
-                            Regions = new HashSet<MetadataProperty>(rom["regions"].Select(r => new MetadataNameProperty(r.ToString()))),
-                            InstallSize = (ulong)rom["file_size_bytes"],
-                            Description = rom["summary"].ToString(),
-                            GameActions = new List<GameAction>
-                            {
-                                new GameAction()
-                                {
-                                    Name = $"Play in {mapping.Emulator.Name}",
-                                    Type = GameActionType.Emulator,
-                                    EmulatorId = mapping.EmulatorId,
-                                    EmulatorProfileId = mapping.EmulatorProfileId,
-                                    IsPlayAction = true,
-                                },
-                                new GameAction
-                                {
-                                    Type = GameActionType.URL,
-                                    Name = "View in RomM",
-                                    Path = $"{Settings.RomMHost}/rom/{rom["id"].ToObject<int>()}",
-                                    IsPlayAction = false
-                                }
-                            }
-                        }, this); // This ensures it gets added under the RomM library
-
-                        // Get newly created game
-                        game = Playnite.Database.Games.Where(g => g.GameId == gameId).FirstOrDefault();
+                        Logger.Warn($"Game {gameName} not found in Playnite database.");
                     }
 
                     PlayniteApi.MainView.SwitchToLibraryView();
