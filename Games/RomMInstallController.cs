@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SharpCompress.Archives;
 using SharpCompress.Common;
+using System.Linq;
 
 namespace RomM.Games
 {
@@ -71,8 +72,8 @@ namespace RomM.Games
 
                     Logger.Debug($"Download of {Game.Name} complete!");
 
-                    // Extract compressed files
-                    if (info.Mapping.AutoExtract && IsFileCompressed(gamePath))
+                    // ALways extract top-level file of multi-file archives
+                    if (info.IsMulti || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
                     {
                         // Create the install directory if it doesn't exist
                         installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
@@ -80,7 +81,9 @@ namespace RomM.Games
 
                         // Extract the archive to the install directory
                         ExtractArchive(gamePath, installDir);
-                        if (info.IsMulti)
+
+                        // Extract nested archives if auto-extract is enabled
+                        if (info.IsMulti && info.Mapping.AutoExtract)
                         {
                             ExtractNestedArchives(installDir);
                         }
@@ -89,13 +92,13 @@ namespace RomM.Games
                         File.Delete(gamePath);
 
                         // Update the game path to the extracted game
-                        gamePath = Path.Combine(installDir, Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)[0]);
-
-                        // Update the game's installation status
-                        var game = _romM.Playnite.Database.Games[Game.Id];
-                        game.IsInstalled = true;
-                        _romM.Playnite.Database.Games.Update(game);
+                        gamePath = Path.Combine(installDir, Directory.GetFiles(installDir, "*", SearchOption.AllDirectories).Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase)).ToArray()[0]);
                     }
+
+                    // Update the game's installation status
+                    var game = _romM.Playnite.Database.Games[Game.Id];
+                    game.IsInstalled = true;
+                    _romM.Playnite.Database.Games.Update(game);
 
                     InvokeOnInstalled(new GameInstalledEventArgs(new GameInstallationData()
                     {
