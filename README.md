@@ -52,9 +52,9 @@ This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](
 
 <!-- Badges -->
 
-[license-badge]: https://img.shields.io/github/license/rommapp/playnite-plugin?style=for-the-badge&color=a32d2a&kill_cache=1
+[license-badge]: https://img.shields.io/github/license/rommapp/playnite-plugin?style=for-the-badge&color=a32d2a&kill_cache=2
 [license-badge-url]: LICENSE
-[release-badge]: https://img.shields.io/github/v/release/rommapp/playnite-plugin?style=for-the-badge&kill_cache=1
+[release-badge]: https://img.shields.io/github/v/release/rommapp/playnite-plugin?style=for-the-badge&kill_cache=2
 [release-badge-url]: https://github.com/rommapp/playnite-plugin/releases
 [discord-badge]: https://img.shields.io/badge/discord-7289da?style=for-the-badge
 [discord-badge-url]: https://discord.gg/P5HtHnhUDH
