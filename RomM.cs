@@ -159,11 +159,6 @@ namespace RomM
                         // We always open the game in the webview
                         return;
                     }
-                    else if (action == "install")
-                    {
-                        InstallController installController = game.GetRomMGameInfo().GetInstallController(game, this);
-                        installController.Install(new InstallActionArgs() { });
-                    }
                     else if (action == "play")
                     {
                         PlayniteApi.StartGame(game.Id);
