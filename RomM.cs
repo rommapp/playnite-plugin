@@ -260,6 +260,7 @@ namespace RomM
                     {
                         var gameName = item["name"].ToString();
                         var fileName = item["file_name"].ToString();
+                        var urlCover = item["url_cover"]?.ToString() ?? null;
                         var pathToGame = Path.Combine(installDir, fileName);
 
                         var info = new RomMGameInfo()
@@ -291,6 +292,7 @@ namespace RomM
                             Regions = new HashSet<MetadataProperty>(item["regions"].Select(r => new MetadataNameProperty(r.ToString()))),
                             InstallSize = (ulong)item["file_size_bytes"],
                             Description = item["summary"].ToString(),
+                            Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             GameActions = new List<GameAction>
                             {
                                 new GameAction()
