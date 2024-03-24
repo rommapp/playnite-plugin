@@ -73,11 +73,106 @@ namespace RomM
             };
         }
 
+        internal JArray FetchPlatforms()
+        {
+            string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
+            JArray apiPlatforms = new JArray();
+
+            try
+            {
+                // Make the request and get the response
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiPlatformsUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                apiPlatforms = JArray.Parse(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new JArray();
+            }
+
+            return apiPlatforms;
+        }
+
+        internal JObject FetchRom(string romId)
+        {
+            string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
+            try
+            {
+                // Fetch the rom info from RomM
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(romUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                JObject jsonObject = JObject.Parse(body);
+                return jsonObject;
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new JObject();
+            }
+        }
+
+        // Playnite url is in the format playnite://romm/<action>/<platform_igdb_id>/<rom_id>
+        internal void HandleRommUri(PlayniteUriEventArgs args)
+        {
+            var action = args.Arguments[0];
+            var platformIgdbId = args.Arguments[1];
+            var romId = args.Arguments[2];
+
+            Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{romId}");
+
+            string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
+            JObject rom = FetchRom(romId);
+
+            if (rom == null || !rom.HasValues)
+            {
+                Logger.Warn($"Game {romId} not found in RomM.");
+                return;
+            }
+
+            foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
+            {
+                if (mapping.Platform.IgdbId.ToString() == platformIgdbId)
+                {
+                    var gameName = rom["name"].ToString();
+
+                    var game = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() &&
+                        g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any() &&
+                        g.Name == gameName).FirstOrDefault();
+
+                    if (game == null)
+                    {
+                        Logger.Warn($"Game {gameName} not found in Playnite database.");
+                    }
+
+                    PlayniteApi.MainView.SwitchToLibraryView();
+                    PlayniteApi.MainView.SelectGame(game.Id);
+
+                    if (action == "view")
+                    {
+                        // We always open the game in the webview
+                        return;
+                    }
+                    else if (action == "play")
+                    {
+                        PlayniteApi.StartGame(game.Id);
+                    }
+                }
+            }
+        }
+
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             base.OnApplicationStarted(args);
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
+            Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
         }
 
         public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
@@ -114,25 +209,8 @@ namespace RomM
                 yield break;
             }
 
-            string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
-            JArray apiPlatforms = new JArray();
+            JArray apiPlatforms = FetchPlatforms();
             List<GameMetadata> games = new List<GameMetadata>();
-
-            try
-            {
-                // Make the request and get the response
-                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiPlatformsUrl).GetAwaiter().GetResult();
-                response.EnsureSuccessStatusCode();
-
-                // Assuming the response is in JSON format
-                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                apiPlatforms = JArray.Parse(body);
-            }
-            catch (HttpRequestException e)
-            {
-                Logger.Error($"Request exception: {e.Message}");
-                yield break;
-            }
 
             foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
             {
@@ -165,7 +243,6 @@ namespace RomM
                 };
 
                 var responseGameIDs = new List<string>();
-
                 try
                 {
                     // Make the request and get the response
@@ -302,3 +379,4 @@ namespace RomM
         }
     }
 }
+
