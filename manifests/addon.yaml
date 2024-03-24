@@ -1,0 +1,16 @@
+AddonId: RomM_9700aa21-447d-41b4-a989-acd38f407d9f
+Type: GameLibrary
+Name: RomM Library Importer
+Author: The RomM Team
+ShortDescription: Import your RomM library into Playnite
+InstallerManifestUrl: https://github.com/rommapp/playnite-plugin/blob/main/manifests/installer.yaml
+SourceUrl: https://github.com/rommapp/playnite-plugin
+Description:
+Tags: ['romm', 'emulation', 'retro']
+IconUrl: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/icon.png
+Links:
+    Issues: https://github.com/rommapp/playnite-plugin/issues/new
+    Discord: https://discord.gg/P5HtHnhUDH
+Screenshots:
+    - Thumbnail: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/.github/resources/screenshot_sm.png
+      Image: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/.github/resources/screenshot_lg.png
