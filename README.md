@@ -4,7 +4,7 @@
 
 # RomM Playnite Library Plugin
 
-This plugin allows you to import your RomM library into Playnite. It queries the RomM API for your library and then creates a Playnite library entry for each game in your RomM library. Installing a game in Playnite will download it from RomM and store it on your system.
+This plugin allows you to import your RomM library into Playnite. It queries the RomM API to create Playnite library entires for each of your games. Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
 
 ## Setup
 
