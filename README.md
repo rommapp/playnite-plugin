@@ -6,6 +6,14 @@
 
 This plugin allows you to import your RomM library into Playnite. It queries the RomM API to create Playnite library entires for each of your games. Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
 
+
+## Installation
+
+- Option A: Click [this link](playnite://playnite/installaddon/RomM_9700aa21-447d-41b4-a989-acd38f407d9f) to launch Playnite and install the plugin automatically
+- Option B: Download the plugin from the [Playnite add-ons website](https://playnite.link/addons.html#RomM_9700aa21-447d-41b4-a989-acd38f407d9f)
+- Option C: In Playnite, go to `Menu` -> `Add-ons...` -> `Browse` -> `Libraries`, search for `RomM`, and click `Install`
+- Option D: Download the latest release from the [releases page](https://github.com/rommapp/playnite-plugin/releases/latest) and install it manually by dragging the `.pext` file onto Playnite 
+
 ## Setup
 
 ### Emulators
@@ -28,7 +36,8 @@ You'll need to enter the host URL of your RomM instance, as well as a username a
 | Emulator Profile | A built-in (or custom) emulator profile | Nintendo GameCube | ✓ |
 | Platform | The platform or console | Nintendo GameCube | ✓ |
 | Destination Path | The path where downloaded ROMs will be stored | `C:\roms\gc` | ✓ |
-| Enabled | Whether the mapping is enabled |  | ✓ |
+| Auto-extract | Whether compressed files should be extracted automatically |  |  |
+| Enabled | Whether the mapping is enabled |  |  |
 
 ## Importing your library
 
