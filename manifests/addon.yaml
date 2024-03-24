@@ -3,9 +3,12 @@ Type: GameLibrary
 Name: RomM Library Importer
 Author: The RomM Team
 ShortDescription: Import your RomM library into Playnite
-InstallerManifestUrl: https://github.com/rommapp/playnite-plugin/blob/main/manifests/installer.yaml
+InstallerManifestUrl: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/manifests/installer.yaml
 SourceUrl: https://github.com/rommapp/playnite-plugin
-Description:
+Description: |
+    This plugin allows you to import your RomM library into Playnite. It queries the RomM API for your library and then creates a Playnite library entry for each game in your RomM library.
+    
+    Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
 Tags: ['romm', 'emulation', 'retro']
 IconUrl: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/icon.png
 Links:
