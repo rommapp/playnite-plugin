@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SharpCompress.Archives;
 using SharpCompress.Common;
+using System.Linq;
 
 namespace RomM.Games
 {
@@ -47,11 +48,13 @@ namespace RomM.Games
                     HttpResponseMessage response = await RomM.GetAsync(info.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
                     response.EnsureSuccessStatusCode();
 
-                    string installDir = dstPath;
-                    string gamePath = Path.Combine(dstPath, info.FileName);
+                    List<GameRom> roms = new List<GameRom>();
+                    string installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
+                    string gamePath = Path.Combine(installDir, info.FileName);
                     if (info.IsMulti)
                     {
-                        gamePath = Path.Combine(dstPath, info.FileName + ".zip");
+                        // File name for multi-file archives is the folder name, so we append .zip
+                        gamePath = Path.Combine(installDir, info.FileName + ".zip");
                     }
 
                     if (_romM.Playnite.ApplicationInfo.IsPortable)
@@ -61,6 +64,7 @@ namespace RomM.Games
                     }
 
                     Logger.Debug($"Downloading {Game.Name} to {gamePath}.");
+                    Directory.CreateDirectory(installDir);
 
                     // Stream the file directly to disk
                     using (var fileStream = new FileStream(gamePath, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -69,38 +73,45 @@ namespace RomM.Games
                         await httpStream.CopyToAsync(fileStream);
                     }
 
-                    Logger.Debug($"Download of {Game.Name} complete!");
+                    Logger.Debug($"Download of {Game.Name} complete.");
 
-                    // Extract compressed files
-                    if (info.Mapping.AutoExtract && IsFileCompressed(gamePath))
+                    // ALways extract top-level file of multi-file archives
+                    if (info.IsMulti || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
                     {
-                        // Create the install directory if it doesn't exist
-                        installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
-                        Directory.CreateDirectory(installDir);
-
                         // Extract the archive to the install directory
                         ExtractArchive(gamePath, installDir);
-                        if (info.IsMulti)
-                        {
-                            ExtractNestedArchives(installDir);
-                        }
 
                         // Delete the compressed file
                         File.Delete(gamePath);
 
-                        // Update the game path to the extracted game
-                        gamePath = Path.Combine(installDir, Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)[0]);
+                        // Extract nested archives if auto-extract is enabled
+                        if (info.IsMulti && info.Mapping.AutoExtract)
+                        {
+                            ExtractNestedArchives(installDir);
+                        }
 
-                        // Update the game's installation status
-                        var game = _romM.Playnite.Database.Games[Game.Id];
-                        game.IsInstalled = true;
-                        _romM.Playnite.Database.Games.Update(game);
+                        // Add just the ROM files to the list
+                        string[] actualRomFiles = Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
+                            .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                            .ToArray();
+
+                        foreach (var romFile in actualRomFiles) {
+                            roms.Add(new GameRom(Game.Name, romFile));
+                        }
+                    } else {
+                        // Add the single ROM file to the list
+                        roms.Add(new GameRom(Game.Name, gamePath));
                     }
+
+                    // Update the game's installation status
+                    var game = _romM.Playnite.Database.Games[Game.Id];
+                    game.IsInstalled = true;
+                    _romM.Playnite.Database.Games.Update(game);
 
                     InvokeOnInstalled(new GameInstalledEventArgs(new GameInstallationData()
                     {
                         InstallDirectory = installDir,
-                        Roms = new List<GameRom>() { new GameRom(Game.Name, gamePath) },
+                        Roms = roms,
                     }));
                 }
                 catch (Exception ex)

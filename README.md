@@ -9,7 +9,7 @@ This plugin allows you to import your RomM library into Playnite. It queries the
 
 ## Installation
 
-- Option A: Click [this link](playnite://playnite/installaddon/RomM_9700aa21-447d-41b4-a989-acd38f407d9f) to launch Playnite and install the plugin automatically
+- Option A: Open this link in your browser to launch Playnite and install the plugin automatically: `playnite://playnite/installaddon/RomM_9700aa21-447d-41b4-a989-acd38f407d9f`
 - Option B: Download the plugin from the [Playnite add-ons website](https://playnite.link/addons.html#RomM_9700aa21-447d-41b4-a989-acd38f407d9f)
 - Option C: In Playnite, go to `Menu` -> `Add-ons...` -> `Browse` -> `Libraries`, search for `RomM`, and click `Install`
 - Option D: Download the latest release from the [releases page](https://github.com/rommapp/playnite-plugin/releases/latest) and install it manually by dragging the `.pext` file onto Playnite 
