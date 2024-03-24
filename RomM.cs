@@ -73,27 +73,129 @@ namespace RomM
             };
         }
 
+        internal JArray FetchPlatforms()
+        {
+            string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
+            JArray apiPlatforms = new JArray();
+
+            try
+            {
+                // Make the request and get the response
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiPlatformsUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                apiPlatforms = JArray.Parse(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new JArray();
+            }
+
+            return apiPlatforms;
+        }
+
+        internal JObject FetchRom(string romId)
+        {
+            string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
+            try
+            {
+                // Fetch the rom info from RomM
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(romUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                JObject jsonObject = JObject.Parse(body);
+                return jsonObject;
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new JObject();
+            }
+        }
+
+        // Playnite url is in the format playnite://romm/<action>/<platform_igdb_id>/<rom_id>
         internal void HandleRommUri(PlayniteUriEventArgs args)
         {
             var action = args.Arguments[0];
             var platformIgdbId = args.Arguments[1];
-            var gameName = args.Arguments[2];
+            var romId = args.Arguments[2];
 
-            Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{gameName}");
+            Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{romId}");
 
-            // Playnite url is in the format playnite://romm/<action>/<platform_igdb_id>/<game_name>
+            string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
+            JObject rom = FetchRom(romId);
+
+            if (rom == null || !rom.HasValues)
+            {
+                Logger.Warn($"Rom {romId} not found in RomM.");
+                return;
+            }
+
             foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
             {
                 if (mapping.Platform.IgdbId.ToString() == platformIgdbId)
                 {
+                    var gameName = rom["name"].ToString();
+                    var fileName = rom["file_name"].ToString();
+
                     var game = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() &&
                         g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any() &&
                         g.Name == gameName).FirstOrDefault();
 
                     if (game == null)
                     {
-                        Logger.Warn($"Game {gameName} not found in the database.");
-                        return;
+                        // Create game info
+                        var installDir = PlayniteApi.Paths.IsPortable ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory) : mapping.DestinationPathResolved;
+                        var pathToGame = Path.Combine(installDir, fileName);
+                        var info = new RomMGameInfo()
+                        {
+                            MappingId = mapping.MappingId,
+                            FileName = fileName,
+                            DownloadUrl = $"{Settings.RomMHost}/api/roms/{rom["id"].ToObject<int>()}/content/{fileName}",
+                            IsMulti = rom["multi"].ToObject<bool>()
+                        };
+                        var gameId = info.AsGameId();
+
+                        // Add new game to Playnite database
+                        PlayniteApi.Database.ImportGame(new GameMetadata
+                        {
+                            Source = RomM.SourceName,
+                            Name = gameName,
+                            Roms = new List<GameRom>() { new GameRom(gameName, pathToGame) },
+                            InstallDirectory = installDir,
+                            IsInstalled = File.Exists(pathToGame),
+                            GameId = gameId,
+                            Platforms = new HashSet<MetadataProperty>() { new MetadataNameProperty(mapping.Platform.Name) },
+                            Regions = new HashSet<MetadataProperty>(rom["regions"].Select(r => new MetadataNameProperty(r.ToString()))),
+                            InstallSize = (ulong)rom["file_size_bytes"],
+                            Description = rom["summary"].ToString(),
+                            GameActions = new List<GameAction>
+                            {
+                                new GameAction()
+                                {
+                                    Name = $"Play in {mapping.Emulator.Name}",
+                                    Type = GameActionType.Emulator,
+                                    EmulatorId = mapping.EmulatorId,
+                                    EmulatorProfileId = mapping.EmulatorProfileId,
+                                    IsPlayAction = true,
+                                },
+                                new GameAction
+                                {
+                                    Type = GameActionType.URL,
+                                    Name = "View in RomM",
+                                    Path = $"{Settings.RomMHost}/rom/{rom["id"].ToObject<int>()}",
+                                    IsPlayAction = false
+                                }
+                            }
+                        }, this); // This ensures it gets added under the RomM library
+
+                        // Get newly created game
+                        game = Playnite.Database.Games.Where(g => g.GameId == gameId).FirstOrDefault();
                     }
 
                     PlayniteApi.MainView.SwitchToLibraryView();
@@ -159,25 +261,8 @@ namespace RomM
                 yield break;
             }
 
-            string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
-            JArray apiPlatforms = new JArray();
+            JArray apiPlatforms = FetchPlatforms();
             List<GameMetadata> games = new List<GameMetadata>();
-
-            try
-            {
-                // Make the request and get the response
-                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiPlatformsUrl).GetAwaiter().GetResult();
-                response.EnsureSuccessStatusCode();
-
-                // Assuming the response is in JSON format
-                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                apiPlatforms = JArray.Parse(body);
-            }
-            catch (HttpRequestException e)
-            {
-                Logger.Error($"Request exception: {e.Message}");
-                yield break;
-            }
 
             foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
             {
@@ -210,7 +295,6 @@ namespace RomM
                 };
 
                 var responseGameIDs = new List<string>();
-
                 try
                 {
                     // Make the request and get the response
