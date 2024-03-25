@@ -57,7 +57,7 @@ Join us on discord, where you can ask questions, submit ideas, get help, showcas
 
 ### Acknowledgement
 
-This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](https://github.com/psychonic/Playnite-EmuLibrary) by @.
+This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](https://github.com/psychonic/Playnite-EmuLibrary) by @psychonic.
 
 <!-- Badges -->
 
