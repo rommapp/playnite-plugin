@@ -13,12 +13,11 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Reflection;
 using System.Linq;
-using System.Threading;
 using Newtonsoft.Json.Linq;
 using RomM.Settings;
 using Playnite.SDK.Events;
 using RomM.Games;
-using System.Security;
+using System.Windows.Media;
 
 
 namespace RomM
@@ -60,6 +59,9 @@ namespace RomM
         public ILogger Logger => LogManager.GetLogger();
         public IPlayniteAPI Playnite { get; private set; }
         public SettingsViewModel Settings { get; private set; }
+        public SidebarItem DownloadQueueSidebarItem { get; set; }
+
+        public DownloadQueueController DownloadQueue { get; set; }
 
         // Implementing Client adds ability to open it via special menu in playnite.
         public override LibraryClient Client { get; } = new RomMClient();
@@ -343,6 +345,27 @@ namespace RomM
             }
         }
 
+        public override IEnumerable<SidebarItem> GetSidebarItems()
+        {
+            DownloadQueueSidebarItem = new SidebarItem
+            {
+                Title = "Downloads",
+                Icon = new TextBlock
+                {
+                    Text = char.ConvertFromUtf32(0xef08),
+                    FontFamily = ResourceProvider.GetResource("FontIcoFont") as FontFamily,
+                },
+                Type = SiderbarItemType.View,
+                Opened = () =>
+                {
+                    var view = new Views.DownloadQueueView(this);
+                    view.DataContext = DownloadQueue;
+                    return view;
+                }
+            };
+
+            yield return DownloadQueueSidebarItem;
+        }
 
         public override ISettings GetSettings(bool firstRunSettings)
         {
