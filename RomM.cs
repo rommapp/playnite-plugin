@@ -315,7 +315,10 @@ namespace RomM
                     }
 
                     // Find games in the database that are not in the response
-                    var gamesInDatabase = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() && g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any());
+                    var gamesInDatabase = Playnite.Database.Games.Where(g =>
+                        g.Source != null && g.Source.Name == RomM.SourceName.ToString() &&
+                        g.Platforms != null && g.Platforms.Any(p => p.Name == mapping.Platform.Name)
+                    );
                     foreach (var game in gamesInDatabase)
                     {
                         if (args.CancelToken.IsCancellationRequested)
