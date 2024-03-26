@@ -1,2 +1,8 @@
 AddonId: RomM_9700aa21-447d-41b4-a989-acd38f407d9f
-Packages: null
+Packages:
+  - Version: 0.2.1
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2024-03-24
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.2.1/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_2_1.pext
+    Changelog:
+      - Initial beta release of the RomM Library Importer
