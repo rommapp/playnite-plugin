@@ -236,10 +236,18 @@ namespace RomM
                 }
 
                 string url = $"{Settings.RomMHost}/api/roms";
+                JToken apiPlatform = apiPlatforms.FirstOrDefault(p => p["igdb_id"] != null && p["igdb_id"].ToObject<ulong>() == mapping.Platform.IgdbId);
+
+                if (apiPlatform == null)
+                {
+                    Logger.Warn($"Platform {mapping.Platform.Name} with IGDB ID {mapping.Platform.IgdbId} not found in RomM, skipping.");
+                    continue;
+                }
+
                 NameValueCollection queryParams = new NameValueCollection
                 {
                     { "size", "10000" },
-                    { "platform_id", apiPlatforms.FirstOrDefault(p => p["igdb_id"].ToObject<ulong>() == mapping.Platform.IgdbId)["id"].ToString() }
+                    { "platform_id", apiPlatform["id"].ToString() }
                 };
 
                 var responseGameIDs = new List<string>();
@@ -288,8 +296,8 @@ namespace RomM
                             InstallDirectory = installDir,
                             IsInstalled = File.Exists(pathToGame),
                             GameId = gameId,
-                            Platforms = new HashSet<MetadataProperty>() { new MetadataNameProperty(mapping.Platform.Name) },
-                            Regions = new HashSet<MetadataProperty>(item["regions"].Select(r => new MetadataNameProperty(r.ToString()))),
+                            Platforms = new HashSet<MetadataProperty>() { new MetadataNameProperty(mapping.Platform.Name ?? "") },
+                            Regions = new HashSet<MetadataProperty>(item["regions"].Where(r => r != null && r.ToString() != "").Select(r => new MetadataNameProperty(r.ToString()))),
                             InstallSize = (ulong)item["file_size_bytes"],
                             Description = item["summary"].ToString(),
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
