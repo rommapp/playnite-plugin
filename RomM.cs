@@ -13,12 +13,10 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Reflection;
 using System.Linq;
-using System.Threading;
 using Newtonsoft.Json.Linq;
 using RomM.Settings;
 using Playnite.SDK.Events;
 using RomM.Games;
-using System.Security;
 
 
 namespace RomM
@@ -211,8 +209,9 @@ namespace RomM
 
             JArray apiPlatforms = FetchPlatforms();
             List<GameMetadata> games = new List<GameMetadata>();
+            IEnumerable<EmulatorMapping> enabledMappings = SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled);
 
-            foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
+            foreach (var mapping in enabledMappings)
             {
                 if (args.CancelToken.IsCancellationRequested)
                     break;
@@ -246,7 +245,7 @@ namespace RomM
 
                 NameValueCollection queryParams = new NameValueCollection
                 {
-                    { "size", "10000" },
+                    { "limit", "10000" },
                     { "platform_id", apiPlatform["id"].ToString() }
                 };
 
@@ -259,8 +258,8 @@ namespace RomM
 
                     // Assuming the response is in JSON format
                     string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    JObject jsonObject = JObject.Parse(body);
-                    var items = jsonObject["items"].Children();
+                    JArray jsonObject = JArray.Parse(body);
+                    var items = jsonObject.Children();
                     var installDir = PlayniteApi.Paths.IsPortable ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory) : mapping.DestinationPathResolved;
 
                     // Return a GameMetadata for each item in the response

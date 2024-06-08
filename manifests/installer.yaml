@@ -12,3 +12,9 @@ Packages:
     PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.2.2/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_2_2.pext
     Changelog:
       - Fix crashes when null igdb_id is returned from RomM for platform
+  - Version: 0.2.3
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2024-06-08
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.2.3/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_2_3.pext
+    Changelog:
+      - Update for API changes in 3.2.0 release of RomM
