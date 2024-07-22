@@ -13,10 +13,12 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Reflection;
 using System.Linq;
-using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 using RomM.Settings;
 using Playnite.SDK.Events;
 using RomM.Games;
+using RomM.Models.RomM.Platform;
+using RomM.Models.RomM.Rom;
 
 
 namespace RomM
@@ -41,6 +43,11 @@ namespace RomM
         {
             get { return httpClient; }
         }
+    }
+
+    public static class JsonSerializerSingleton
+    {
+        public static JsonSerializer Instance { get; } = new JsonSerializer();
     }
 
     public class RomM : LibraryPlugin, IRomM
@@ -71,11 +78,9 @@ namespace RomM
             };
         }
 
-        internal JArray FetchPlatforms()
+        internal IList<RomMPlatform> FetchPlatforms()
         {
             string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
-            JArray apiPlatforms = new JArray();
-
             try
             {
                 // Make the request and get the response
@@ -84,18 +89,16 @@ namespace RomM
 
                 // Assuming the response is in JSON format
                 string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                apiPlatforms = JArray.Parse(body);
+                return JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
             }
             catch (HttpRequestException e)
             {
                 Logger.Error($"Request exception: {e.Message}");
-                return new JArray();
+                return new List<RomMPlatform>();
             }
-
-            return apiPlatforms;
         }
 
-        internal JObject FetchRom(string romId)
+        internal RomMRom FetchRom(string romId)
         {
             string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
             try
@@ -106,13 +109,12 @@ namespace RomM
 
                 // Assuming the response is in JSON format
                 string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                JObject jsonObject = JObject.Parse(body);
-                return jsonObject;
+                return JsonConvert.DeserializeObject<RomMRom>(body);
             }
             catch (HttpRequestException e)
             {
                 Logger.Error($"Request exception: {e.Message}");
-                return new JObject();
+                return null;
             }
         }
 
@@ -126,9 +128,9 @@ namespace RomM
             Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{romId}");
 
             string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
-            JObject rom = FetchRom(romId);
+            RomMRom rom = FetchRom(romId);
 
-            if (rom == null || !rom.HasValues)
+            if (rom == null)
             {
                 Logger.Warn($"Game {romId} not found in RomM.");
                 return;
@@ -138,11 +140,11 @@ namespace RomM
             {
                 if (mapping.Platform.IgdbId.ToString() == platformIgdbId)
                 {
-                    var gameName = rom["name"].ToString();
+                    var gameName = rom.Name;
 
-                    var game = Playnite.Database.Games.Where(g => g.Source.Name == RomM.SourceName.ToString() &&
-                        g.Platforms.Where(p => p.Name == mapping.Platform.Name).Any() &&
-                        g.Name == gameName).FirstOrDefault();
+                    var game = Playnite.Database.Games.FirstOrDefault(g => g.Source.Name == SourceName.ToString() &&
+                                                                           g.Platforms.Any(p => p.Name == mapping.Platform.Name) &&
+                                                                           g.Name == gameName);
 
                     if (game == null)
                     {
@@ -152,14 +154,14 @@ namespace RomM
                     PlayniteApi.MainView.SwitchToLibraryView();
                     PlayniteApi.MainView.SelectGame(game.Id);
 
-                    if (action == "view")
+                    switch (action)
                     {
-                        // We always open the game in the webview
-                        return;
-                    }
-                    else if (action == "play")
-                    {
-                        PlayniteApi.StartGame(game.Id);
+                        case "view":
+                            // We always open the game in the webview
+                            return;
+                        case "play":
+                            PlayniteApi.StartGame(game.Id);
+                            break;
                     }
                 }
             }
@@ -197,19 +199,25 @@ namespace RomM
         {
             if (Playnite.ApplicationInfo.Mode == ApplicationMode.Fullscreen && !Settings.ScanGamesInFullScreen)
             {
-                yield break;
+                return new List<GameMetadata>();
             }
 
             // Return early if host, username or password is not set
             if (string.IsNullOrEmpty(Settings.RomMHost) || string.IsNullOrEmpty(Settings.RomMUsername) || string.IsNullOrEmpty(Settings.RomMPassword))
             {
                 Logger.Warn("RomM host, username or password is not set.");
-                yield break;
+                return new List<GameMetadata>();
             }
 
-            JArray apiPlatforms = FetchPlatforms();
+            IList<RomMPlatform> apiPlatforms = FetchPlatforms();
             List<GameMetadata> games = new List<GameMetadata>();
             IEnumerable<EmulatorMapping> enabledMappings = SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled);
+
+            if (enabledMappings == null)
+            {
+                Logger.Warn("No enabled mappings found.");
+                return games;
+            }
 
             foreach (var mapping in enabledMappings)
             {
@@ -235,7 +243,7 @@ namespace RomM
                 }
 
                 string url = $"{Settings.RomMHost}/api/roms";
-                JToken apiPlatform = apiPlatforms.FirstOrDefault(p => p["igdb_id"].Type != JTokenType.Null && p["igdb_id"].ToObject<ulong>() == mapping.Platform.IgdbId);
+                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
 
                 if (apiPlatform == null)
                 {
@@ -243,66 +251,81 @@ namespace RomM
                     continue;
                 }
 
+                Logger.Debug($"Starting to fetch games for {apiPlatform.Name}.");
+
                 NameValueCollection queryParams = new NameValueCollection
                 {
                     { "limit", "10000" },
-                    { "platform_id", apiPlatform["id"].ToString() }
+                    { "platform_id", apiPlatform.Id.ToString() }
                 };
 
-                var responseGameIDs = new List<string>();
+                var responseGameIDs = new HashSet<string>();
                 try
                 {
                     // Make the request and get the response
                     HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
                     response.EnsureSuccessStatusCode();
 
+                    Logger.Debug($"Starting to parse response for {apiPlatform.Name}.");
+
                     // Assuming the response is in JSON format
-                    string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    JArray jsonObject = JArray.Parse(body);
-                    var items = jsonObject.Children();
-                    var installDir = PlayniteApi.Paths.IsPortable ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory) : mapping.DestinationPathResolved;
+                    Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                    List<RomMRom> roms;
+                    using (StreamReader reader = new StreamReader(body))
+                    using (JsonTextReader jsonReader = new JsonTextReader(reader))
+                    {
+                        roms = JsonSerializerSingleton.Instance.Deserialize<List<RomMRom>>(jsonReader);
+                    }
+
+                    Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
+
+                    var installDir = PlayniteApi.Paths.IsPortable
+                        ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
+                        : mapping.DestinationPathResolved;
 
                     // Return a GameMetadata for each item in the response
-                    foreach (var item in items)
+                    foreach (var item in roms)
                     {
-                        var gameName = item["name"].ToString();
-                        var fileName = item["file_name"].ToString();
-                        var urlCover = item["url_cover"]?.ToString() ?? null;
+                        var gameName = item.Name;
+                        var fileName = item.FileName;
+                        var urlCover = item.UrlCover;
                         var pathToGame = Path.Combine(installDir, fileName);
 
-                        var info = new RomMGameInfo()
+                        var info = new RomMGameInfo
                         {
                             MappingId = mapping.MappingId,
                             FileName = fileName,
-                            DownloadUrl = $"{Settings.RomMHost}/api/roms/{item["id"].ToObject<int>()}/content/{fileName}",
-                            IsMulti = item["multi"].ToObject<bool>()
+                            DownloadUrl = $"{Settings.RomMHost}/api/roms/{item.Id}/content/{fileName}",
+                            IsMulti = item.Multi
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
 
                         // Check if the game is already installed
-                        if (Playnite.Database.Games.Where(g => g.GameId == gameId).Any())
+                        if (Playnite.Database.Games.Any(g => g.GameId == gameId))
                         {
                             continue;
                         }
 
+                        var gameNameExtended = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" ({item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
+
                         // Add newly found game
                         games.Add(new GameMetadata
                         {
-                            Source = RomM.SourceName,
-                            Name = gameName,
-                            Roms = new List<GameRom>() { new GameRom(gameName, pathToGame) },
+                            Source = SourceName,
+                            Name = gameNameExtended,
+                            Roms = new List<GameRom> { new GameRom(gameNameExtended, pathToGame) },
                             InstallDirectory = installDir,
                             IsInstalled = File.Exists(pathToGame),
                             GameId = gameId,
-                            Platforms = new HashSet<MetadataProperty>() { new MetadataNameProperty(mapping.Platform.Name ?? "") },
-                            Regions = new HashSet<MetadataProperty>(item["regions"].Where(r => r.Type != JTokenType.Null && r.ToString() != "").Select(r => new MetadataNameProperty(r.ToString()))),
-                            InstallSize = (ulong)item["file_size_bytes"],
-                            Description = item["summary"].ToString(),
+                            Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(mapping.Platform.Name ?? "") },
+                            Regions = new HashSet<MetadataProperty>(item.Regions.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
+                            InstallSize = item.FileSizeBytes,
+                            Description = item.Summary,
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             GameActions = new List<GameAction>
                             {
-                                new GameAction()
+                                new GameAction
                                 {
                                     Name = $"Play in {mapping.Emulator.Name}",
                                     Type = GameActionType.Emulator,
@@ -314,18 +337,23 @@ namespace RomM
                                 {
                                     Type = GameActionType.URL,
                                     Name = "View in RomM",
-                                    Path = $"{Settings.RomMHost}/rom/{item["id"].ToObject<int>()}",
+                                    Path = $"{Settings.RomMHost}/rom/{item.Id}",
                                     IsPlayAction = false
                                 }
                             }
                         });
                     }
 
+                    Logger.Debug($"Finished adding new games for {apiPlatform.Name}");
+
                     // Find games in the database that are not in the response
                     var gamesInDatabase = Playnite.Database.Games.Where(g =>
-                        g.Source != null && g.Source.Name == RomM.SourceName.ToString() &&
+                        g.Source != null && g.Source.Name == SourceName.ToString() &&
                         g.Platforms != null && g.Platforms.Any(p => p.Name == mapping.Platform.Name)
                     );
+
+                    Logger.Debug($"Starting to remove not found games for {apiPlatform.Name}.");
+
                     foreach (var game in gamesInDatabase)
                     {
                         if (args.CancelToken.IsCancellationRequested)
@@ -339,18 +367,17 @@ namespace RomM
                         // Remove from the playnite database
                         Playnite.Database.Games.Remove(game.Id);
                     }
+
+                    Logger.Debug($"Finished removing not found games for {apiPlatform.Name}");
                 }
                 catch (HttpRequestException e)
                 {
                     Logger.Error($"Request exception: {e.Message}");
-                    yield break;
-                }
-
-                foreach (var game in games)
-                {
-                    yield return game;
+                    return games;
                 }
             }
+
+            return games;
         }
 
 
