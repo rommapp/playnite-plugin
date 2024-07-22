@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
@@ -31,16 +31,14 @@ namespace RomM.Settings
         {
             var mapping = ((FrameworkElement)sender).DataContext as EmulatorMapping;
             string path;
-            if ((path = GetSelectedFolderPath()) != null)
+            if ((path = GetSelectedFolderPath()) == null) return;
+            var playnite = SettingsViewModel.Instance.PlayniteAPI;
+            if (playnite.Paths.IsPortable)
             {
-                var playnite = SettingsViewModel.Instance.PlayniteAPI;
-                if (playnite.Paths.IsPortable)
-                {
-                    path = path.Replace(playnite.Paths.ApplicationPath, Playnite.SDK.ExpandableVariables.PlayniteDirectory);
-                }
-
-                mapping.DestinationPath = path;
+                path = path.Replace(playnite.Paths.ApplicationPath, Playnite.SDK.ExpandableVariables.PlayniteDirectory);
             }
+
+            mapping.DestinationPath = path;
         }
 
         private static string GetSelectedFolderPath()
