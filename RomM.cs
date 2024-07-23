@@ -307,14 +307,14 @@ namespace RomM
                             continue;
                         }
 
-                        var gameNameExtended = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
+                        var gameNameWithTags  = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
 
                         // Add newly found game
                         games.Add(new GameMetadata
                         {
                             Source = SourceName,
-                            Name = gameNameExtended,
-                            Roms = new List<GameRom> { new GameRom(gameNameExtended, pathToGame) },
+                            Name = gameNameWithTags ,
+                            Roms = new List<GameRom> { new GameRom(gameNameWithTags , pathToGame) },
                             InstallDirectory = installDir,
                             IsInstalled = File.Exists(pathToGame),
                             GameId = gameId,
