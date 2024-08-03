@@ -22,7 +22,7 @@ public class RomMPlatform
         public int RomCount { get; set; }
 
         [JsonProperty("igdb_id")]
-        public ulong IgdbId { get; set; }
+        public ulong? IgdbId { get; set; }
 
         [JsonProperty("sgdb_id")]
         public object SgdbId { get; set; }
