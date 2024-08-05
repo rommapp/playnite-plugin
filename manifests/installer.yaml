@@ -24,3 +24,9 @@ Packages:
     PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.2.4/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_2_4.pext
     Changelog:
       - Performance, naming and code quality improvements
+  - Version: 0.2.5
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2024-08-05
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.2.5/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_2_5.pext
+    Changelog:
+      - Fix fetching platforms with missing/null IGDB ID
