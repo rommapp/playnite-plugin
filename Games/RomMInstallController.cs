@@ -67,15 +67,21 @@ namespace RomM.Games
                     Directory.CreateDirectory(installDir);
 
                     // Stream the file directly to disk
-                    using (var fileStream = new FileStream(gamePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    using (var fileStream = new FileStream(gamePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                     using (var httpStream = await response.Content.ReadAsStreamAsync())
                     {
-                        await httpStream.CopyToAsync(fileStream);
+                        byte[] buffer = new byte[65536];
+                        int bytesRead;
+
+                        while ((bytesRead = await httpStream.ReadAsync(buffer, 0, buffer.Length, _watcherToken.Token)) > 0)
+                        {
+                            await fileStream.WriteAsync(buffer, 0, bytesRead, _watcherToken.Token);
+                        }
                     }
 
                     Logger.Debug($"Download of {Game.Name} complete.");
 
-                    // ALways extract top-level file of multi-file archives
+                    // Always extract top-level file of multi-file archives
                     if (info.IsMulti || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
                     {
                         // Extract the archive to the install directory
