@@ -279,7 +279,7 @@ namespace RomM
 
                     Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
 
-                    var installDir = PlayniteApi.Paths.IsPortable
+                    var rootInstallDir = PlayniteApi.Paths.IsPortable
                         ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
                         : mapping.DestinationPathResolved;
 
@@ -289,7 +289,8 @@ namespace RomM
                         var gameName = item.Name;
                         var fileName = item.FileName;
                         var urlCover = item.UrlCover;
-                        var pathToGame = Path.Combine(installDir, fileName);
+                        var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(fileName));
+                        var pathToGame = Path.Combine(gameInstallDir, fileName);
 
                         var info = new RomMGameInfo
                         {
@@ -313,9 +314,9 @@ namespace RomM
                         games.Add(new GameMetadata
                         {
                             Source = SourceName,
-                            Name = gameNameWithTags ,
-                            Roms = new List<GameRom> { new GameRom(gameNameWithTags , pathToGame) },
-                            InstallDirectory = installDir,
+                            Name = gameNameWithTags,
+                            Roms = new List<GameRom> { new GameRom(gameNameWithTags, pathToGame) },
+                            InstallDirectory = gameInstallDir,
                             IsInstalled = File.Exists(pathToGame),
                             GameId = gameId,
                             Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(mapping.Platform.Name ?? "") },
