@@ -96,8 +96,28 @@ namespace RomM.Games
                             ExtractNestedArchives(installDir);
                         }
 
+                        List<string> supportedFileTypes = null;
+                        if (info.Mapping.EmulatorProfile is CustomEmulatorProfile)
+                        {
+                            var customProfile = info.Mapping.EmulatorProfile as CustomEmulatorProfile;
+                            supportedFileTypes = customProfile.ImageExtensions;
+                        }
+                        else if (info.Mapping.EmulatorProfile is BuiltInEmulatorProfile)
+                        {
+                            var builtInProfile = (info.Mapping.EmulatorProfile as BuiltInEmulatorProfile);
+                            supportedFileTypes = API.Instance.Emulation.Emulators
+                                .FirstOrDefault(e => e.Id == info.Mapping.Emulator.BuiltInConfigId)?
+                                .Profiles
+                                .FirstOrDefault(p => p.Name == builtInProfile.Name)?
+                                .ImageExtensions;
+                        }
+
+                        var searchPattern = (supportedFileTypes != null && supportedFileTypes.Count == 0)
+                            ? "*"
+                            : String.Join("|", supportedFileTypes.Select(x => "*." + x));
+
                         // Add just the ROM files to the list
-                        string[] actualRomFiles = Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
+                        string[] actualRomFiles = Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories)
                             .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
                             .ToArray();
 
