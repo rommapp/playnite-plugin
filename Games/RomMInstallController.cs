@@ -112,13 +112,12 @@ namespace RomM.Games
                                 .ImageExtensions;
                         }
 
-                        var searchPattern = (supportedFileTypes != null && supportedFileTypes.Count == 0)
-                            ? "*"
-                            : String.Join("|", supportedFileTypes.Select(x => "*." + x));
+                        var searchPatterns = (supportedFileTypes != null && supportedFileTypes.Count == 0)
+                            ? new List<string> { "*" }
+                            : supportedFileTypes.Select(x => "*." + x);
 
                         // Add just the ROM files to the list
-                        string[] actualRomFiles = Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories)
-                            .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                        string[] actualRomFiles = searchPatterns.SelectMany(searchPattern => Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories))
                             .ToArray();
 
                         foreach (var romFile in actualRomFiles) {
