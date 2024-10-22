@@ -112,13 +112,14 @@ namespace RomM.Games
                                 .ImageExtensions;
                         }
 
-                        var searchPatterns = (supportedFileTypes != null && supportedFileTypes.Count == 0)
+                        var searchPatterns = (supportedFileTypes != null || supportedFileTypes.Count == 0)
                             ? new List<string> { "*" }
                             : supportedFileTypes.Select(x => "*." + x);
 
                         // Add just the ROM files to the list
-                        string[] actualRomFiles = searchPatterns.SelectMany(searchPattern => Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories))
-                            .ToArray();
+                        string[] actualRomFiles = searchPatterns.SelectMany(
+                            searchPattern => Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories)
+                            ).ToArray();
 
                         foreach (var romFile in actualRomFiles) {
                             roms.Add(new GameRom(Game.Name, romFile));
