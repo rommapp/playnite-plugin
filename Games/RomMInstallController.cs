@@ -96,10 +96,8 @@ namespace RomM.Games
                             ExtractNestedArchives(installDir);
                         }
 
-                        // Add just the ROM files to the list
-                        string[] actualRomFiles = Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
-                            .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
-                            .ToArray();
+                        List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
+                        string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
 
                         foreach (var romFile in actualRomFiles) {
                             roms.Add(new GameRom(Game.Name, romFile));
@@ -127,6 +125,42 @@ namespace RomM.Games
                     throw;
                 }
             });
+        }
+
+        private static string[] GetRomFiles(string installDir, List<string> supportedFileTypes)
+        {
+            if (supportedFileTypes == null || supportedFileTypes.Count == 0)
+            {
+               return Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
+                    .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+            }
+            else
+            {
+                return supportedFileTypes.SelectMany(
+                    fileType => Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories)
+                ).ToArray();
+            }
+        }
+
+        private static List<string> GetEmulatorSupportedFileTypes(RomMGameInfo info)
+        {
+            if (info.Mapping.EmulatorProfile is CustomEmulatorProfile)
+            {
+                var customProfile = info.Mapping.EmulatorProfile as CustomEmulatorProfile;
+                return customProfile.ImageExtensions;
+            }
+            else if (info.Mapping.EmulatorProfile is BuiltInEmulatorProfile)
+            {
+                var builtInProfile = (info.Mapping.EmulatorProfile as BuiltInEmulatorProfile);
+                return API.Instance.Emulation.Emulators
+                    .FirstOrDefault(e => e.Id == info.Mapping.Emulator.BuiltInConfigId)?
+                    .Profiles
+                    .FirstOrDefault(p => p.Name == builtInProfile.Name)?
+                    .ImageExtensions;
+            }
+
+            return null;
         }
 
         private static bool IsFileCompressed(string filePath)
