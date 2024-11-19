@@ -112,7 +112,7 @@ namespace RomM.Games
                                 .ImageExtensions;
                         }
 
-                        var searchPatterns = (supportedFileTypes != null || supportedFileTypes.Count == 0)
+                        var searchPatterns = (supportedFileTypes == null || supportedFileTypes.Count == 0)
                             ? new List<string> { "*" }
                             : supportedFileTypes.Select(x => "*." + x);
 
