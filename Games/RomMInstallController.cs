@@ -96,35 +96,15 @@ namespace RomM.Games
                             ExtractNestedArchives(installDir);
                         }
 
-                        List<string> supportedFileTypes = null;
-                        if (info.Mapping.EmulatorProfile is CustomEmulatorProfile)
+                        List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
+                        string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
+
+                        foreach (var romFile in actualRomFiles)
                         {
-                            var customProfile = info.Mapping.EmulatorProfile as CustomEmulatorProfile;
-                            supportedFileTypes = customProfile.ImageExtensions;
-                        }
-                        else if (info.Mapping.EmulatorProfile is BuiltInEmulatorProfile)
-                        {
-                            var builtInProfile = (info.Mapping.EmulatorProfile as BuiltInEmulatorProfile);
-                            supportedFileTypes = API.Instance.Emulation.Emulators
-                                .FirstOrDefault(e => e.Id == info.Mapping.Emulator.BuiltInConfigId)?
-                                .Profiles
-                                .FirstOrDefault(p => p.Name == builtInProfile.Name)?
-                                .ImageExtensions;
-                        }
-
-                        var searchPatterns = (supportedFileTypes == null || supportedFileTypes.Count == 0)
-                            ? new List<string> { "*" }
-                            : supportedFileTypes.Select(x => "*." + x);
-
-                        // Add just the ROM files to the list
-                        string[] actualRomFiles = searchPatterns.SelectMany(
-                            searchPattern => Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories)
-                            ).ToArray();
-
-                        foreach (var romFile in actualRomFiles) {
                             roms.Add(new GameRom(Game.Name, romFile));
                         }
-                    } else {
+                    }
+                    else {
                         // Add the single ROM file to the list
                         roms.Add(new GameRom(Game.Name, gamePath));
                     }
@@ -147,6 +127,42 @@ namespace RomM.Games
                     throw;
                 }
             });
+        }
+
+        private static string[] GetRomFiles(string installDir, List<string> supportedFileTypes)
+        {
+            if (supportedFileTypes == null || supportedFileTypes.Count == 0)
+            {
+               return Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
+                    .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+            }
+            else
+            {
+                return supportedFileTypes.Select(x => "*." + x).SelectMany(
+                    searchPattern => Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories)
+                ).ToArray();
+            }
+        }
+
+        private static List<string> GetEmulatorSupportedFileTypes(RomMGameInfo info)
+        {
+            if (info.Mapping.EmulatorProfile is CustomEmulatorProfile)
+            {
+                var customProfile = info.Mapping.EmulatorProfile as CustomEmulatorProfile;
+                return customProfile.ImageExtensions;
+            }
+            else if (info.Mapping.EmulatorProfile is BuiltInEmulatorProfile)
+            {
+                var builtInProfile = (info.Mapping.EmulatorProfile as BuiltInEmulatorProfile);
+                return API.Instance.Emulation.Emulators
+                    .FirstOrDefault(e => e.Id == info.Mapping.Emulator.BuiltInConfigId)?
+                    .Profiles
+                    .FirstOrDefault(p => p.Name == builtInProfile.Name)?
+                    .ImageExtensions;
+            }
+
+            return null;
         }
 
         private static bool IsFileCompressed(string filePath)
