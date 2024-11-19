@@ -99,12 +99,10 @@ namespace RomM.Games
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
 
-                        foreach (var romFile in actualRomFiles)
-                        {
+                        foreach (var romFile in actualRomFiles) {
                             roms.Add(new GameRom(Game.Name, romFile));
                         }
-                    }
-                    else {
+                    } else {
                         // Add the single ROM file to the list
                         roms.Add(new GameRom(Game.Name, gamePath));
                     }
