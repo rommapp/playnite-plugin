@@ -137,8 +137,8 @@ namespace RomM.Games
             }
             else
             {
-                return supportedFileTypes.Select(x => "*." + x).SelectMany(
-                    searchPattern => Directory.GetFiles(installDir, searchPattern, SearchOption.AllDirectories)
+                return supportedFileTypes.SelectMany(
+                    fileType => Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories)
                 ).ToArray();
             }
         }
