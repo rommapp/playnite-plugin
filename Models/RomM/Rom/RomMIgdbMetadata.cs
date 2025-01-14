@@ -12,7 +12,7 @@ namespace RomM.Models.RomM.Rom
         public string AggregatedRating { get; set; }
 
         [JsonProperty("first_release_date")]
-        public int? FirstReleaseDate { get; set; }
+        public long? FirstReleaseDate { get; set; }
 
         [JsonProperty("genres")]
         public List<string> Genres { get; set; }
