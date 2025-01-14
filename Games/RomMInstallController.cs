@@ -63,7 +63,7 @@ namespace RomM.Games
                         gamePath = gamePath.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
                     }
 
-                    Logger.Debug($"Downloading {Game.Name} to {gamePath}.");
+                    Logger.Debug($"Downloading {Game.Name} to {gamePath}...");
                     Directory.CreateDirectory(installDir);
 
                     // Stream the file directly to disk
@@ -84,6 +84,7 @@ namespace RomM.Games
                     // Always extract top-level file of multi-file archives
                     if (info.IsMulti || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
                     {
+                        Logger.Debug($"Extracting {Game.Name} to {installDir}...");
                         // Extract the archive to the install directory
                         ExtractArchive(gamePath, installDir);
 
@@ -95,6 +96,8 @@ namespace RomM.Games
                         {
                             ExtractNestedArchives(installDir);
                         }
+
+                        Logger.Debug($"Extraction of {Game.Name} complete.");
 
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
