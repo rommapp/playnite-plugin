@@ -55,7 +55,7 @@ namespace RomM.Models.RomM.Rom
         public string Summary { get; set; }
 
         [JsonProperty("first_release_date")]
-        public int? FirstReleaseDate { get; set; }
+        public long? FirstReleaseDate { get; set; }
 
         [JsonProperty("alternative_names")]
         public List<string> AlternativeNames { get; set; }
