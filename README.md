@@ -1,8 +1,24 @@
-[![license-badge]][license-badge-url]
-[![release-badge]][release-badge-url]
-[![discord-badge]][discord-badge-url]
+<!-- trunk-ignore-all(markdownlint/MD033) -->
+<!-- trunk-ignore(markdownlint/MD041) -->
+<div align="center">
 
-# RomM Playnite Library Plugin
+  <img src=".github/resources/isotipo.png" height="180px" width="auto" alt="romm-muos logo">
+    <h3 style="font-size: 25px;">
+    A beautiful, powerful, playnite RomM plugin.
+  </h3>
+
+<br>
+
+[![license-badge-img]][license-badge]
+[![release-badge-img]][release-badge]
+[![discord-badge-img]][discord-badge]
+
+<!-- [![wiki-badge-img]][wiki] -->
+
+  </div>
+</div>
+
+# Overview
 
 This plugin allows you to import your RomM library into Playnite. It queries the RomM API to create Playnite library entires for each of your games. Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
 
@@ -64,12 +80,12 @@ This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](
 
 <!-- Badges -->
 
-[license-badge]: https://img.shields.io/github/license/rommapp/playnite-plugin?style=for-the-badge&color=a32d2a&kill_cache=2
-[license-badge-url]: LICENSE
-[release-badge]: https://img.shields.io/github/v/release/rommapp/playnite-plugin?style=for-the-badge&kill_cache=2
-[release-badge-url]: https://github.com/rommapp/playnite-plugin/releases
-[discord-badge]: https://img.shields.io/badge/discord-7289da?style=for-the-badge
-[discord-badge-url]: https://discord.gg/P5HtHnhUDH
+[license-badge-img]: https://img.shields.io/github/license/rommapp/playnite-plugin?style=for-the-badge&color=a32d2a&kill_cache=2
+[license-badge]: LICENSE
+[release-badge-img]: https://img.shields.io/github/v/release/rommapp/playnite-plugin?style=for-the-badge&kill_cache=2
+[release-badge]: https://github.com/rommapp/playnite-plugin/releases
+[discord-badge-img]: https://img.shields.io/badge/discord-7289da?style=for-the-badge
+[discord-badge]: https://discord.gg/P5HtHnhUDH
 
 <!-- Links -->
 
