@@ -27,22 +27,22 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("platform_name")]
         public string PlatformName { get; set; }
 
-        [JsonProperty("file_name")]
+        [JsonProperty("fs_name")]
         public string FileName { get; set; }
 
-        [JsonProperty("file_name_no_tags")]
+        [JsonProperty("fs_name_no_tags")]
         public string FileNameNoTags { get; set; }
 
-        [JsonProperty("file_name_no_ext")]
+        [JsonProperty("fs_name_no_ext")]
         public string FileNameNoExt { get; set; }
 
-        [JsonProperty("file_extension")]
+        [JsonProperty("fs_extension")]
         public string FileExtension { get; set; }
 
-        [JsonProperty("file_path")]
+        [JsonProperty("fs_path")]
         public string FilePath { get; set; }
 
-        [JsonProperty("file_size_bytes")]
+        [JsonProperty("fs_size_bytes")]
         public ulong FileSizeBytes { get; set; }
 
         [JsonProperty("name")]
