@@ -78,10 +78,10 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("igdb_metadata")]
         public RomMIgdbMetadata IgdbMetadata { get; set; }
 
-        [JsonProperty("path_cover_s")]
+        [JsonProperty("path_cover_small")]
         public string PathCoverS { get; set; }
 
-        [JsonProperty("path_cover_l")]
+        [JsonProperty("path_cover_large")]
         public string PathCoverL { get; set; }
 
         [JsonProperty("has_cover")]
