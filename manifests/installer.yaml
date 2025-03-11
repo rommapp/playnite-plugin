@@ -48,4 +48,10 @@ Packages:
     ReleaseDate: 2025-01-13
     PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.2.8/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_2_8.pext
     Changelog:
-      - Fix crash when importing ROMs with long last_played_at datetimes
+      - Fix crash when importing ROMs with long last_played_at datetimes\
+  - Version: 0.3.0
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-03-11
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.3.0/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_3_0.pext
+    Changelog:
+      - Update game fetching to support changes in API version 3.8.0
