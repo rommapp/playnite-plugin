@@ -255,8 +255,10 @@ namespace RomM
 
                 NameValueCollection queryParams = new NameValueCollection
                 {
-                    { "limit", "10000" },
-                    { "platform_id", apiPlatform.Id.ToString() }
+                    { "limit", "2500" },
+                    { "platform_id", apiPlatform.Id.ToString() },
+                    { "order_by", "name" },
+                    { "order_dir", "asc" },
                 };
 
                 var responseGameIDs = new HashSet<string>();
