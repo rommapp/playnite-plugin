@@ -256,6 +256,7 @@ namespace RomM
                 NameValueCollection queryParams = new NameValueCollection
                 {
                     { "limit", "2500" },
+                    { "offset": "0"},
                     { "platform_id", apiPlatform.Id.ToString() },
                     { "order_by", "name" },
                     { "order_dir", "asc" },
