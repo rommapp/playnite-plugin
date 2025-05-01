@@ -14,6 +14,7 @@ using System.IO;
 using System.Reflection;
 using System.Linq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RomM.Settings;
 using Playnite.SDK.Events;
 using RomM.Games;
@@ -277,7 +278,8 @@ namespace RomM
                     using (StreamReader reader = new StreamReader(body))
                     using (JsonTextReader jsonReader = new JsonTextReader(reader))
                     {
-                        roms = JsonSerializerSingleton.Instance.Deserialize<List<RomMRom>>(jsonReader);
+                        var jsonResponse = JObject.Parse(reader.ReadToEnd());
+                        roms = jsonResponse["items"].ToObject<List<RomMRom>>();
                     }
 
                     Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
