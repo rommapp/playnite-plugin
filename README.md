@@ -23,7 +23,7 @@
 This plugin allows you to import your RomM library into Playnite. It queries the RomM API to create Playnite library entires for each of your games. Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
 
 > [!WARNING]
-> The plugin requires a RomM instance setup with IGDB API credentials, otherwise it won't work. You can find more information on how to set generate and set credentials in the [wiki](https://github.com/rommapp/romm/wiki/Generate-API-Keys#igdb).
+> The plugin requires a RomM instance setup with IGDB API credentials, otherwise it won't work. You can find more information on how to set generate and set credentials in the [docs](https://docs.romm.app/latest/Getting-Started/Generate-API-Keys/).
 
 ## Installation
 
