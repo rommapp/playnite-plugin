@@ -25,15 +25,15 @@ This plugin allows you to import your RomM library into Playnite. It queries the
 > [!WARNING]
 > The plugin requires a RomM instance setup with IGDB API credentials, otherwise it won't work. You can find more information on how to set generate and set credentials in the [docs](https://docs.romm.app/latest/Getting-Started/Generate-API-Keys/).
 
-## Installation
+# Installation
 
 To install and configure the RomM playnite plugin, check out the [Installation Guide][docs-installation-guide]
 
-## Contributing
+# Contributing
 
 To contribute to RomM Playnite plugin, please check [Contribution Guide](./CONTRIBUTING.md)
 
-## Support
+# Support
 
 If you have any issues with the plugin, please [open an issue](https://github.com/rommapp/playnite-plugin/issues/new) in this repository. If the issue is with RomM itself, open an issue in the [RomM repository](https://github.com/rommapp/romm/issues/new/choose).
 
@@ -41,7 +41,7 @@ Join us on discord, where you can ask questions, submit ideas, get help, showcas
 
 [![discord-invite]][discord-invite-url]
 
-### Acknowledgement
+# Acknowledgement
 
 This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](https://github.com/psychonic/Playnite-EmuLibrary) by [@psychonic](https://github.com/psychonic).
 
