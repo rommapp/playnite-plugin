@@ -33,13 +33,21 @@ To install and configure the RomM playnite plugin, check out the [Installation G
 
 To contribute to RomM Playnite plugin, please check [Contribution Guide](./CONTRIBUTING.md)
 
-# Support
+# Community
+
+Join us on Discord, where you can ask questions, submit ideas, get help, showcase your collection, and discuss RomM with other users.
+
+[![discord-invite]][discord-invite-url]
+
+# Technical Support
 
 If you have any issues with the plugin, please [open an issue](https://github.com/rommapp/playnite-plugin/issues/new) in this repository. If the issue is with RomM itself, open an issue in the [RomM repository](https://github.com/rommapp/romm/issues/new/choose).
 
-Join us on discord, where you can ask questions, submit ideas, get help, showcase your collection, and discuss RomM with other users.
+# Project Support
 
-[![discord-invite]][discord-invite-url]
+Consider supporting the development of this project on Open Collective.
+
+[![oc-donate-img]][oc-donate]
 
 # Acknowledgement
 
@@ -59,3 +67,5 @@ This plugin is **very heavily** inspired by the excellent [Playnite EmuLibrary](
 [docs-installation-guide]: https://docs.romm.app/latest/Integrations/Playnite-plugin/
 [discord-invite]: https://invidget.switchblade.xyz/P5HtHnhUDH
 [discord-invite-url]: https://discord.gg/P5HtHnhUDH
+[oc-donate-img]: https://opencollective.com/romm/donate/button.png?color=blue
+[oc-donate]: https://opencollective.com/romm
