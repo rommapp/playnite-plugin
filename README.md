@@ -29,6 +29,10 @@ This plugin allows you to import your RomM library into Playnite. It queries the
 
 To install and configure the RomM playnite plugin, check out the [Installation Guide][docs-installation-guide]
 
+## Contributing
+
+To contribute to RomM Playnite plugin, please check [Contribution Guide](./CONTRIBUTING.md)
+
 ## Support
 
 If you have any issues with the plugin, please [open an issue](https://github.com/rommapp/playnite-plugin/issues/new) in this repository. If the issue is with RomM itself, open an issue in the [RomM repository](https://github.com/rommapp/romm/issues/new/choose).
