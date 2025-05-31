@@ -254,34 +254,64 @@ namespace RomM
 
                 Logger.Debug($"Starting to fetch games for {apiPlatform.Name}.");
 
-                NameValueCollection queryParams = new NameValueCollection
-                {
-                    { "limit", "2500" },
-                    { "offset", "0" },
-                    { "platform_id", apiPlatform.Id.ToString() },
-                    { "order_by", "name" },
-                    { "order_dir", "asc" },
-                };
-
+                const int pageSize = 150;
+                int offset = 0;
+                bool hasMoreData = true;
+                var allRoms = new List<RomMRom>();
                 var responseGameIDs = new HashSet<string>();
+
+                while (hasMoreData)
+                {
+                    if (args.CancelToken.IsCancellationRequested)
+                        break;
+
+                    NameValueCollection queryParams = new NameValueCollection
+                    {
+                        { "limit", pageSize.ToString() },
+                        { "offset", offset.ToString() },
+                        { "platform_id", apiPlatform.Id.ToString() },
+                        { "order_by", "name" },
+                        { "order_dir", "asc" },
+                    };
+
+                    try
+                    {
+                        // Make the request and get the response
+                        HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
+                        response.EnsureSuccessStatusCode();
+
+                        Logger.Debug($"Starting to parse response for {apiPlatform.Name}.");
+
+                        // Assuming the response is in JSON format
+                        Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                        List<RomMRom> roms;
+                        using (StreamReader reader = new StreamReader(body))
+                        using (JsonTextReader jsonReader = new JsonTextReader(reader))
+                        {
+                            var jsonResponse = JObject.Parse(reader.ReadToEnd());
+                            roms = jsonResponse["items"].ToObject<List<RomMRom>>();
+                        }
+
+                        Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
+
+                        if (roms.Count == 0)
+                        {
+                            hasMoreData = false;
+                            break;
+                        }
+
+                        allRoms.AddRange(roms);
+                        offset += pageSize;
+                    }
+                    catch (HttpRequestException e)
+                    {
+                        Logger.Error($"Request exception: {e.Message}");
+                        hasMoreData = false;
+                    }
+                }
+
                 try
                 {
-                    // Make the request and get the response
-                    HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
-                    response.EnsureSuccessStatusCode();
-
-                    Logger.Debug($"Starting to parse response for {apiPlatform.Name}.");
-
-                    // Assuming the response is in JSON format
-                    Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
-                    List<RomMRom> roms;
-                    using (StreamReader reader = new StreamReader(body))
-                    using (JsonTextReader jsonReader = new JsonTextReader(reader))
-                    {
-                        var jsonResponse = JObject.Parse(reader.ReadToEnd());
-                        roms = jsonResponse["items"].ToObject<List<RomMRom>>();
-                    }
-
                     Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
 
                     var rootInstallDir = PlayniteApi.Paths.IsPortable
@@ -289,8 +319,11 @@ namespace RomM
                         : mapping.DestinationPathResolved;
 
                     // Return a GameMetadata for each item in the response
-                    foreach (var item in roms)
+                    foreach (var item in allRoms)
                     {
+                        if (args.CancelToken.IsCancellationRequested)
+                            break;
+
                         var gameName = item.Name;
                         var fileName = item.FileName;
                         var urlCover = item.UrlCover;
