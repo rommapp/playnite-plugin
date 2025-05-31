@@ -24,7 +24,7 @@ namespace RomM.Models.RomM.Platform
         public string FilePath { get; set; }
 
         [JsonProperty("file_size_bytes")]
-        public int FileSizeBytes { get; set; }
+        public ulong FileSizeBytes { get; set; }
 
         [JsonProperty("full_path")]
         public string FullPath { get; set; }
