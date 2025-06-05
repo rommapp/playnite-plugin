@@ -37,8 +37,8 @@ jobs:
         msbuild RomM.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackages=false
 
     - name: Package Extension
-    run: |
-      .github/tools/Toolbox.exe pack ./bin/Release/net462 ./packed
+      run: |
+        .github/tools/Toolbox.exe pack ./bin/Release/net462 ./packed
 
     # - name: Upload Artifact
     #   uses: actions/upload-artifact@v4
