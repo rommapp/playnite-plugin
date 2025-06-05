@@ -1,0 +1,45 @@
+name: Build and Package Extension
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Download Playnite Toolbox
+      run: |
+        Invoke-WebRequest -Uri "https://playnite.link/update/toolbox/stable/1.0/Toolbox.zip" -OutFile "Toolbox.zip"
+        Expand-Archive -Path "Toolbox.zip" -DestinationPath "./Toolbox"
+
+    - name: Package Extension
+      run: |
+        ./Toolbox/Toolbox.exe pack ./bin/Release/net462 ./packed
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: packed-extension
+        path: ./packed/
