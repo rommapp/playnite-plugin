@@ -254,7 +254,7 @@ namespace RomM
 
                 Logger.Debug($"Starting to fetch games for {apiPlatform.Name}.");
 
-                const int pageSize = 150;
+                const int pageSize = 72;
                 int offset = 0;
                 bool hasMoreData = true;
                 var allRoms = new List<RomMRom>();
@@ -280,7 +280,7 @@ namespace RomM
                         HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
                         response.EnsureSuccessStatusCode();
 
-                        Logger.Debug($"Starting to parse response for {apiPlatform.Name}.");
+                        Logger.Debug($"Parsing response for {apiPlatform.Name} batch {offset / pageSize + 1}.");
 
                         // Assuming the response is in JSON format
                         Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
@@ -292,10 +292,10 @@ namespace RomM
                             roms = jsonResponse["items"].ToObject<List<RomMRom>>();
                         }
 
-                        Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
-
-                        if (roms.Count == 0)
+                        Logger.Debug($"Parsed {roms.Count} roms for batch {offset / pageSize + 1}.");
+                        if (roms.Count < pageSize)
                         {
+                            Logger.Debug($"Received less than {pageSize} roms for {apiPlatform.Name}, assuming no more games.");
                             hasMoreData = false;
                             break;
                         }
