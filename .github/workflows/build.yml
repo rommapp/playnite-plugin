@@ -36,12 +36,18 @@ jobs:
         run: |
           msbuild RomM.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackages=false
 
-      - name: Package Extension
+      - name: Setup Playnite
         run: |
-          .github/tools/Toolbox.exe pack ./bin/Release/net462 ./packed
+          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/10.35/Playnite1035.zip" -OutFile "Playnite.zip"
+          Expand-Archive "Playnite.zip" -DestinationPath "Playnite"
+
+      - name: Pack with Playnite
+        run: |
+          mkdir .\PackingOutput
+          & "Playnite\Toolbox.exe" pack .\bin\Release\net462 .\PackingOutput
 
     # - name: Upload Artifact
     #   uses: actions/upload-artifact@v4
     #   with:
     #     name: packed-extension
-    #     path: ./packed/
+    #     path: PackingOutput
