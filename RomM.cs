@@ -293,6 +293,8 @@ namespace RomM
                         }
 
                         Logger.Debug($"Parsed {roms.Count} roms for batch {offset / pageSize + 1}.");
+                        allRoms.AddRange(roms);
+
                         if (roms.Count < pageSize)
                         {
                             Logger.Debug($"Received less than {pageSize} roms for {apiPlatform.Name}, assuming no more games.");
@@ -300,7 +302,6 @@ namespace RomM
                             break;
                         }
 
-                        allRoms.AddRange(roms);
                         offset += pageSize;
                     }
                     catch (HttpRequestException e)
