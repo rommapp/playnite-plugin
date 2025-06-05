@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -42,8 +43,8 @@ jobs:
       run: |
         ./Toolbox/Toolbox.exe pack ./bin/Release/net462 ./packed
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: packed-extension
-        path: ./packed/
+    # - name: Upload Artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: packed-extension
+    #     path: ./packed/
