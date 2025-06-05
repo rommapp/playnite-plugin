@@ -29,21 +29,16 @@ jobs:
 
     - name: Restore dependencies
       run: |
-        dotnet restore
+        dotnet restore --locked-mode
         dotnet add package Microsoft.Net.Sdk.Compilers.Toolset --version 9.0.300
 
     - name: Build with MSBuild
       run: |
         msbuild RomM.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackages=false
 
-    - name: Download Playnite Toolbox
-      run: |
-        Invoke-WebRequest -Uri "https://playnite.link/update/toolbox/stable/1.0/Toolbox.zip" -OutFile "Toolbox.zip"
-        Expand-Archive -Path "Toolbox.zip" -DestinationPath "./Toolbox"
-
     - name: Package Extension
-      run: |
-        ./Toolbox/Toolbox.exe pack ./bin/Release/net462 ./packed
+    run: |
+      .github/tools/Toolbox.exe pack ./bin/Release/net462 ./packed
 
     # - name: Upload Artifact
     #   uses: actions/upload-artifact@v4
