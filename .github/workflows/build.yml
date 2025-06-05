@@ -34,7 +34,7 @@ jobs:
 
       - name: Build with MSBuild
         run: |
-          msbuild RomM.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackages=false
+          msbuild RomM.csproj /p:Configuration=Release /p:Platform="AnyCPU" /p:RestorePackages=false
 
       - name: Setup Playnite
         run: |
