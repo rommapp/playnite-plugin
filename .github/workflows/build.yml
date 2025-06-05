@@ -39,7 +39,7 @@ jobs:
         ./Toolbox/Toolbox.exe pack ./bin/Release/net462 ./packed
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: packed-extension
         path: ./packed/
