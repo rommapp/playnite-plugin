@@ -6,14 +6,14 @@ ShortDescription: Import your RomM library into Playnite
 InstallerManifestUrl: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/manifests/installer.yaml
 SourceUrl: https://github.com/rommapp/playnite-plugin
 Description: |
-    This plugin allows you to import your RomM library into Playnite. It queries the RomM API to create Playnite library entires for each of your games.
-    
-    Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
+  This plugin allows you to import your RomM library into Playnite. It queries the RomM API to create Playnite library entires for each of your games.
+
+  Installing a game in Playnite will download it from RomM and store it on your system, allowing you to launch it in your emulator of choice.
 Tags: [romm, emulation, retro]
 IconUrl: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/icon.png
 Links:
-    Issues: https://github.com/rommapp/playnite-plugin/issues/new
-    Discord: https://discord.gg/P5HtHnhUDH
+  Issues: https://github.com/rommapp/playnite-plugin/issues/new
+  Discord: https://discord.gg/P5HtHnhUDH
 Screenshots:
-    - Thumbnail: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/.github/resources/screenshot_sm.png
-      Image: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/.github/resources/screenshot_lg.png
+  - Thumbnail: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/.github/resources/screenshot_sm.png
+    Image: https://raw.githubusercontent.com/rommapp/playnite-plugin/main/.github/resources/screenshot_lg.png
