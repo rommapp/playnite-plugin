@@ -17,28 +17,28 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 9.0.x
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 9.0.x
 
-    - name: Restore dependencies
-      run: |
-        dotnet restore --locked-mode
-        dotnet add package Microsoft.Net.Sdk.Compilers.Toolset --version 9.0.300
+      - name: Restore dependencies
+        run: |
+          dotnet restore --locked-mode
+          dotnet add package Microsoft.Net.Sdk.Compilers.Toolset --version 9.0.300
 
-    - name: Build with MSBuild
-      run: |
-        msbuild RomM.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackages=false
+      - name: Build with MSBuild
+        run: |
+          msbuild RomM.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackages=false
 
-    - name: Package Extension
-      run: |
-        .github/tools/Toolbox.exe pack ./bin/Release/net462 ./packed
+      - name: Package Extension
+        run: |
+          .github/tools/Toolbox.exe pack ./bin/Release/net462 ./packed
 
     # - name: Upload Artifact
     #   uses: actions/upload-artifact@v4
