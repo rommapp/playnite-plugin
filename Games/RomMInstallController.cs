@@ -132,6 +132,11 @@ namespace RomM.Games
 
         private static string[] GetRomFiles(string installDir, List<string> supportedFileTypes)
         {
+            if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid file path");
+            }
+
             if (supportedFileTypes == null || supportedFileTypes.Count == 0)
             {
                return Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
