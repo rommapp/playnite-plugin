@@ -195,6 +195,16 @@ namespace RomM.Games
 
         private void ExtractArchive(string gamePath, string installDir)
         {
+            if (gamePath == null || gamePath.Contains("../") || gamePath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid game path");
+            }
+
+            if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid install directory path");
+            }
+
             using (var archive = ArchiveFactory.Open(gamePath))
             {
                 foreach (var entry in archive.Entries)
@@ -213,6 +223,11 @@ namespace RomM.Games
 
         void ExtractNestedArchives(string directoryPath)
         {
+            if (directoryPath == null || directoryPath.Contains("../") || directoryPath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid file path");
+            }
+
             foreach (var file in Directory.GetFiles(directoryPath))
             {   
                 if (IsFileCompressed(file))
