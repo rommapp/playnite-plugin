@@ -145,9 +145,15 @@ namespace RomM.Games
             }
             else
             {
-                return supportedFileTypes.SelectMany(
-                    fileType => Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories)
-                ).ToArray();
+                return supportedFileTypes.SelectMany(fileType =>
+                {
+                    if (fileType == null || fileType.Contains("../") || fileType.Contains(@"..\"))
+                    {
+                        throw new ArgumentException("Invalid file path");
+                    }
+                    return Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories)
+                        .Where(file => !file.Contains("../") && !file.Contains(@"..\"));
+                }).ToArray();
             }
         }
 
