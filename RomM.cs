@@ -353,7 +353,7 @@ namespace RomM
                         games.Add(new GameMetadata
                         {
                             Source = SourceName,
-                            Name = gameNameWithTags,
+                            Name = gameName,
                             Roms = new List<GameRom> { new GameRom(gameNameWithTags, pathToGame) },
                             InstallDirectory = gameInstallDir,
                             IsInstalled = File.Exists(pathToGame),
