@@ -1,13 +1,14 @@
 ﻿using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Plugins;
+using RomM.Settings;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 
-namespace RomM.Settings
+namespace RomM.ViewModels
 {
     public class SettingsViewModel : ObservableObject, ISettings
     {
@@ -28,7 +29,7 @@ namespace RomM.Settings
         public string RomMHost { get; set; } = "";
         public string RomMUsername { get; set; } = "";
         public string RomMPassword { get; set; } = "";
-        public ObservableCollection<EmulatorMapping> Mappings { get; set; }
+        public ObservableCollection<Settings.EmulatorMapping> Mappings { get; set; }
 
         public SettingsViewModel()
         {
@@ -57,7 +58,7 @@ namespace RomM.Settings
             
             if (Mappings == null)
             {
-                Mappings = new ObservableCollection<EmulatorMapping>();
+                Mappings = new ObservableCollection<Settings.EmulatorMapping>();
             }
 
             var mappingsWithoutId = Mappings.Where(m => m.MappingId == default);
@@ -91,7 +92,7 @@ namespace RomM.Settings
             // Code executed when user decides to confirm changes made since BeginEdit was called.
             // This method should save settings made to Option1 and Option2.
             SavePluginSettings(this);
-            HttpClientSingleton.ConfigureBasicAuth(this.RomMUsername, this.RomMPassword);
+            HttpClientSingleton.ConfigureBasicAuth(RomMUsername, RomMPassword);
         }
 
         private void SavePluginSettings<SettingsViewModel>(SettingsViewModel settings)

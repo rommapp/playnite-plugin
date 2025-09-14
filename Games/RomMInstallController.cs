@@ -40,10 +40,17 @@ namespace RomM.Games
 
             _watcherToken = new CancellationTokenSource();
 
-            Task.Run(async () =>
+            // Add to download queue (we'll get total bytes later)
+            _romM.DownloadQueueController.AddDownload(Game.Name, 0);
+
+            // Start the installation process asynchronously
+            _ = Task.Run(async () =>
             {
                 try
                 {
+                    // Set downloading status in queue
+                    _romM.DownloadQueueController.SetDownloading(Game.Name);
+
                     // Fetch file from content endpoint
                     HttpResponseMessage response = await RomM.GetAsync(info.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
                     response.EnsureSuccessStatusCode();
@@ -66,18 +73,8 @@ namespace RomM.Games
                     Logger.Debug($"Downloading {Game.Name} to {gamePath}...");
                     Directory.CreateDirectory(installDir);
 
-                    // Stream the file directly to disk
-                    using (var fileStream = new FileStream(gamePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
-                    using (var httpStream = await response.Content.ReadAsStreamAsync())
-                    {
-                        byte[] buffer = new byte[65536];
-                        int bytesRead;
-
-                        while ((bytesRead = await httpStream.ReadAsync(buffer, 0, buffer.Length, _watcherToken.Token)) > 0)
-                        {
-                            await fileStream.WriteAsync(buffer, 0, bytesRead, _watcherToken.Token);
-                        }
-                    }
+                    // Download with progress reporting
+                    await DownloadWithProgress(response, gamePath);
 
                     Logger.Debug($"Download of {Game.Name} complete.");
 
@@ -85,8 +82,12 @@ namespace RomM.Games
                     if (info.IsMulti || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
                     {
                         Logger.Debug($"Extracting {Game.Name} to {installDir}...");
+                        
+                        // Set extracting status in queue (handles all UI updates)
+                        _romM.DownloadQueueController.SetExtracting(Game.Name);
+
                         // Extract the archive to the install directory
-                        ExtractArchive(gamePath, installDir);
+                        ExtractArchiveWithProgress(gamePath, installDir);
 
                         // Delete the compressed file
                         File.Delete(gamePath);
@@ -94,7 +95,7 @@ namespace RomM.Games
                         // Extract nested archives if auto-extract is enabled
                         if (info.IsMulti && info.Mapping.AutoExtract)
                         {
-                            ExtractNestedArchives(installDir);
+                            ExtractNestedArchivesWithProgress(installDir);
                         }
 
                         Logger.Debug($"Extraction of {Game.Name} complete.");
@@ -115,6 +116,9 @@ namespace RomM.Games
                     game.IsInstalled = true;
                     _romM.Playnite.Database.Games.Update(game);
 
+                    // Mark as completed in download queue
+                    _romM.DownloadQueueController.SetCompleted(Game.Name);
+
                     InvokeOnInstalled(new GameInstalledEventArgs(new GameInstallationData()
                     {
                         InstallDirectory = installDir,
@@ -125,6 +129,10 @@ namespace RomM.Games
                 {
                     _romM.Playnite.Notifications.Add(Game.GameId, $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex}", NotificationType.Error);
                     Game.IsInstalling = false;
+                    
+                    // Mark as error in download queue
+                    _romM.DownloadQueueController.SetError(Game.Name, ex.Message);
+                    
                     throw;
                 }
             });
@@ -235,6 +243,96 @@ namespace RomM.Games
                     ExtractArchive(file, directoryPath);
                     File.Delete(file);
                 }
+            }
+        }
+
+        private async Task DownloadWithProgress(HttpResponseMessage response, string filePath)
+        {
+            var totalBytes = response.Content.Headers.ContentLength ?? 0;
+            var downloadedBytes = 0L;
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+            using (var httpStream = await response.Content.ReadAsStreamAsync())
+            {
+                byte[] buffer = new byte[65536];
+                int bytesRead;
+
+                while ((bytesRead = await httpStream.ReadAsync(buffer, 0, buffer.Length, _watcherToken.Token)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, bytesRead, _watcherToken.Token);
+                    downloadedBytes += bytesRead;
+
+                    if (totalBytes > 0)
+                    {
+                        var progressValue = (int)((double)downloadedBytes / totalBytes * 100);
+                        
+                        // DownloadQueueController handles all detailed progress UI updates
+                        _romM.DownloadQueueController.UpdateDownloadProgress(Game.Name, progressValue, downloadedBytes, totalBytes);
+                    }
+                }
+            }
+        }
+
+        private void ExtractArchiveWithProgress(string gamePath, string installDir)
+        {
+            if (gamePath == null || gamePath.Contains("../") || gamePath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid game path");
+            }
+
+            if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid install directory path");
+            }
+
+            using (var archive = ArchiveFactory.Open(gamePath))
+            {
+                var entries = archive.Entries.Where(e => !e.IsDirectory).ToList();
+                var totalEntries = entries.Count;
+                var processedEntries = 0;
+
+                foreach (var entry in entries)
+                {
+                    _watcherToken.Token.ThrowIfCancellationRequested();
+
+                    entry.WriteToDirectory(installDir, new ExtractionOptions
+                    {
+                        ExtractFullPath = true,
+                        Overwrite = true
+                    });
+
+                    processedEntries++;
+                    var progressValue = (int)((double)processedEntries / totalEntries * 100);
+                    
+                    // DownloadQueueController handles all detailed progress UI updates
+                    _romM.DownloadQueueController.UpdateExtractionProgress(Game.Name, progressValue);
+                }
+            }
+        }
+
+        private void ExtractNestedArchivesWithProgress(string directoryPath)
+        {
+            if (directoryPath == null || directoryPath.Contains("../") || directoryPath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid file path");
+            }
+
+            var compressedFiles = Directory.GetFiles(directoryPath).Where(IsFileCompressed).ToList();
+            var totalFiles = compressedFiles.Count;
+            var processedFiles = 0;
+
+            foreach (var file in compressedFiles)
+            {
+                _watcherToken.Token.ThrowIfCancellationRequested();
+
+                ExtractArchive(file, directoryPath);
+                File.Delete(file);
+
+                processedFiles++;
+                var progressValue = (int)((double)processedFiles / totalFiles * 100);
+                
+                // DownloadQueueController handles all detailed progress UI updates
+                _romM.DownloadQueueController.UpdateExtractionProgress(Game.Name, progressValue);
             }
         }
     }

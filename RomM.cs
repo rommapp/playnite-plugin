@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Web;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,10 +17,13 @@ using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RomM.Settings;
+using RomM.ViewModels;
 using Playnite.SDK.Events;
 using RomM.Games;
 using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
+using RomM.Controllers;
+using RomM.Views;
 
 
 namespace RomM
@@ -66,6 +70,7 @@ namespace RomM
         public ILogger Logger => LogManager.GetLogger();
         public IPlayniteAPI Playnite { get; private set; }
         public SettingsViewModel Settings { get; private set; }
+        public DownloadQueueController DownloadQueueController { get; private set; }
 
         // Implementing Client adds ability to open it via special menu in playnite.
         public override LibraryClient Client { get; } = new RomMClient();
@@ -172,6 +177,7 @@ namespace RomM
         {
             base.OnApplicationStarted(args);
             Settings = new SettingsViewModel(this, this);
+            DownloadQueueController = new DownloadQueueController(Playnite);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
         }
@@ -212,7 +218,7 @@ namespace RomM
 
             IList<RomMPlatform> apiPlatforms = FetchPlatforms();
             List<GameMetadata> games = new List<GameMetadata>();
-            IEnumerable<EmulatorMapping> enabledMappings = SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled);
+            IEnumerable<Settings.EmulatorMapping> enabledMappings = SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled);
 
             if (enabledMappings == null)
             {
@@ -456,6 +462,30 @@ namespace RomM
                 Playnite.Notifications.Add(args.Game.GameId, $"Download of \"{args.Game.Name}\" is complete", NotificationType.Info);
             }
         }
+
+        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
+        {
+            base.OnApplicationStopped(args);
+            
+            // Clean up download queue controller
+            DownloadQueueController?.ClearAll();
+        }
+
+        public override IEnumerable<SidebarItem> GetSidebarItems()
+        {
+            yield return new SidebarItem
+            {
+                Title = "Download Queue",
+                Icon = LibraryIcon,
+                Type = SiderbarItemType.View,
+                Opened = () =>
+                {
+                    var sidebarViewModel = new DownloadQueueSidebarViewModel(DownloadQueueController, Playnite);
+                    return new DownloadQueueSidebarView(sidebarViewModel);
+                }
+            };
+        }
+
     }
 }
 

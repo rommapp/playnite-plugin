@@ -1,5 +1,6 @@
 ﻿using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using RomM.ViewModels;
 using RomM.Settings;
 using System;
 using System.Collections.Generic;
@@ -30,7 +31,7 @@ namespace RomM.Games
         {
             get
             {
-                return Settings.SettingsViewModel.Instance.Mappings.FirstOrDefault(m => m.MappingId == MappingId);
+                return ViewModels.SettingsViewModel.Instance.Mappings.FirstOrDefault(m => m.MappingId == MappingId);
             }
         }
 

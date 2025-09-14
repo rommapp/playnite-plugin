@@ -1,10 +1,12 @@
-﻿using System;
+﻿using RomM.Settings;
+using RomM.ViewModels;
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace RomM.Settings
+namespace RomM.Views
 {
     public partial class SettingsView : UserControl
     {

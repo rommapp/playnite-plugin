@@ -1,4 +1,6 @@
 using Playnite.SDK;
+using RomM.Controllers;
+using RomM.ViewModels;
 
 namespace RomM
 {
@@ -6,7 +8,8 @@ namespace RomM
 	{
 		ILogger Logger { get; }
 		IPlayniteAPI Playnite { get; }
-		Settings.SettingsViewModel Settings { get; }
+		SettingsViewModel Settings { get; }
+		DownloadQueueController DownloadQueueController { get; }
 		string GetPluginUserDataPath();
 	}
 }
