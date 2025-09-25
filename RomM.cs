@@ -327,6 +327,7 @@ namespace RomM
 
                         var gameName = item.Name;
                         var fileName = item.FileName;
+                        // Start Multi API workound
                         var multi = item.Multi;
                         if (item.Files != null && item.Files.Count == 1)
                         {
@@ -339,6 +340,7 @@ namespace RomM
                             fileName = files["file_name"].ToString();
                             multi = false;
                         }
+                        // End Multi API workaround
                         var urlCover = item.UrlCover;
                         var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(fileName));
                         var pathToGame = Path.Combine(gameInstallDir, fileName);
@@ -348,7 +350,7 @@ namespace RomM
                             MappingId = mapping.MappingId,
                             FileName = fileName,
                             DownloadUrl = $"{Settings.RomMHost}/api/roms/{item.Id}/content/{fileName}",
-                            IsMulti = multi,
+                            IsMulti = multi, // API workaround from above. Original line: IsMulti = item.IsMulti
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
