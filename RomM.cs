@@ -327,6 +327,18 @@ namespace RomM
 
                         var gameName = item.Name;
                         var fileName = item.FileName;
+                        var multi = item.Multi;
+                        if (item.Files != null && item.Files.Count == 1)
+                        {
+                            var files = JObject.Parse(item.Files.FirstOrDefault().ToString());
+                            if (files["file_name"] == null)
+                            {
+                                Logger.Warn($"File name is null for {item.Name}, skipping.");
+                                continue;
+                            }
+                            fileName = files["file_name"].ToString();
+                            multi = false;
+                        }
                         var urlCover = item.UrlCover;
                         var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(fileName));
                         var pathToGame = Path.Combine(gameInstallDir, fileName);
@@ -336,7 +348,7 @@ namespace RomM
                             MappingId = mapping.MappingId,
                             FileName = fileName,
                             DownloadUrl = $"{Settings.RomMHost}/api/roms/{item.Id}/content/{fileName}",
-                            IsMulti = item.Multi
+                            IsMulti = multi,
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
