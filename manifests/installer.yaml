@@ -64,6 +64,6 @@ Packages:
   - Version: 0.4.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-06-05
-    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/v0.4.0/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_4_0.pext
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/0.4.0/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_4_0.pext
     Changelog:
       - Fetch games in pagniated chunks of 72 to avoid timeouts
