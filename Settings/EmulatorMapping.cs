@@ -91,6 +91,9 @@ namespace RomM.Settings
         }
 
         [JsonIgnore]
+        public string PlatformFsSlug { get; set; }
+
+        [JsonIgnore]
         [XmlIgnore]
         public string DestinationPathResolved
         {

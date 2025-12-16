@@ -237,14 +237,19 @@ namespace RomM
                     continue;
                 }
 
-                if (mapping.Platform == null)
+                if (mapping.Platform == null && mapping.PlatformFsSlug == null)
                 {
                     Logger.Warn($"Platform {mapping.PlatformId} not found, skipping.");
                     continue;
                 }
 
                 string url = $"{Settings.RomMHost}/api/roms";
-                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
+                RomMPlatform apiPlatform = apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
+                
+                if (mapping.PlatformFsSlug != null)
+                {
+                    apiPlatform = apiPlatforms.FirstOrDefault(p => p.FsSlug == mapping.PlatformFsSlug);
+                }
 
                 if (apiPlatform == null)
                 {
@@ -273,6 +278,18 @@ namespace RomM
                         { "order_by", "name" },
                         { "order_dir", "asc" },
                     };
+
+                    if (mapping.PlatformFsSlug != null)
+                    {
+                        queryParams = new NameValueCollection
+                        {
+                            { "limit", pageSize.ToString() },
+                            { "offset", offset.ToString() },
+                            { "platform_fs_slug", apiPlatform.FsSlug.ToString() },
+                            { "order_by", "name" },
+                            { "order_dir", "asc" },
+                        };
+                    }
 
                     try
                     {
