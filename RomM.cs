@@ -214,9 +214,9 @@ namespace RomM
             List<GameMetadata> games = new List<GameMetadata>();
             IEnumerable<EmulatorMapping> enabledMappings = SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled);
 
-            if (enabledMappings == null)
+            if (enabledMappings == null || !enabledMappings.Any())
             {
-                Logger.Warn("No enabled mappings found.");
+                Logger.Warn("No emulators are configured or enabled in RomM settings. No games will be fetched.");
                 return games;
             }
 
