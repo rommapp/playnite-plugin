@@ -102,8 +102,14 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("tags")]
         public List<string> Tags { get; set; }
 
-        [JsonProperty("multi")]
-        public bool Multi { get; set; }
+        [JsonProperty("has_simple_single_file")]
+        public bool HasSimpleSingleFile { get; set; }
+
+        [JsonProperty("has_nested_single_file")]
+        public bool HasNestedSingleFile { get; set; }
+        
+        [JsonProperty("has_multiple_files")]
+        public bool HasMultipleFiles { get; set; }
 
         [JsonProperty("files")]
         public List<object> Files { get; set; }

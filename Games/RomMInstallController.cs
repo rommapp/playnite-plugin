@@ -51,7 +51,7 @@ namespace RomM.Games
                     List<GameRom> roms = new List<GameRom>();
                     string installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
                     string gamePath = Path.Combine(installDir, info.FileName);
-                    if (info.IsMulti)
+                    if (info.HasMultipleFiles)
                     {
                         // File name for multi-file archives is the folder name, so we append .zip
                         gamePath = Path.Combine(installDir, info.FileName + ".zip");
@@ -82,7 +82,7 @@ namespace RomM.Games
                     Logger.Debug($"Download of {Game.Name} complete.");
 
                     // Always extract top-level file of multi-file archives
-                    if (info.IsMulti || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
+                    if (info.HasMultipleFiles || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
                     {
                         Logger.Debug($"Extracting {Game.Name} to {installDir}...");
                         // Extract the archive to the install directory
@@ -92,7 +92,7 @@ namespace RomM.Games
                         File.Delete(gamePath);
 
                         // Extract nested archives if auto-extract is enabled
-                        if (info.IsMulti && info.Mapping.AutoExtract)
+                        if (info.HasMultipleFiles && info.Mapping.AutoExtract)
                         {
                             ExtractNestedArchives(installDir);
                         }
