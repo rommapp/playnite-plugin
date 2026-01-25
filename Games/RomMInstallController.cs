@@ -180,12 +180,12 @@ namespace RomM.Games
         private static bool IsFileCompressed(string filePath)
         {
             // Exclude disk images which aren't handled by sharpcompress
-            if (filePath.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+            if (Path.GetExtension(filePath).Equals(".iso", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
-            return ArchiveFactory.isArchive(filePath, out var type);
+            return ArchiveFactory.IsArchive(filePath, out var type);
         }
 
         private void ExtractArchive(string gamePath, string installDir)
