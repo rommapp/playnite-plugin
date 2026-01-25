@@ -79,9 +79,14 @@ namespace RomM
             };
         }
 
+        private string CombineUrl(string baseUrl, string relativePath)
+        {
+            return $"{baseUrl?.TrimEnd('/')}/{relativePath.TrimStart('/')}";
+        }
+
         internal IList<RomMPlatform> FetchPlatforms()
         {
-            string apiPlatformsUrl = $"{Settings.RomMHost}/api/platforms";
+            string apiPlatformsUrl = CombineUrl(Settings.RomMHost, "api/platforms");
             try
             {
                 // Make the request and get the response
@@ -101,7 +106,7 @@ namespace RomM
 
         internal RomMRom FetchRom(string romId)
         {
-            string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
+            string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
             try
             {
                 // Fetch the rom info from RomM
@@ -128,7 +133,7 @@ namespace RomM
 
             Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{romId}");
 
-            string romUrl = $"{Settings.RomMHost}/api/roms/{romId}";
+            string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
             RomMRom rom = FetchRom(romId);
 
             if (rom == null)
@@ -243,7 +248,7 @@ namespace RomM
                     continue;
                 }
 
-                string url = $"{Settings.RomMHost}/api/roms";
+                string url = CombineUrl(Settings.RomMHost, "api/roms");
                 RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
 
                 if (apiPlatform == null)
@@ -377,7 +382,7 @@ namespace RomM
                                 {
                                     Type = GameActionType.URL,
                                     Name = "View in RomM",
-                                    Path = $"{Settings.RomMHost}/rom/{item.Id}",
+                                    Path = CombineUrl(Settings.RomMHost, $"rom/{item.Id}"),
                                     IsPlayAction = false
                                 }
                             }
