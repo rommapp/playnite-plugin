@@ -81,7 +81,7 @@ namespace RomM
 
         private string CombineUrl(string baseUrl, string relativePath)
         {
-            return $"{baseUrl?.TrimEnd('/')}/{relativePath.TrimStart('/')}";
+            return $"{baseUrl?.TrimEnd('/')}/{relativePath?.TrimStart('/') ?? ""}";
         }
 
         internal IList<RomMPlatform> FetchPlatforms()
@@ -133,7 +133,6 @@ namespace RomM
 
             Logger.Debug($"Received Playnite URI: {action}/{platformIgdbId}/{romId}");
 
-            string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
             RomMRom rom = FetchRom(romId);
 
             if (rom == null)
