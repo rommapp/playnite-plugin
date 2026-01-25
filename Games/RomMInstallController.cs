@@ -179,18 +179,13 @@ namespace RomM.Games
 
         private static bool IsFileCompressed(string filePath)
         {
-            try
-            {
-                // Try to open the file as an archive
-                using (var archive = ArchiveFactory.Open(filePath))
-                {
-                    return true;
-                }
-            }
-            catch
+            // Exclude disk images which aren't handled by sharpcompress
+            if (Path.GetExtension(filePath).Equals(".iso", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
+
+            return ArchiveFactory.IsArchive(filePath, out var type);
         }
 
         private void ExtractArchive(string gamePath, string installDir)
