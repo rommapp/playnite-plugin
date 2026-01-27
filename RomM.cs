@@ -1,25 +1,27 @@
-﻿using Playnite.SDK;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Playnite.SDK;
+using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Controls;
-using System.Web;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Collections.Specialized;
-using System.IO;
-using System.Reflection;
-using System.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using RomM.Settings;
-using Playnite.SDK.Events;
+using RomM.Downloads;
 using RomM.Games;
 using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
+using RomM.Settings;
+using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Reflection;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web;
+using System.Windows.Controls;
 
 
 namespace RomM
@@ -66,8 +68,12 @@ namespace RomM
         public ILogger Logger => LogManager.GetLogger();
         public IPlayniteAPI Playnite { get; private set; }
         public SettingsViewModel Settings { get; private set; }
+        public DownloadQueueController DownloadQueueController { get; private set; }
 
-        // Implementing Client adds ability to open it via special menu in playnite.
+        internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
+        private DownloadQueueViewModel downloadsVm;
+
+        // Implementing Client adds ability to open it via special menu in playnite
         public override LibraryClient Client { get; } = new RomMClient();
 
         public RomM(IPlayniteAPI api) : base(api)
@@ -77,6 +83,18 @@ namespace RomM
             {
                 HasSettings = true
             };
+
+            // Initialise the download queue
+            downloadsVm = new DownloadQueueViewModel();
+
+            // Limit to 10 concurrent downloads for the moment
+            DownloadQueueController = new DownloadQueueController(Playnite, downloadsVm, maxConcurrent: 10);
+
+            // Initialise the sidebar only in desktop mode
+            if (API.Instance.ApplicationInfo.Mode == ApplicationMode.Desktop)
+            {
+                DownloadsSidebar = new RomMDownloadsSidebarItem(this);
+            }
         }
 
         private string CombineUrl(string baseUrl, string relativePath)
@@ -178,11 +196,16 @@ namespace RomM
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
+
+            Playnite.Database.Games.ItemUpdated += OnItemUpdated;
         }
 
-        public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
+        public static Task<HttpResponseMessage> GetAsync(
+            string url,
+            HttpCompletionOption completionOption,
+            CancellationToken ct)
         {
-            return await HttpClientSingleton.Instance.GetAsync(baseUrl, completionOption);
+            return HttpClientSingleton.Instance.GetAsync(url, completionOption, ct);
         }
 
         public static async Task<HttpResponseMessage> GetAsyncWithParams(string baseUrl, NameValueCollection queryParams)
@@ -425,6 +448,11 @@ namespace RomM
         }
 
 
+        public override IEnumerable<SidebarItem> GetSidebarItems()
+        {
+            yield return DownloadsSidebar;
+        }
+
         public override ISettings GetSettings(bool firstRunSettings)
         {
             return Settings;
@@ -458,6 +486,28 @@ namespace RomM
             if (args.Game.PluginId == PluginId && Settings.NotifyOnInstallComplete)
             {
                 Playnite.Notifications.Add(args.Game.GameId, $"Download of \"{args.Game.Name}\" is complete", NotificationType.Info);
+            }
+        }
+
+        private void OnItemUpdated(object sender, ItemUpdatedEventArgs<Game> e)
+        {
+            foreach (var update in e.UpdatedItems)
+            {
+                var oldGame = update.OldData;
+                var newGame = update.NewData;
+
+                // Ignore non-RomM games
+                if (newGame.PluginId != Id)
+                {
+                    continue;
+                }
+
+                // This is the cancel signal
+                if (oldGame.IsInstalling && !newGame.IsInstalling)
+                {
+                    // Installation was canceled or finished
+                    DownloadQueueController?.Cancel(newGame.Id);
+                }
             }
         }
     }

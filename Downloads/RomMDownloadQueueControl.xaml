@@ -1,0 +1,89 @@
+<UserControl x:Class="RomM.Downloads.RomMDownloadQueueControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:RomM.Downloads"
+             Background="Transparent">
+
+	<UserControl.Resources>
+		<local:ProgressLineMultiConverter x:Key="ProgressLineMultiConverter"/>
+	</UserControl.Resources>
+
+    <DockPanel>
+        <!-- Header -->
+		<TextBlock DockPanel.Dock="Top"
+                   Text="Downloads"
+                   FontWeight="Bold"
+                   Margin="8,8,8,4"
+                   Foreground="{DynamicResource TextBrush}" />
+
+		<!-- List -->
+		<ScrollViewer VerticalScrollBarVisibility="Auto">
+			<ItemsControl Margin="6,0,6,6"
+                          ItemsSource="{Binding Items}">
+
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Border BorderThickness="1"
+                                BorderBrush="{DynamicResource PopupBorderBrush}"
+                                CornerRadius="4"
+                                Padding="8"
+                                Margin="0,0,0,8"
+                                Background="{DynamicResource PopupBackgroundBrush}">
+
+							<StackPanel Orientation="Vertical">
+
+								<!-- Title -->
+								<TextBlock FontWeight="SemiBold"
+                                           Text="{Binding GameName}"
+                                           Foreground="{DynamicResource TextBrush}"/>
+
+								<!-- Status -->
+								<TextBlock Opacity="0.9"
+                                           Margin="0,2,0,0"
+                                           Text="{Binding StatusText}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"/>
+
+								<!-- Progress -->
+								<ProgressBar Height="12"
+                                             Margin="0,6,0,0"
+                                             IsIndeterminate="{Binding IsIndeterminate}"
+                                             Maximum="{Binding ProgressMaximum}"
+                                             Value="{Binding ProgressValue}"
+                                             Foreground="{DynamicResource ProgressBarForegroundBrush}"
+                                             Background="{DynamicResource ProgressBarBackgroundBrush}"/>
+
+								<!-- Numbers -->
+								<TextBlock Opacity="0.75"
+										   Margin="0,4,0,0"
+										   Foreground="{DynamicResource SecondaryTextBrush}">
+									<TextBlock.Text>
+										<MultiBinding Converter="{StaticResource ProgressLineMultiConverter}">
+											<Binding Path="ProgressValue" />
+											<Binding Path="ProgressMaximum" />
+											<Binding Path="IsIndeterminate" />
+										</MultiBinding>
+									</TextBlock.Text>
+								</TextBlock>
+
+								<!-- Buttons -->
+								<StackPanel Orientation="Horizontal"
+                                            Margin="0,6,0,0"
+                                            HorizontalAlignment="Right">
+
+									<Button Content="Cancel"
+                                            MinWidth="72"
+                                            Click="CancelClicked"
+                                            Tag="{Binding}"
+                                            Style="{DynamicResource ButtonStyle}" />
+								</StackPanel>
+
+							</StackPanel>
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+
+			</ItemsControl>
+		</ScrollViewer>
+
+	</DockPanel>
+</UserControl>
