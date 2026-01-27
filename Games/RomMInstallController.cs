@@ -6,9 +6,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-using RomM.Downloads;            // IMPORTANT
-using SharpCompress.Archives;     // doar dacă mai ai IsFileCompressed aici; altfel scoate
-using SharpCompress.Common;
+using RomM.Downloads;
+using SharpCompress.Archives;
 
 namespace RomM.Games
 {

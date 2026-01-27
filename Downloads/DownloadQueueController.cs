@@ -18,7 +18,6 @@ namespace RomM.Downloads
         private readonly DownloadQueueViewModel vm;
 
         private readonly SemaphoreSlim concurrencyGate;
-        private readonly object sync = new object();
 
         private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, CancellationTokenSource> activeDownloads =
             new System.Collections.Concurrent.ConcurrentDictionary<Guid, CancellationTokenSource>();
@@ -66,7 +65,10 @@ namespace RomM.Downloads
                 {
                     cts.Cancel();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    logger.Warn(ex, "An error occurred while cancelling a download.");
+                }
             }
         }
 
@@ -144,6 +146,11 @@ namespace RomM.Downloads
                         ct.ThrowIfCancellationRequested();
 
                         int read = await httpStream.ReadAsync(buffer, 0, buffer.Length, ct);
+                        if (read <= 0)
+                        {
+                            break;
+                        }
+
                         await fileStream.WriteAsync(buffer, 0, read, ct);
 
                         downloaded += read;
