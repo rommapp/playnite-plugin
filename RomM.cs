@@ -273,7 +273,7 @@ namespace RomM
                     {
                         { "limit", pageSize.ToString() },
                         { "offset", offset.ToString() },
-                        { "platform_id", apiPlatform.Id.ToString() },
+                        { "platform_ids", apiPlatform.Id.ToString() },
                         { "order_by", "name" },
                         { "order_dir", "asc" },
                     };
