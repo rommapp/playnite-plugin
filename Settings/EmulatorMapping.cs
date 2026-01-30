@@ -28,7 +28,7 @@ namespace RomM.Settings
 
         [DefaultValue(false)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
-        public bool Usem3u { get; set; }
+        public bool UseM3u { get; set; }
 
         [JsonIgnore]
         public Emulator Emulator

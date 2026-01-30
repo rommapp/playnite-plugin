@@ -101,14 +101,15 @@ namespace RomM.Games
 
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
-                        
-                        if(info.Mapping.Usem3u)
+
+                        if (info.Mapping.UseM3u)
                         {
                             bool m3uPresent = false;
                             int m3uIndex = 0;
                             foreach (var romFile in actualRomFiles)
                             {
-                                if (romFile.Contains(".m3u") || romFile.Contains(".M3U"))
+
+                                if (romFile.EndsWith(".m3u") || romFile.EndsWith(".M3U"))
                                 {
                                     m3uPresent = true;
                                     break;
