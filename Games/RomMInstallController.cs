@@ -102,10 +102,43 @@ namespace RomM.Games
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
 
-                        foreach (var romFile in actualRomFiles) {
-                            roms.Add(new GameRom(Game.Name, romFile));
+                        if (info.Mapping.UseM3u)
+                        {
+                            bool m3uPresent = false;
+                            int m3uIndex = 0;
+                            foreach (var romFile in actualRomFiles)
+                            {
+
+                                if (romFile.EndsWith(".m3u") || romFile.EndsWith(".M3U"))
+                                {
+                                    m3uPresent = true;
+                                    break;
+                                }
+                                m3uIndex++;
+                            }
+
+                            if (m3uPresent)
+                            {
+                                roms.Add(new GameRom(Game.Name, actualRomFiles[m3uIndex]));
+                            }
+                            else
+                            {
+                                foreach (var romFile in actualRomFiles)
+                                {
+                                    roms.Add(new GameRom(Game.Name, romFile));
+                                }
+                            }
                         }
-                    } else {
+                        else
+                        {
+                            foreach (var romFile in actualRomFiles)
+                            {
+                                roms.Add(new GameRom(Game.Name, romFile));
+                            }
+                        }
+                    } 
+                    else 
+                    {
                         // Add the single ROM file to the list
                         roms.Add(new GameRom(Game.Name, gamePath));
                     }

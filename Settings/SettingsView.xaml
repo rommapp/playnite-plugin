@@ -113,6 +113,7 @@
                             </DataGridTemplateColumn>
 
                             <DataGridCheckBoxColumn Header="Auto-extract" Binding="{Binding AutoExtract}" />
+                            <DataGridCheckBoxColumn Header="Use M3U File" Binding="{Binding UseM3u}" />
                             <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding Enabled}" />
                             <DataGridTextColumn Header="Mapping ID" IsReadOnly="True" Binding="{Binding MappingId}" />
                         </DataGrid.Columns>
