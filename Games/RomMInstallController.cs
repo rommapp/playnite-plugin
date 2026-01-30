@@ -101,11 +101,43 @@ namespace RomM.Games
 
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
+                        
+                        if(info.Mapping.Usem3u)
+                        {
+                            bool m3uPresent = false;
+                            int m3uIndex = 0;
+                            foreach (var romFile in actualRomFiles)
+                            {
+                                if (romFile.Contains(".m3u") || romFile.Contains(".M3U"))
+                                {
+                                    m3uPresent = true;
+                                    break;
+                                }
+                                m3uIndex++;
+                            }
 
-                        foreach (var romFile in actualRomFiles) {
-                            roms.Add(new GameRom(Game.Name, romFile));
+                            if (m3uPresent)
+                            {
+                                roms.Add(new GameRom(Game.Name, actualRomFiles[m3uIndex]));
+                            }
+                            else
+                            {
+                                foreach (var romFile in actualRomFiles)
+                                {
+                                    roms.Add(new GameRom(Game.Name, romFile));
+                                }
+                            }
                         }
-                    } else {
+                        else
+                        {
+                            foreach (var romFile in actualRomFiles)
+                            {
+                                roms.Add(new GameRom(Game.Name, romFile));
+                            }
+                        }
+                    } 
+                    else 
+                    {
                         // Add the single ROM file to the list
                         roms.Add(new GameRom(Game.Name, gamePath));
                     }
