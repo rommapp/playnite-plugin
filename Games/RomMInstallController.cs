@@ -102,39 +102,18 @@ namespace RomM.Games
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
 
-                        if (info.Mapping.UseM3u)
+                        var m3uFile = info.Mapping.Usem3u
+                            ? Directory.EnumerateFiles(installDir, "*", SearchOption.AllDirectories)
+                                .FirstOrDefault(f => f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                            : null;
+
+                        if (m3uFile != null)
                         {
-                            bool m3uPresent = false;
-                            int m3uIndex = 0;
-                            foreach (var romFile in actualRomFiles)
-                            {
-
-                                if (romFile.EndsWith(".m3u") || romFile.EndsWith(".M3U"))
-                                {
-                                    m3uPresent = true;
-                                    break;
-                                }
-                                m3uIndex++;
-                            }
-
-                            if (m3uPresent)
-                            {
-                                roms.Add(new GameRom(Game.Name, actualRomFiles[m3uIndex]));
-                            }
-                            else
-                            {
-                                foreach (var romFile in actualRomFiles)
-                                {
-                                    roms.Add(new GameRom(Game.Name, romFile));
-                                }
-                            }
+                            roms.Add(new GameRom(Game.Name, m3uFile));
                         }
                         else
                         {
-                            foreach (var romFile in actualRomFiles)
-                            {
-                                roms.Add(new GameRom(Game.Name, romFile));
-                            }
+                            roms.AddRange(actualRomFiles.Select(f => new GameRom(Game.Name, f)));
                         }
                     } 
                     else 
