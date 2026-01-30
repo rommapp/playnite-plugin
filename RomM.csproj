@@ -30,8 +30,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Playnite.SDK, Version=6.14.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\packages\PlayniteSDK.6.14.0\lib\net462\Playnite.SDK.dll</HintPath>
+    <Reference Include="Playnite.SDK, Version=6.15.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\PlayniteSDK.6.15.0\lib\net462\Playnite.SDK.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="PresentationCore" />
@@ -76,7 +76,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
-    <PackageReference Include="PlayniteSDK" Version="6.14.0" />
+    <PackageReference Include="PlayniteSDK" Version="6.15.0" />
     <PackageReference Include="protobuf-net" Version="2.0.0.668" />
     <PackageReference Include="SharpCompress" Version="0.36.0" />
   </ItemGroup>
