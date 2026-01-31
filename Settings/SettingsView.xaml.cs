@@ -41,6 +41,14 @@ namespace RomM.Settings
             mapping.DestinationPath = path;
         }
 
+        private void Click_Browse7zDestination(object sender, RoutedEventArgs e)
+        {
+            string path;
+            if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
+
+            SettingsViewModel.Instance.PathTo7z = path;
+        }
+
         private static string GetSelectedFolderPath()
         {
             return SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFolder();
