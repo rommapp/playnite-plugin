@@ -57,12 +57,6 @@ namespace RomM.Games
                         gamePath = Path.Combine(installDir, info.FileName + ".zip");
                     }
 
-                    if (_romM.Playnite.ApplicationInfo.IsPortable)
-                    {
-                        installDir = installDir.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
-                        gamePath = gamePath.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
-                    }
-
                     Logger.Debug($"Downloading {Game.Name} to {gamePath}...");
                     Directory.CreateDirectory(installDir);
 

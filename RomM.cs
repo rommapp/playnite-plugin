@@ -178,6 +178,61 @@ namespace RomM
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
+
+            if (Playnite.Paths.IsPortable)
+            {
+                // Fix Paths that contain "{PlayniteDir}" so they can be installed and player
+                // Only applies if playnite is portable and the target directory is within the playnite folder
+                using (PlayniteApi.Database.BufferedUpdate())
+                {
+                    var games = PlayniteApi.Database.Games.Where(g => g.PluginId == Id && g.InstallDirectory != null && g.InstallDirectory.Contains(ExpandableVariables.PlayniteDirectory));
+                    foreach (var game in games)
+                    {
+                        game.InstallDirectory = PlayniteApi.ExpandGameVariables(game, game.InstallDirectory);
+                        
+                        //Also apply to roms, so the "installed" status can be set correctly
+                        if (game.Roms != null && game.Roms.Count > 0) 
+                        {
+                        var roms = game.Roms.Where(r => r.Path.Contains(ExpandableVariables.PlayniteDirectory));
+                        foreach (var rom in roms)
+                        {
+                            rom.Path = PlayniteApi.ExpandGameVariables(game, rom.Path);
+                        }
+                        }
+
+                        PlayniteApi.Database.Games.Update(game);
+                    }
+                }
+            }
+        }
+
+        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
+        {
+            base.OnApplicationStopped(args);
+
+            if(Playnite.Paths.IsPortable)
+            {
+                // Reverse Paths and put "{PlayniteDir}" back in so they can be restored when the application starts the next time
+                // Only applies if playnite is portable and the target directory is within the playnite folder
+                using (PlayniteApi.Database.BufferedUpdate())
+                {
+                    var games = PlayniteApi.Database.Games.Where(g => g.PluginId == Id && g.InstallDirectory != null && g.InstallDirectory.StartsWith(PlayniteApi.Paths.ApplicationPath));
+                    foreach (var game in games)
+                    {
+                        game.InstallDirectory = game.InstallDirectory.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
+
+                        if (game.Roms != null && game.Roms.Count > 0)
+                        {
+                            foreach (var rom in game.Roms)
+                            {
+                                rom.Path = rom.Path.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
+                            }
+                        }
+
+                        PlayniteApi.Database.Games.Update(game);
+                    }
+                }
+            }
         }
 
         public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
@@ -319,9 +374,7 @@ namespace RomM
                 {
                     Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
 
-                    var rootInstallDir = PlayniteApi.Paths.IsPortable
-                        ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
-                        : mapping.DestinationPathResolved;
+                    var rootInstallDir = mapping.DestinationPathResolved;
 
                     // Return a GameMetadata for each item in the response
                     foreach (var item in allRoms)
@@ -351,7 +404,7 @@ namespace RomM
                             continue;
                         }
 
-                        var gameNameWithTags  = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
+                        var gameNameWithTags = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
 
                         // Add newly found game
                         games.Add(new GameMetadata
@@ -366,6 +419,7 @@ namespace RomM
                             Regions = new HashSet<MetadataProperty>(item.Regions.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
                             InstallSize = item.FileSizeBytes,
                             Description = item.Summary,
+                            CoverImage = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             GameActions = new List<GameAction>
                             {
@@ -423,8 +477,7 @@ namespace RomM
 
             return games;
         }
-
-
+                
         public override ISettings GetSettings(bool firstRunSettings)
         {
             return Settings;
