@@ -213,7 +213,7 @@ namespace RomM
                 // Only applies if playnite is portable and the target directory is within the playnite folder
                 using (PlayniteApi.Database.BufferedUpdate())
                 {
-                    var games = PlayniteApi.Database.Games.Where(g => g.PluginId == Id);
+                    var games = PlayniteApi.Database.Games.Where(g => g.PluginId == Id && g.InstallDirectory.StartsWith(PlayniteApi.Paths.ApplicationPath));
                     foreach (var game in games)
                     {
                         game.InstallDirectory = game.InstallDirectory.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
