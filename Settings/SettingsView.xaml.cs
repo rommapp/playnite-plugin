@@ -45,10 +45,8 @@ namespace RomM.Settings
         {
             string path;
             if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
-            var playnite = SettingsViewModel.Instance.PlayniteAPI;
 
             SettingsViewModel.Instance.PathTo7z = path;
-            PathTo7zText.Text = path;
         }
 
         private static string GetSelectedFolderPath()

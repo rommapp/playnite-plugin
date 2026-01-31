@@ -229,6 +229,7 @@ namespace RomM.Games
                     if(process.ExitCode != 0)
                     {
                         _romM.Playnite.Notifications.Add(new NotificationMessage("RomM-Archive-Failed", $"Failed to extract {gamePath}", NotificationType.Error));
+                        throw new Exception($"7z extraction failed for {gamePath} with exit code {process.ExitCode}.");
                     }
                 }
             }
