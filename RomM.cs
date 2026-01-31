@@ -1,6 +1,14 @@
-﻿using Playnite.SDK;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Playnite.SDK;
+using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using RomM.Games;
+using RomM.Models.RomM.Collection;
+using RomM.Models.RomM.Platform;
+using RomM.Models.RomM.Rom;
+using RomM.Settings;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,14 +21,13 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Reflection;
 using System.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using RomM.Settings;
-using Playnite.SDK.Events;
-using RomM.Games;
-using RomM.Models.RomM.Platform;
-using RomM.Models.RomM.Rom;
-using RomM.Models.RomM.Collection;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
+using System.Web;
+using System.Windows.Controls;
 
 
 namespace RomM
@@ -105,13 +112,13 @@ namespace RomM
             }
         }
 
-        internal IList<RomMCollection> FetchCollections()
+        internal IList<RomMCollection> FetchFavorites()
         {
-            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections?isFavorite=true&isPublic=false");
             try
             {
                 // Make the request and get the response
-                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiCollectionUrl).GetAwaiter().GetResult();
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiFavoriteUrl).GetAwaiter().GetResult();
                 response.EnsureSuccessStatusCode();
 
                 // Assuming the response is in JSON format
@@ -122,6 +129,27 @@ namespace RomM
             {
                 Logger.Error($"Request exception: {e.Message}");
                 return new List<RomMCollection>();
+            }
+        }
+
+        internal async void UpdateOrCreateFavorites(RomMCollection favoriteCollection, List<int> romIds)
+        {
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            var formData = new MultipartFormDataContent();
+            formData.Add(new StringContent("Favorites"), "name");
+            formData.Add(new StringContent(JsonConvert.SerializeObject(romIds)), "rom_ids");
+
+            if (favoriteCollection == null)
+            {
+                formData.Add(new StringContent("true"), "isFavorite");
+                formData.Add(new StringContent("false"), "isPublic");
+
+                HttpResponseMessage response = HttpClientSingleton.Instance.PostAsync(apiCollectionUrl, formData).GetAwaiter().GetResult();
+            }
+            else
+            {
+                Logger.Info($"{apiCollectionUrl}/{favoriteCollection.Id}");
+                HttpResponseMessage response = HttpClientSingleton.Instance.PutAsync($"{apiCollectionUrl}/{favoriteCollection.Id}", formData).GetAwaiter().GetResult();
             }
         }
 
@@ -225,6 +253,58 @@ namespace RomM
                     }
                 }
             }
+
+            PlayniteApi.Database.Games.ItemUpdated += Games_ItemUpdated;
+        }
+
+        private bool isInternalUpdate = false;
+
+        private void Games_ItemUpdated(object sender, ItemUpdatedEventArgs<Game> args)
+        {
+            if (isInternalUpdate) return;
+
+            if (Settings.KeepRomMSynced == true)
+            {
+                foreach (var update in args.UpdatedItems)
+                {
+                    if (update.NewData.PluginId != Id) continue;
+
+                    var gameInfo = RomMGameInfo.FromGame<RomMGameInfo>(update.NewData);
+
+                    //Check if this Update changed the favorit and sync it
+                    if (update.OldData.Favorite != update.NewData.Favorite)
+                    {
+                        Logger.Info($"Favorites changed for {gameInfo.RomMId}.");
+                        //Start Background Task so Interface stays smooth
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                IList<RomMCollection> favoriteCollections = FetchFavorites();
+                                var favoriteCollection = favoriteCollections.FirstOrDefault(c => c.IsFavorite);
+
+                                var romIds = favoriteCollection?.RomIds ?? new List<int>();
+                                if (update.NewData.Favorite == false)
+                                {
+                                    romIds.Remove(gameInfo.RomMId);
+                                }
+                                else
+                                {
+                                    romIds.Add(gameInfo.RomMId);
+                                }
+
+                                UpdateOrCreateFavorites(favoriteCollection, romIds);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error(ex, "RomM Favorite Sync Failed");
+                            }
+                        });
+                    }
+
+                    //TODO: Sync status changes
+                }
+            }
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -254,6 +334,8 @@ namespace RomM
                     }
                 }
             }
+
+            PlayniteApi.Database.Games.ItemUpdated -= Games_ItemUpdated;
         }
 
         public static async Task<HttpResponseMessage> GetAsync(string baseUrl, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
@@ -300,8 +382,8 @@ namespace RomM
                 return games;
             }
 
-            IList<RomMCollection> collections = FetchCollections();
-            var favorites = collections.FirstOrDefault(c => c.IsFavorite)?.RomIds ?? new List<string>();
+            IList<RomMCollection> favoritCollections = FetchFavorites();
+            var favorites = favoritCollections.FirstOrDefault(c => c.IsFavorite)?.RomIds ?? new List<int>();
 
             foreach (var mapping in enabledMappings)
             {
@@ -442,6 +524,31 @@ namespace RomM
                             completionStatus = RomMRomUser.CompletionStatusMap[item.RomUser.Status ?? "not_played"];
                         }
 
+                        // Check if the game is already installed
+                        var game = Playnite.Database.Games.FirstOrDefault(g => g.GameId == gameId);
+                        if (game != null)
+                        {
+                            //If it is already installed, we sync over status like favorite and status!
+                            if (Settings.KeepRomMSynced == true)
+                            {
+                                game.Favorite = favorites.Exists(f => f == item.Id);
+                                game.CompletionStatusId = Playnite.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Id;
+
+                                try
+                                {
+                                    isInternalUpdate = true;
+                                    Playnite.Database.Games.Update(game);
+                                }
+                                finally
+                                {
+                                    isInternalUpdate = false; 
+                                }
+                            }
+                            continue;
+                        }
+
+                        var gameNameWithTags = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
+
                         // Add newly found game
                         games.Add(new GameMetadata
                         {
@@ -457,7 +564,7 @@ namespace RomM
                             Description = item.Summary,
                             CoverImage = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
-                            Favorite = favorites.Exists(f => f == item.Id.ToString()),
+                            Favorite = favorites.Exists(f => f == item.Id),
                             LastActivity = item.RomUser.LastPlayed,
                             UserScore = item.RomUser.Rating,
                             CompletionStatus = new MetadataNameProperty(PlayniteApi.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Name) ?? null,

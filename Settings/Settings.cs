@@ -25,6 +25,7 @@ namespace RomM.Settings
 
         public bool ScanGamesInFullScreen { get; set; } = false;
         public bool NotifyOnInstallComplete { get; set; } = false;
+        public bool KeepRomMSynced { get; set; } = false;
         public string RomMHost { get; set; } = "";
         public string RomMUsername { get; set; } = "";
         public string RomMPassword { get; set; } = "";
