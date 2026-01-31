@@ -393,7 +393,8 @@ namespace RomM
                             MappingId = mapping.MappingId,
                             FileName = fileName,
                             DownloadUrl = CombineUrl(Settings.RomMHost, $"api/roms/{item.Id}/content/{fileName}"),
-                            HasMultipleFiles = item.HasMultipleFiles
+                            HasMultipleFiles = item.HasMultipleFiles,
+                            RomMId = item.Id
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
