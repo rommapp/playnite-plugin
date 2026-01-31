@@ -191,10 +191,13 @@ namespace RomM
                         game.InstallDirectory = PlayniteApi.ExpandGameVariables(game, game.InstallDirectory);
                         
                         //Also apply to roms, so the "installed" status can be set correctly
+                        if (game.Roms != null && game.Roms.Count > 0) 
+                        {
                         var roms = game.Roms.Where(r => r.Path.Contains(ExpandableVariables.PlayniteDirectory));
                         foreach (var rom in roms)
                         {
                             rom.Path = PlayniteApi.ExpandGameVariables(game, rom.Path);
+                        }
                         }
 
                         PlayniteApi.Database.Games.Update(game);
@@ -213,7 +216,7 @@ namespace RomM
                 // Only applies if playnite is portable and the target directory is within the playnite folder
                 using (PlayniteApi.Database.BufferedUpdate())
                 {
-                    var games = PlayniteApi.Database.Games.Where(g => g.PluginId == Id && g.InstallDirectory.StartsWith(PlayniteApi.Paths.ApplicationPath));
+                    var games = PlayniteApi.Database.Games.Where(g => g.PluginId == Id && g.InstallDirectory != null && g.InstallDirectory.StartsWith(PlayniteApi.Paths.ApplicationPath));
                     foreach (var game in games)
                     {
                         game.InstallDirectory = game.InstallDirectory.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
