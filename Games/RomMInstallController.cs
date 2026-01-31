@@ -102,18 +102,16 @@ namespace RomM.Games
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
 
-                        var m3uFile = info.Mapping.Usem3u
-                            ? Directory.EnumerateFiles(installDir, "*", SearchOption.AllDirectories)
-                                .FirstOrDefault(f => f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
-                            : null;
+                        var m3uFile = info.Mapping.UseM3u ? actualRomFiles.FirstOrDefault(m => m.EndsWith(".m3u")) : null;
 
-                        if (m3uFile != null)
-                        {
+                        if (m3uFile != null && info.Mapping.UseM3u)
+                            {
                             roms.Add(new GameRom(Game.Name, m3uFile));
                         }
                         else
                         {
-                            roms.AddRange(actualRomFiles.Select(f => new GameRom(Game.Name, f)));
+                            var actualRomFilesNoM3u = actualRomFiles.Where(r => !r.EndsWith(".m3u"));
+                            roms.AddRange(actualRomFilesNoM3u.Select(f => new GameRom(Game.Name, f)));
                         }
                     } 
                     else 
