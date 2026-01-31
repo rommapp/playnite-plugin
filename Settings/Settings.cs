@@ -30,6 +30,9 @@ namespace RomM.Settings
         public string RomMPassword { get; set; } = "";
         public ObservableCollection<EmulatorMapping> Mappings { get; set; }
 
+        public bool Use7z { get; set; } = false;
+        public string PathTo7z { get; set; } = "";
+
         public SettingsViewModel()
         {
         }
@@ -53,6 +56,8 @@ namespace RomM.Settings
                 RomMUsername = savedSettings.RomMUsername;
                 RomMPassword = savedSettings.RomMPassword;
                 Mappings = savedSettings.Mappings;
+                Use7z = savedSettings.Use7z;
+                PathTo7z = savedSettings.PathTo7z;
             }
             
             if (Mappings == null)

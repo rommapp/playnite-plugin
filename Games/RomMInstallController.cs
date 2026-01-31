@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using SharpCompress.Archives;
 using SharpCompress.Common;
 using System.Linq;
+using System.Diagnostics;
 
 namespace RomM.Games
 {
@@ -212,20 +213,42 @@ namespace RomM.Games
                 throw new ArgumentException("Invalid install directory path");
             }
 
-            using (var archive = ArchiveFactory.Open(gamePath))
+            if (_romM.Settings.Use7z && (!string.IsNullOrEmpty(_romM.Settings.PathTo7z) && _romM.Settings.PathTo7z.EndsWith("7z.exe")))
             {
-                foreach (var entry in archive.Entries)
+                ProcessStartInfo startInfo = new ProcessStartInfo
                 {
-                    if (!entry.IsDirectory)
+                    FileName = _romM.Settings.PathTo7z,
+                    Arguments = $"x \"{gamePath}\" -o\"{installDir}\" -y",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using (Process process = Process.Start(startInfo))
+                {
+                    process.WaitForExit();
+                    if(process.ExitCode != 0)
                     {
-                        entry.WriteToDirectory(installDir, new ExtractionOptions
-                        {
-                            ExtractFullPath = true,
-                            Overwrite = true
-                        });
+                        _romM.Playnite.Notifications.Add(new NotificationMessage("RomM-Archive-Failed", $"Failed to extract {gamePath}", NotificationType.Error));
                     }
                 }
             }
+            else
+            {
+                using (var archive = ArchiveFactory.Open(gamePath))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (!entry.IsDirectory)
+                        {
+                            entry.WriteToDirectory(installDir, new ExtractionOptions
+                            {
+                                ExtractFullPath = true,
+                                Overwrite = true
+                            });
+                        }
+                    }
+                }
+            }      
         }
 
         void ExtractNestedArchives(string directoryPath)
