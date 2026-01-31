@@ -11,15 +11,8 @@ using RomM.Models.RomM.Rom;
 using RomM.Settings;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Controls;
-using System.Web;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Collections.Specialized;
 using System.IO;
-using System.Reflection;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -504,14 +497,6 @@ namespace RomM
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
-
-                        // Check if the game is already installed
-                        if (Playnite.Database.Games.Any(g => g.GameId == gameId))
-                        {
-                            continue;
-                        }
-
-                        var gameNameWithTags = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
 
                         string completionStatus;
                         // Determine status in Playnite. Backlogged and "now playing" take precedent over the status options
