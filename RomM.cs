@@ -20,6 +20,7 @@ using Playnite.SDK.Events;
 using RomM.Games;
 using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
+using RomM.Models.RomM.Collection;
 
 
 namespace RomM
@@ -101,6 +102,26 @@ namespace RomM
             {
                 Logger.Error($"Request exception: {e.Message}");
                 return new List<RomMPlatform>();
+            }
+        }
+
+        internal IList<RomMCollection> FetchCollections()
+        {
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            try
+            {
+                // Make the request and get the response
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiCollectionUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonConvert.DeserializeObject<List<RomMCollection>>(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new List<RomMCollection>();
             }
         }
 
@@ -279,6 +300,9 @@ namespace RomM
                 return games;
             }
 
+            IList<RomMCollection> collections = FetchCollections();
+            var favorites = collections.FirstOrDefault(c => c.IsFavorite)?.RomIds ?? new List<string>();
+
             foreach (var mapping in enabledMappings)
             {
                 if (args.CancelToken.IsCancellationRequested)
@@ -407,6 +431,17 @@ namespace RomM
 
                         var gameNameWithTags = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
 
+                        string completionStatus;
+                        // Determine status in Playnite. Backlogged and "now playing" take precedent over the status options
+                        if (item.RomUser.Backlogged || item.RomUser.NowPlaying)
+                        {
+                            completionStatus = item.RomUser.NowPlaying ? RomMRomUser.CompletionStatusMap["now_playing"] : RomMRomUser.CompletionStatusMap["backlogged"];
+                        }
+                        else
+                        {
+                            completionStatus = RomMRomUser.CompletionStatusMap[item.RomUser.Status ?? "not_played"];
+                        }
+
                         // Add newly found game
                         games.Add(new GameMetadata
                         {
@@ -422,6 +457,10 @@ namespace RomM
                             Description = item.Summary,
                             CoverImage = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
+                            Favorite = favorites.Exists(f => f == item.Id.ToString()),
+                            LastActivity = item.RomUser.LastPlayed,
+                            UserScore = item.RomUser.Rating,
+                            CompletionStatus = new MetadataNameProperty(PlayniteApi.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Name) ?? null,
                             GameActions = new List<GameAction>
                             {
                                 new GameAction

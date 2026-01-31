@@ -124,7 +124,7 @@ namespace RomM.Models.RomM.Rom
         public DateTime UpdatedAt { get; set; }
 
         [JsonProperty("rom_user")]
-        public object RomUser { get; set; }
+        public RomMRomUser RomUser { get; set; }
 
         [JsonProperty("sort_comparator")]
         public string SortComparator { get; set; }
