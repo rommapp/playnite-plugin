@@ -602,7 +602,7 @@ namespace RomM
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             Favorite = favorites.Exists(f => f == item.Id),
                             LastActivity = item.RomUser.LastPlayed,
-                            UserScore = item.RomUser.Rating,
+                            UserScore = item.RomUser.Rating * 10, //RomM-Rating is 1-10, Playnite 1-100, so it can unfortunately only by synced one direction without loosing decimals
                             CompletionStatus = new MetadataNameProperty(PlayniteApi.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Name) ?? null,
                             GameActions = new List<GameAction>
                             {
