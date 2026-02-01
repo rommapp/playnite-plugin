@@ -1,13 +1,12 @@
 ﻿using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using RomM.Downloads;
+using SharpCompress.Archives;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
-using RomM.Downloads;
-using SharpCompress.Archives;
 
 namespace RomM.Games
 {
@@ -31,11 +30,13 @@ namespace RomM.Games
 
             // Paths (same as before)
             var installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
+
+            // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
+            // Otherwise we download the single ROM file.
             var downloadFilePath = info.HasMultipleFiles
                 ? Path.Combine(installDir, info.FileName + ".zip")
                 : Path.Combine(installDir, info.FileName);
 
-            // Create request for queue
             var req = new DownloadRequest
             {
                 GameId = Game.Id,
@@ -54,17 +55,37 @@ namespace RomM.Games
                     var roms = new List<GameRom>();
 
                     // If the downloaded file still exists and wasn't extracted -> single file ROM
-                    if (File.Exists(downloadFilePath) && !(info.HasMultipleFiles || (info.Mapping.AutoExtract && IsFileCompressed(downloadFilePath))))
+                    // (AutoExtract might be false, or file isn't an archive, etc.)
+                    var wouldExtract =
+                        info.HasMultipleFiles ||
+                        (info.Mapping != null && info.Mapping.AutoExtract && IsFileCompressed(downloadFilePath));
+
+                    if (File.Exists(downloadFilePath) && !wouldExtract)
                     {
                         roms.Add(new GameRom(Game.Name, downloadFilePath));
                         return roms;
                     }
 
-                    // Otherwise, we assume extracted files in installDir
+                    // Otherwise, we assume extracted files are in installDir
                     var supported = GetEmulatorSupportedFileTypes(info);
-                    var files = GetRomFiles(installDir, supported);
+                    var actualRomFiles = GetRomFiles(installDir, supported);
 
-                    foreach (var f in files)
+                    // Prefer .m3u if requested
+                    var useM3u = info.Mapping != null && info.Mapping.UseM3u;
+                    if (useM3u)
+                    {
+                        var m3uFile = actualRomFiles.FirstOrDefault(m =>
+                            m.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase));
+
+                        if (!string.IsNullOrEmpty(m3uFile))
+                        {
+                            roms.Add(new GameRom(Game.Name, m3uFile));
+                            return roms;
+                        }
+                    }
+
+                    // Otherwise add all rom files except m3u (we don’t want duplicates)
+                    foreach (var f in actualRomFiles.Where(f => !f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase)))
                     {
                         roms.Add(new GameRom(Game.Name, f));
                     }
@@ -109,6 +130,8 @@ namespace RomM.Games
 
         private static string[] GetRomFiles(string installDir, List<string> supportedFileTypes)
         {
+            // NOTE: this traversal check is weak; containment checks should be done via GetFullPath
+            // against a trusted root. Keeping your existing checks as-is for now.
             if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
             {
                 throw new ArgumentException("Invalid file path");
@@ -117,7 +140,6 @@ namespace RomM.Games
             if (supportedFileTypes == null || supportedFileTypes.Count == 0)
             {
                 return Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
-                    .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
                     .ToArray();
             }
 
@@ -128,8 +150,7 @@ namespace RomM.Games
                     throw new ArgumentException("Invalid file path");
                 }
 
-                return Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories)
-                    .Where(file => !file.Contains("../") && !file.Contains(@"..\"));
+                return Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories);
             }).ToArray();
         }
 

@@ -23,7 +23,6 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Controls;
 
-
 namespace RomM
 {
     public static class HttpClientSingleton
@@ -42,10 +41,7 @@ namespace RomM
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
         }
 
-        public static HttpClient Instance
-        {
-            get { return httpClient; }
-        }
+        public static HttpClient Instance => httpClient;
     }
 
     public static class JsonSerializerSingleton
@@ -71,7 +67,7 @@ namespace RomM
         public DownloadQueueController DownloadQueueController { get; private set; }
 
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
-        private DownloadQueueViewModel downloadsVm;
+        private readonly DownloadQueueViewModel downloadsVm;
 
         // Implementing Client adds ability to open it via special menu in playnite
         public override LibraryClient Client { get; } = new RomMClient();
@@ -107,11 +103,9 @@ namespace RomM
             string apiPlatformsUrl = CombineUrl(Settings.RomMHost, "api/platforms");
             try
             {
-                // Make the request and get the response
                 HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiPlatformsUrl).GetAwaiter().GetResult();
                 response.EnsureSuccessStatusCode();
 
-                // Assuming the response is in JSON format
                 string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 return JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
             }
@@ -127,11 +121,9 @@ namespace RomM
             string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
             try
             {
-                // Fetch the rom info from RomM
                 HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(romUrl).GetAwaiter().GetResult();
                 response.EnsureSuccessStatusCode();
 
-                // Assuming the response is in JSON format
                 string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 return JsonConvert.DeserializeObject<RomMRom>(body);
             }
@@ -172,6 +164,7 @@ namespace RomM
                     if (game == null)
                     {
                         Logger.Warn($"Game {gameName} not found in Playnite database.");
+                        return;
                     }
 
                     PlayniteApi.MainView.SwitchToLibraryView();
@@ -193,13 +186,89 @@ namespace RomM
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             base.OnApplicationStarted(args);
+
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
 
             Playnite.Database.Games.ItemUpdated += OnItemUpdated;
+
+            // Portable path fix: expand "{PlayniteDir}" to absolute paths in DB on startup
+            if (Playnite.Paths.IsPortable)
+            {
+                using (PlayniteApi.Database.BufferedUpdate())
+                {
+                    var games = PlayniteApi.Database.Games.Where(g =>
+                        g.PluginId == Id &&
+                        g.InstallDirectory != null &&
+                        g.InstallDirectory.Contains(ExpandableVariables.PlayniteDirectory));
+
+                    foreach (var game in games)
+                    {
+                        game.InstallDirectory = PlayniteApi.ExpandGameVariables(game, game.InstallDirectory);
+
+                        if (game.Roms != null && game.Roms.Count > 0)
+                        {
+                            var roms = game.Roms.Where(r => r.Path.Contains(ExpandableVariables.PlayniteDirectory));
+                            foreach (var rom in roms)
+                            {
+                                rom.Path = PlayniteApi.ExpandGameVariables(game, rom.Path);
+                            }
+                        }
+
+                        PlayniteApi.Database.Games.Update(game);
+                    }
+                }
+            }
         }
 
+        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
+        {
+            base.OnApplicationStopped(args);
+
+            Playnite.Database.Games.ItemUpdated -= OnItemUpdated;
+
+            // Portable path fix: restore "{PlayniteDir}" tokens before exiting
+            if (Playnite.Paths.IsPortable)
+            {
+                using (PlayniteApi.Database.BufferedUpdate())
+                {
+                    var games = PlayniteApi.Database.Games.Where(g =>
+                        g.PluginId == Id &&
+                        g.InstallDirectory != null &&
+                        g.InstallDirectory.StartsWith(PlayniteApi.Paths.ApplicationPath));
+
+                    foreach (var game in games)
+                    {
+                        game.InstallDirectory = game.InstallDirectory.Replace(
+                            PlayniteApi.Paths.ApplicationPath,
+                            ExpandableVariables.PlayniteDirectory);
+
+                        if (game.Roms != null && game.Roms.Count > 0)
+                        {
+                            foreach (var rom in game.Roms)
+                            {
+                                rom.Path = rom.Path.Replace(
+                                    PlayniteApi.Paths.ApplicationPath,
+                                    ExpandableVariables.PlayniteDirectory);
+                            }
+                        }
+
+                        PlayniteApi.Database.Games.Update(game);
+                    }
+                }
+            }
+        }
+
+        // Old-style overload (keeps older call sites working)
+        public static Task<HttpResponseMessage> GetAsync(
+            string url,
+            HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
+        {
+            return HttpClientSingleton.Instance.GetAsync(url, completionOption);
+        }
+
+        // New-style overload (used by DownloadQueueController)
         public static Task<HttpResponseMessage> GetAsync(
             string url,
             HttpCompletionOption completionOption,
@@ -230,8 +299,9 @@ namespace RomM
                 return new List<GameMetadata>();
             }
 
-            // Return early if host, username or password is not set
-            if (string.IsNullOrEmpty(Settings.RomMHost) || string.IsNullOrEmpty(Settings.RomMUsername) || string.IsNullOrEmpty(Settings.RomMPassword))
+            if (string.IsNullOrEmpty(Settings.RomMHost) ||
+                string.IsNullOrEmpty(Settings.RomMUsername) ||
+                string.IsNullOrEmpty(Settings.RomMPassword))
             {
                 Logger.Warn("RomM host, username or password is not set.");
                 return new List<GameMetadata>();
@@ -296,24 +366,21 @@ namespace RomM
                     {
                         { "limit", pageSize.ToString() },
                         { "offset", offset.ToString() },
-                        { "platform_id", apiPlatform.Id.ToString() },
+                        { "platform_id", apiPlatform.Id.ToString() }, // singular
                         { "order_by", "name" },
                         { "order_dir", "asc" },
                     };
 
                     try
                     {
-                        // Make the request and get the response
                         HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
                         response.EnsureSuccessStatusCode();
 
                         Logger.Debug($"Parsing response for {apiPlatform.Name} batch {offset / pageSize + 1}.");
 
-                        // Assuming the response is in JSON format
                         Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
                         List<RomMRom> roms;
                         using (StreamReader reader = new StreamReader(body))
-                        using (JsonTextReader jsonReader = new JsonTextReader(reader))
                         {
                             var jsonResponse = JObject.Parse(reader.ReadToEnd());
                             roms = jsonResponse["items"].ToObject<List<RomMRom>>();
@@ -346,14 +413,21 @@ namespace RomM
                         ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
                         : mapping.DestinationPathResolved;
 
-                    // Return a GameMetadata for each item in the response
                     foreach (var item in allRoms)
                     {
                         if (args.CancelToken.IsCancellationRequested)
                             break;
 
                         var gameName = item.Name;
-                        var fileName = item.FileName;
+
+                        // Defensive: never allow path segments from server-provided filename
+                        var fileName = Path.GetFileName(item.FileName);
+                        if (string.IsNullOrWhiteSpace(fileName))
+                        {
+                            Logger.Warn($"Rom {item.Id} returned empty/invalid filename, skipping.");
+                            continue;
+                        }
+
                         var urlCover = item.UrlCover;
                         var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(fileName));
                         var pathToGame = Path.Combine(gameInstallDir, fileName);
@@ -365,18 +439,21 @@ namespace RomM
                             DownloadUrl = CombineUrl(Settings.RomMHost, $"api/roms/{item.Id}/content/{fileName}"),
                             HasMultipleFiles = item.HasMultipleFiles
                         };
+
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
 
-                        // Check if the game is already installed
                         if (Playnite.Database.Games.Any(g => g.GameId == gameId))
                         {
                             continue;
                         }
 
-                        var gameNameWithTags  = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
+                        var gameNameWithTags =
+                            $"{gameName}" +
+                            $"{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}" +
+                            $"{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}" +
+                            $"{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
 
-                        // Add newly found game
                         games.Add(new GameMetadata
                         {
                             Source = SourceName,
@@ -389,6 +466,7 @@ namespace RomM
                             Regions = new HashSet<MetadataProperty>(item.Regions.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
                             InstallSize = item.FileSizeBytes,
                             Description = item.Summary,
+                            CoverImage = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             GameActions = new List<GameAction>
                             {
@@ -413,7 +491,6 @@ namespace RomM
 
                     Logger.Debug($"Finished adding new games for {apiPlatform.Name}");
 
-                    // Find games in the database that are not in the response
                     var gamesInDatabase = Playnite.Database.Games.Where(g =>
                         g.Source != null && g.Source.Name == SourceName.ToString() &&
                         g.Platforms != null && g.Platforms.Any(p => p.Name == mapping.Platform.Name)
@@ -431,7 +508,6 @@ namespace RomM
                             continue;
                         }
 
-                        // Remove from the playnite database
                         Playnite.Database.Games.Remove(game.Id);
                     }
 
@@ -447,10 +523,12 @@ namespace RomM
             return games;
         }
 
-
         public override IEnumerable<SidebarItem> GetSidebarItems()
         {
-            yield return DownloadsSidebar;
+            if (DownloadsSidebar != null)
+            {
+                yield return DownloadsSidebar;
+            }
         }
 
         public override ISettings GetSettings(bool firstRunSettings)
@@ -505,11 +583,9 @@ namespace RomM
                 // This is the cancel signal
                 if (oldGame.IsInstalling && !newGame.IsInstalling)
                 {
-                    // Installation was canceled or finished
                     DownloadQueueController?.Cancel(newGame.Id);
                 }
             }
         }
     }
 }
-
