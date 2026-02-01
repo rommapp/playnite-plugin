@@ -126,24 +126,46 @@ namespace RomM
             }
         }
 
-        internal async void UpdateOrCreateFavorites(RomMCollection favoriteCollection, List<int> romIds)
+        internal RomMCollection CreateFavorites()
         {
-            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
-            var formData = new MultipartFormDataContent();
-            formData.Add(new StringContent("Favorites"), "name");
-            formData.Add(new StringContent(JsonConvert.SerializeObject(romIds)), "rom_ids");
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections?is_favorite=true&is_public=false");
+            try
+            {
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent("Favorites"), "name");
 
+                HttpResponseMessage postResponse = HttpClientSingleton.Instance.PostAsync(apiCollectionUrl, formData).GetAwaiter().GetResult();
+                postResponse.EnsureSuccessStatusCode();
+
+                string body = postResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonConvert.DeserializeObject<RomMCollection>(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return null;
+            }
+        }
+
+        internal async void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
+        {
             if (favoriteCollection == null)
             {
-                formData.Add(new StringContent("true"), "isFavorite");
-                formData.Add(new StringContent("false"), "isPublic");
-
-                HttpResponseMessage response = HttpClientSingleton.Instance.PostAsync(apiCollectionUrl, formData).GetAwaiter().GetResult();
+                Logger.Error($"Can't update favorites, collection is null");
+                return;
             }
-            else
+
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            try
             {
-                Logger.Info($"{apiCollectionUrl}/{favoriteCollection.Id}");
-                HttpResponseMessage response = HttpClientSingleton.Instance.PutAsync($"{apiCollectionUrl}/{favoriteCollection.Id}", formData).GetAwaiter().GetResult();
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent(JsonConvert.SerializeObject(romIds)), "rom_ids");
+                HttpResponseMessage putResponse = HttpClientSingleton.Instance.PutAsync($"{apiCollectionUrl}/{favoriteCollection.Id}", formData).GetAwaiter().GetResult();
+                putResponse.EnsureSuccessStatusCode();
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
             }
         }
 
@@ -269,27 +291,32 @@ namespace RomM
                         if (update.OldData.Favorite != update.NewData.Favorite)
                         {
                             Logger.Info($"Favorites changed for {gameInfo.RomMId}.");
-                                try
-                                {
-                                    IList<RomMCollection> favoriteCollections = FetchFavorites();
-                                    var favoriteCollection = favoriteCollections.FirstOrDefault(c => c.IsFavorite);
+                            try
+                            {
+                                IList<RomMCollection> favoriteCollections = FetchFavorites();
+                                var favoriteCollection = favoriteCollections.FirstOrDefault(c => c.IsFavorite);
 
-                                    var romIds = favoriteCollection?.RomIds ?? new List<int>();
-                                    if (update.NewData.Favorite == false)
-                                    {
-                                        romIds.Remove(gameInfo.RomMId);
-                                    }
-                                    else
-                                    {
-                                        romIds.Add(gameInfo.RomMId);
-                                    }
-
-                                    UpdateOrCreateFavorites(favoriteCollection, romIds);
-                                }
-                                catch (Exception ex)
+                                if (favoriteCollection == null)
                                 {
-                                    Logger.Error(ex, "RomM Favorite Sync Failed");
+                                    favoriteCollection = CreateFavorites();
                                 }
+
+                                var romIds = favoriteCollection?.RomIds ?? new List<int>();
+                                if (update.NewData.Favorite == false)
+                                {
+                                    romIds.Remove(gameInfo.RomMId);
+                                }
+                                else
+                                {
+                                    romIds.Add(gameInfo.RomMId);
+                                }
+
+                                UpdateFavorites(favoriteCollection, romIds);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error(ex, "RomM Favorite Sync Failed");
+                            }
                         }
 
                         if (update.OldData.CompletionStatus != update.NewData.CompletionStatus)
@@ -313,6 +340,7 @@ namespace RomM
                                 };
                                 string apiRomMRomUserProps = CombineUrl(Settings.RomMHost, $"api/roms/{gameInfo.RomMId}/props");
                                 HttpResponseMessage response = HttpClientSingleton.Instance.PutAsync(apiRomMRomUserProps, new StringContent(JsonConvert.SerializeObject(updatePayload), Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+                                response.EnsureSuccessStatusCode();
                             }
                             catch (Exception ex)
                             {
