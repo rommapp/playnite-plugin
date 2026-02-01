@@ -26,6 +26,10 @@ namespace RomM.Settings
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool AutoExtract { get; set; }
 
+        [DefaultValue(false)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
+        public bool UseM3u { get; set; }
+
         [JsonIgnore]
         public Emulator Emulator
         {
