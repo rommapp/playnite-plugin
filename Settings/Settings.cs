@@ -54,6 +54,7 @@ namespace RomM.Settings
                 RomMUsername = savedSettings.RomMUsername;
                 RomMPassword = savedSettings.RomMPassword;
                 Mappings = savedSettings.Mappings;
+                KeepRomMSynced = savedSettings.KeepRomMSynced;
             }
             
             if (Mappings == null)

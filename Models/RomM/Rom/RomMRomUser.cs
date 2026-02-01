@@ -33,7 +33,7 @@ namespace RomM.Models.RomM.Rom
             { "retired", "Played" },
             { "incomplete", "On Hold" },
             { "finished", "Beaten" },
-            { "completed_100", "Beaten" },
+            { "completed_100", "Completed" },
             { "backlogged", "Plan to Play" },
             { "now_playing", "Playing" },
             { "not_played", "Not Played" }
