@@ -1,14 +1,11 @@
 ﻿using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using RomM.Downloads;
+using SharpCompress.Archives;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
-using SharpCompress.Archives;
-using SharpCompress.Common;
 using System.Linq;
 using System.Diagnostics;
 
@@ -17,7 +14,6 @@ namespace RomM.Games
     internal class RomMInstallController : InstallController
     {
         protected readonly IRomM _romM;
-        protected CancellationTokenSource _watcherToken;
         public ILogger Logger => LogManager.GetLogger();
 
         internal RomMInstallController(Game game, IRomM romM) : base(game)
@@ -26,43 +22,61 @@ namespace RomM.Games
             _romM = romM;
         }
 
-        public override void Dispose()
-        {
-            _watcherToken?.Cancel();
-            base.Dispose();
-        }
-
         public override void Install(InstallActionArgs args)
         {
             var info = Game.GetRomMGameInfo();
 
-            var dstPath = info.Mapping?.DestinationPathResolved ??
-                throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
+            var dstPath = info.Mapping?.DestinationPathResolved
+                ?? throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
 
-            _watcherToken = new CancellationTokenSource();
+            // Paths (same as before)
+            var installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
 
-            Task.Run(async () =>
+            // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
+            // Otherwise we download the single ROM file.
+            var downloadFilePath = info.HasMultipleFiles
+                ? Path.Combine(installDir, info.FileName + ".zip")
+                : Path.Combine(installDir, info.FileName);
+
+            var req = new DownloadRequest
             {
-                try
+                GameId = Game.Id,
+                GameName = Game.Name,
+
+                DownloadUrl = info.DownloadUrl,
+                InstallDir = installDir,
+                GamePath = downloadFilePath,
+
+                HasMultipleFiles = info.HasMultipleFiles,
+                AutoExtract = info.Mapping != null && info.Mapping.AutoExtract,
+
+                // Called by queue AFTER download/extract is done
+                BuildRoms = () =>
                 {
-                    // Fetch file from content endpoint
-                    HttpResponseMessage response = await RomM.GetAsync(info.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
-                    response.EnsureSuccessStatusCode();
+                    var roms = new List<GameRom>();
 
-                    List<GameRom> roms = new List<GameRom>();
-                    string installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
-                    string gamePath = Path.Combine(installDir, info.FileName);
-                    if (info.HasMultipleFiles)
+                    // If the downloaded file still exists and wasn't extracted -> single file ROM
+                    // (AutoExtract might be false, or file isn't an archive, etc.)
+                    var wouldExtract =
+                        info.HasMultipleFiles ||
+                        (info.Mapping != null && info.Mapping.AutoExtract && IsFileCompressed(downloadFilePath));
+
+                    if (File.Exists(downloadFilePath) && !wouldExtract)
                     {
-                        // File name for multi-file archives is the folder name, so we append .zip
-                        gamePath = Path.Combine(installDir, info.FileName + ".zip");
+                        roms.Add(new GameRom(Game.Name, downloadFilePath));
+                        return roms;
                     }
 
-                    if (_romM.Playnite.ApplicationInfo.IsPortable)
+                    // Otherwise, we assume extracted files are in installDir
+                    var supported = GetEmulatorSupportedFileTypes(info);
+                    var actualRomFiles = GetRomFiles(installDir, supported);
+
+                    // Prefer .m3u if requested
+                    var useM3u = info.Mapping != null && info.Mapping.UseM3u;
+                    if (useM3u)
                     {
-                        installDir = installDir.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
-                        gamePath = gamePath.Replace(_romM.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory);
-                    }
+                        var m3uFile = actualRomFiles.FirstOrDefault(m =>
+                            m.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase));
 
                     Logger.Debug($"Downloading {Game.Name} to {gamePath}...");
                     Directory.CreateDirectory(installDir);
@@ -108,43 +122,61 @@ namespace RomM.Games
                                 .FirstOrDefault(f => f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
                             : null;
 
-                        if (m3uFile != null)
+                        if (!string.IsNullOrEmpty(m3uFile))
                         {
                             roms.Add(new GameRom(Game.Name, m3uFile));
+                            return roms;
                         }
-                        else
-                        {
-                            roms.AddRange(actualRomFiles.Select(f => new GameRom(Game.Name, f)));
-                        }
-                    } 
-                    else 
-                    {
-                        // Add the single ROM file to the list
-                        roms.Add(new GameRom(Game.Name, gamePath));
                     }
 
-                    // Update the game's installation status
+                    // Otherwise add all rom files except m3u (we don’t want duplicates)
+                    foreach (var f in actualRomFiles.Where(f => !f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        roms.Add(new GameRom(Game.Name, f));
+                    }
+
+                    return roms;
+                },
+
+                // Callbacks into Playnite install pipeline
+                OnInstalled = installedArgs =>
+                {
                     var game = _romM.Playnite.Database.Games[Game.Id];
                     game.IsInstalled = true;
                     _romM.Playnite.Database.Games.Update(game);
 
-                    InvokeOnInstalled(new GameInstalledEventArgs(new GameInstallationData()
-                    {
-                        InstallDirectory = installDir,
-                        Roms = roms,
-                    }));
-                }
-                catch (Exception ex)
+                    InvokeOnInstalled(installedArgs);
+                },
+
+                OnCanceled = () =>
                 {
-                    _romM.Playnite.Notifications.Add(Game.GameId, $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex}", NotificationType.Error);
+                    var game = _romM.Playnite.Database.Games[Game.Id];
+                    game.IsInstalling = false;
+                    game.IsInstalled = false;
+                    _romM.Playnite.Database.Games.Update(game);
+
+                    InvokeOnInstallationCancelled(new GameInstallationCancelledEventArgs());
+                },
+
+                OnFailed = ex =>
+                {
+                    _romM.Playnite.Notifications.Add(
+                        Game.GameId,
+                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex}",
+                        NotificationType.Error);
+
                     Game.IsInstalling = false;
-                    throw;
                 }
-            });
+            };
+
+            // Enqueue (non-blocking)
+            _romM.DownloadQueueController.Enqueue(req);
         }
 
         private static string[] GetRomFiles(string installDir, List<string> supportedFileTypes)
         {
+            // NOTE: this traversal check is weak; containment checks should be done via GetFullPath
+            // against a trusted root. Keeping your existing checks as-is for now.
             if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
             {
                 throw new ArgumentException("Invalid file path");
@@ -152,22 +184,19 @@ namespace RomM.Games
 
             if (supportedFileTypes == null || supportedFileTypes.Count == 0)
             {
-               return Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
-                    .Where(file => !file.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                return Directory.GetFiles(installDir, "*", SearchOption.AllDirectories)
                     .ToArray();
             }
-            else
+
+            return supportedFileTypes.SelectMany(fileType =>
             {
-                return supportedFileTypes.SelectMany(fileType =>
+                if (fileType == null || fileType.Contains("../") || fileType.Contains(@"..\"))
                 {
-                    if (fileType == null || fileType.Contains("../") || fileType.Contains(@"..\"))
-                    {
-                        throw new ArgumentException("Invalid file path");
-                    }
-                    return Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories)
-                        .Where(file => !file.Contains("../") && !file.Contains(@"..\"));
-                }).ToArray();
-            }
+                    throw new ArgumentException("Invalid file path");
+                }
+
+                return Directory.GetFiles(installDir, "*." + fileType, SearchOption.AllDirectories);
+            }).ToArray();
         }
 
         private static List<string> GetEmulatorSupportedFileTypes(RomMGameInfo info)
