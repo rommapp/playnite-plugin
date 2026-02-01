@@ -103,7 +103,7 @@ namespace RomM.Games
                         List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
                         string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
 
-                        var m3uFile = info.Mapping.Usem3u
+                        var m3uFile = info.Mapping.UseM3u
                             ? Directory.EnumerateFiles(installDir, "*", SearchOption.AllDirectories)
                                 .FirstOrDefault(f => f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
                             : null;
@@ -213,7 +213,7 @@ namespace RomM.Games
                 throw new ArgumentException("Invalid install directory path");
             }
 
-            if (_romM.Settings.Use7z && (!string.IsNullOrEmpty(_romM.Settings.PathTo7z) && _romM.Settings.PathTo7z.EndsWith("7z.exe")))
+            if (_romM.Settings.Use7z && (!string.IsNullOrEmpty(_romM.Settings.PathTo7z) && _romM.Settings.PathTo7z.EndsWith("7z.exe", StringComparison.OrdinalIgnoreCase)))
             {
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
