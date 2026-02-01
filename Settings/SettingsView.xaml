@@ -129,6 +129,26 @@
                 <CheckBox IsChecked="{Binding NotifyOnInstallComplete, Mode=TwoWay}" Margin="0,0,0,10">
                     <TextBlock Text="Enable notification upon game install completion" TextWrapping="Wrap"/>
                 </CheckBox>
+                
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <CheckBox IsChecked="{Binding Use7z, Mode=TwoWay}" Grid.Row="0" Grid.Column="0" Margin="0,0,0,10">
+                        <TextBlock Text="Use 7z for archive extraction" TextWrapping="Wrap"/>
+                    </CheckBox>
+                    <TextBox x:Name="PathTo7zText" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" Text="{Binding PathTo7z, Mode=TwoWay}" />
+                    <Button Name="Browse7z" Click="Click_Browse7zDestination" Grid.Row="0" Grid.Column="2">
+                        <Label Content="Browse" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
+                    </Button>
+                </Grid>
+
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

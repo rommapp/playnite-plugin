@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
 
 namespace RomM.Games
 {
@@ -76,6 +77,50 @@ namespace RomM.Games
                     {
                         var m3uFile = actualRomFiles.FirstOrDefault(m =>
                             m.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase));
+
+                    Logger.Debug($"Downloading {Game.Name} to {gamePath}...");
+                    Directory.CreateDirectory(installDir);
+
+                    // Stream the file directly to disk
+                    using (var fileStream = new FileStream(gamePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                    using (var httpStream = await response.Content.ReadAsStreamAsync())
+                    {
+                        byte[] buffer = new byte[65536];
+                        int bytesRead;
+
+                        while ((bytesRead = await httpStream.ReadAsync(buffer, 0, buffer.Length, _watcherToken.Token)) > 0)
+                        {
+                            await fileStream.WriteAsync(buffer, 0, bytesRead, _watcherToken.Token);
+                        }
+                    }
+
+                    Logger.Debug($"Download of {Game.Name} complete.");
+
+                    // Always extract top-level file of multi-file archives
+                    if (info.HasMultipleFiles || (info.Mapping.AutoExtract && IsFileCompressed(gamePath)))
+                    {
+                        Logger.Debug($"Extracting {Game.Name} to {installDir}...");
+                        // Extract the archive to the install directory
+                        ExtractArchive(gamePath, installDir);
+
+                        // Delete the compressed file
+                        File.Delete(gamePath);
+
+                        // Extract nested archives if auto-extract is enabled
+                        if (info.HasMultipleFiles && info.Mapping.AutoExtract)
+                        {
+                            ExtractNestedArchives(installDir);
+                        }
+
+                        Logger.Debug($"Extraction of {Game.Name} complete.");
+
+                        List<string> supportedFileTypes = GetEmulatorSupportedFileTypes(info);
+                        string[] actualRomFiles = GetRomFiles(installDir, supportedFileTypes);
+
+                        var m3uFile = info.Mapping.UseM3u
+                            ? Directory.EnumerateFiles(installDir, "*", SearchOption.AllDirectories)
+                                .FirstOrDefault(f => f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                            : null;
 
                         if (!string.IsNullOrEmpty(m3uFile))
                         {
@@ -183,6 +228,74 @@ namespace RomM.Games
             }
 
             return ArchiveFactory.IsArchive(filePath, out var type);
+        }
+
+        private void ExtractArchive(string gamePath, string installDir)
+        {
+            if (gamePath == null || gamePath.Contains("../") || gamePath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid game path");
+            }
+
+            if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid install directory path");
+            }
+
+            if (_romM.Settings.Use7z && (!string.IsNullOrEmpty(_romM.Settings.PathTo7z) && _romM.Settings.PathTo7z.EndsWith("7z.exe", StringComparison.OrdinalIgnoreCase)))
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = _romM.Settings.PathTo7z,
+                    Arguments = $"x \"{gamePath}\" -o\"{installDir}\" -y",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using (Process process = Process.Start(startInfo))
+                {
+                    process.WaitForExit();
+                    if(process.ExitCode != 0)
+                    {
+                        _romM.Playnite.Notifications.Add(new NotificationMessage("RomM-Archive-Failed", $"Failed to extract {gamePath}", NotificationType.Error));
+                        throw new Exception($"7z extraction failed for {gamePath} with exit code {process.ExitCode}.");
+                    }
+                }
+            }
+            else
+            {
+                using (var archive = ArchiveFactory.Open(gamePath))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (!entry.IsDirectory)
+                        {
+                            entry.WriteToDirectory(installDir, new ExtractionOptions
+                            {
+                                ExtractFullPath = true,
+                                Overwrite = true
+                            });
+                        }
+                    }
+                }
+            }      
+        }
+
+        void ExtractNestedArchives(string directoryPath)
+        {
+            if (directoryPath == null || directoryPath.Contains("../") || directoryPath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid file path");
+            }
+
+            foreach (var file in Directory.GetFiles(directoryPath))
+            {   
+                if (IsFileCompressed(file))
+                {
+                    ExtractArchive(file, directoryPath);
+                    File.Delete(file);
+                }
+            }
         }
     }
 }
