@@ -366,7 +366,7 @@ namespace RomM
                     {
                         { "limit", pageSize.ToString() },
                         { "offset", offset.ToString() },
-                        { "platform_id", apiPlatform.Id.ToString() }, // singular
+                        { "platform_ids", apiPlatform.Id.ToString() },
                         { "order_by", "name" },
                         { "order_dir", "asc" },
                     };
@@ -419,9 +419,12 @@ namespace RomM
                             break;
 
                         var gameName = item.Name;
+                        //Not sure if this a server bug or if my RomM server is borked but some games like Wii U dont have any of these enabled
+                        if (!item.HasSimpleSingleFile & !item.HasNestedSingleFile & !item.HasMultipleFiles)
+                            item.HasMultipleFiles = true;
 
-                        // Defensive: never allow path segments from server-provided filename
-                        var fileName = Path.GetFileName(item.FileName);
+                        // Defensive: never allow path segments from server-provided filename & make sure single ROM files have an extention
+                        var fileName = item.HasMultipleFiles ? Path.GetFileName(item.FileName) : item.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName;
                         if (string.IsNullOrWhiteSpace(fileName))
                         {
                             Logger.Warn($"Rom {item.Id} returned empty/invalid filename, skipping.");
@@ -464,10 +467,15 @@ namespace RomM
                             GameId = gameId,
                             Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(mapping.Platform.Name ?? "") },
                             Regions = new HashSet<MetadataProperty>(item.Regions.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
+                            Genres = new HashSet<MetadataProperty>(item.Metadatum.Genres.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
+                            ReleaseDate = item.Metadatum.Release_Date.HasValue ? new ReleaseDate(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(item.Metadatum.Release_Date.Value).ToLocalTime()) : new ReleaseDate(),
+                            Series = new HashSet<MetadataProperty>(item.Metadatum.Franchises.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
+                            CommunityScore = (int?)item.Metadatum.Average_Rating,
+                            Features = new HashSet<MetadataProperty>(item.Metadatum.Gamemodes.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),              
+                            Categories = new HashSet<MetadataProperty>(item.Metadatum.Collections.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
                             InstallSize = item.FileSizeBytes,
                             Description = item.Summary,
                             CoverImage = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
-                            Icon = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
                             GameActions = new List<GameAction>
                             {
                                 new GameAction

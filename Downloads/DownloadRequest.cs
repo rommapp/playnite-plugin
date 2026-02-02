@@ -14,6 +14,9 @@ namespace RomM.Downloads
         public string GamePath { get; set; }        // full path to the downloaded file on disk
         public bool HasMultipleFiles { get; set; }  // whether archive contains multiple top-level files
         public bool AutoExtract { get; set; } = true;
+        public bool Use7z { get; set; } = false;
+        public string PathTo7Z { get; set; } = "";
+
 
         /// Optional function used after extraction to build rom list for Playnite
         public Func<List<GameRom>> BuildRoms { get; set; }
