@@ -424,7 +424,7 @@ namespace RomM
                             item.HasMultipleFiles = true;
 
                         // Defensive: never allow path segments from server-provided filename & make sure single ROM files have an extention
-                        var fileName = item.HasMultipleFiles ? Path.GetFileName(item.FileName) : item.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName;
+                        var fileName = item.HasMultipleFiles ? Path.GetFileName(item.FileName) : Path.GetFileName(item.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName);
                         if (string.IsNullOrWhiteSpace(fileName))
                         {
                             Logger.Warn($"Rom {item.Id} returned empty/invalid filename, skipping.");

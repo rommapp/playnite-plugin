@@ -215,10 +215,19 @@ namespace RomM.Downloads
 
         private void ExtractArchiveWith7z(string pathTo7z, string archivePath, string installDir, DownloadQueueItem item, CancellationToken ct)
         {
+            if (archivePath == null || archivePath.Contains("../") || archivePath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid archive path");
+            }
+            if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid install directory path");
+            }
+
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = pathTo7z,
-                Arguments = $"x \"{archivePath}\" -o\"{installDir}\" -y",
+                Arguments = $"x \"{archivePath.Replace("\"", "\\\"")}\" -o\"{installDir.Replace("\"", "\\\"")}\" -y",
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
