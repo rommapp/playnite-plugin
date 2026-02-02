@@ -57,12 +57,7 @@ namespace RomM.Games
                     var roms = new List<GameRom>();
 
                     // If the downloaded file still exists and wasn't extracted -> single file ROM
-                    // (AutoExtract might be false, or file isn't an archive, etc.)
-                    var wouldExtract =
-                        info.HasMultipleFiles ||
-                        (info.Mapping != null && info.Mapping.AutoExtract && IsFileCompressed(downloadFilePath));
-
-                    if (File.Exists(downloadFilePath) && !wouldExtract)
+                    if (File.Exists(downloadFilePath))
                     {
                         roms.Add(new GameRom(Game.Name, downloadFilePath));
                         return roms;

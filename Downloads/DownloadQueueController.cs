@@ -15,7 +15,6 @@ namespace RomM.Downloads
     public class DownloadQueueController
     {
         private readonly IPlayniteAPI api;
-        private readonly ILogger logger;
         private readonly DownloadQueueViewModel vm;
 
         private readonly SemaphoreSlim concurrencyGate;
@@ -23,13 +22,13 @@ namespace RomM.Downloads
         private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, CancellationTokenSource> activeDownloads =
             new System.Collections.Concurrent.ConcurrentDictionary<Guid, CancellationTokenSource>();
 
+        public ILogger Logger => LogManager.GetLogger();
         public int MaxConcurrent { get; }
 
         public DownloadQueueController(IPlayniteAPI api, DownloadQueueViewModel vm, int maxConcurrent)
         {
             this.api = api;
             this.vm = vm;
-            this.logger = LogManager.GetLogger();
 
             MaxConcurrent = Math.Max(1, maxConcurrent);
             concurrencyGate = new SemaphoreSlim(MaxConcurrent, MaxConcurrent);
@@ -68,7 +67,7 @@ namespace RomM.Downloads
                 }
                 catch (Exception ex)
                 {
-                    logger.Warn(ex, "An error occurred while cancelling a download.");
+                    Logger.Warn(ex, "An error occurred while cancelling a download.");
                 }
             }
         }
@@ -180,6 +179,7 @@ namespace RomM.Downloads
             if (req.HasMultipleFiles || (req.AutoExtract && IsFileCompressed(req.GamePath)))
             {
                 item.SetStatus(DownloadStatus.Extracting, "Extracting...");
+                Logger.Info($"Extracting {req.GamePath}...");
 
                 if(req.Use7z && !string.IsNullOrEmpty(req.PathTo7Z) && req.PathTo7Z.EndsWith("7z.exe", StringComparison.OrdinalIgnoreCase))
                 {
@@ -292,7 +292,7 @@ namespace RomM.Downloads
             }
             catch (Exception ex)
             {
-                logger.Warn(ex, $"Cleanup failed for {req.GameName} ({req.GameId}).");
+                Logger.Warn(ex, $"Cleanup failed for {req.GameName} ({req.GameId}).");
                 // don't rethrow - cancel should still succeed
             }
         }
