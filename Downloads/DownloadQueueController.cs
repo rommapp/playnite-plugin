@@ -3,6 +3,7 @@ using Playnite.SDK.Plugins;
 using SharpCompress.Archives;
 using SharpCompress.Common;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -179,8 +180,15 @@ namespace RomM.Downloads
             if (req.HasMultipleFiles || (req.AutoExtract && IsFileCompressed(req.GamePath)))
             {
                 item.SetStatus(DownloadStatus.Extracting, "Extracting...");
-                ExtractArchiveWithEntryProgress(req.GamePath, req.InstallDir, item, ct);
 
+                if(req.Use7z && !string.IsNullOrEmpty(req.PathTo7Z) && req.PathTo7Z.EndsWith("7z.exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    ExtractArchiveWith7z(req.PathTo7Z, req.GamePath, req.InstallDir, item, ct);
+                }
+                else
+                {
+                    ExtractArchiveWithEntryProgress(req.GamePath, req.InstallDir, item, ct);
+                }
                 try { File.Delete(req.GamePath); } catch { }
             }
 
@@ -204,6 +212,36 @@ namespace RomM.Downloads
             return ArchiveFactory.IsArchive(filePath, out var type);
         }
 
+
+        private void ExtractArchiveWith7z(string pathTo7z, string archivePath, string installDir, DownloadQueueItem item, CancellationToken ct)
+        {
+            if (archivePath == null || archivePath.Contains("../") || archivePath.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid archive path");
+            }
+            if (installDir == null || installDir.Contains("../") || installDir.Contains(@"..\"))
+            {
+                throw new ArgumentException("Invalid install directory path");
+            }
+
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = pathTo7z,
+                Arguments = $"x \"{archivePath.Replace("\"", "\\\"")}\" -o\"{installDir.Replace("\"", "\\\"")}\" -y",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            ct.ThrowIfCancellationRequested();
+            using (Process process = Process.Start(startInfo))
+            { 
+                process.WaitForExit();
+                if (process.ExitCode != 0)
+                {
+                    throw new Exception($"7z extraction failed for {archivePath} with exit code {process.ExitCode}.");
+                }
+            }
+        }
         private void ExtractArchiveWithEntryProgress(string archivePath, string installDir, DownloadQueueItem item, CancellationToken ct)
         {
             using (var archive = ArchiveFactory.Open(archivePath))
