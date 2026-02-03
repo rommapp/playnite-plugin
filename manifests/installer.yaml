@@ -74,3 +74,19 @@ Packages:
     Changelog:
       - Use gameName instead of gameNameWithTags
       - Bump PlayniteSDK from 6.11.0 to 6.13.0
+  - Version: 0.5.0
+    RequiredApiVersion: 6.15.0
+    ReleaseDate: 2026-02-02
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/0.5.0/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_5_0.pext
+    Changelog:
+      - Skip detect .iso files as compressed by @gantoine
+      - Update isMulti to HasMultipleFiles field by @gantoine
+      - Normalize RomMHost URLs to avoid double slashes by @saitatter
+      - Update platform_id to platform_ids by @matthew-pye
+      - Implement per mapping m3u support by @matthew-pye
+      - Update path handling for playnite portable case by @dravorle
+      - Check mappings UseM3u is enabled  by @matthew-pye
+      - Added download manager to inspect progress of games download by @saitatter
+      - Implement 7z extraction by @matthew-pye
+      - Fix incorrectly merged 7z & use more metadata by @matthew-pye
+      - Bump PlayniteSDK from 6.13.0 to 6.15.0 by @dependabot
