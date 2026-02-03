@@ -680,26 +680,26 @@ namespace RomM
         private readonly ConcurrentDictionary<Guid, byte> ignoredGameIds = new ConcurrentDictionary<Guid, byte>();
         private void OnItemUpdated(object sender, ItemUpdatedEventArgs<Game> e)
         {
-            foreach (var update in e.UpdatedItems)
+            Task.Run(async () =>
             {
-                var oldGame = update.OldData;
-                var newGame = update.NewData;
-
-                // Ignore non-RomM games
-                if (newGame.PluginId != Id)
+                foreach (var update in e.UpdatedItems)
                 {
-                    continue;
-                }
+                    var oldGame = update.OldData;
+                    var newGame = update.NewData;
 
-                // This is the cancel signal
-                if (oldGame.IsInstalling && !newGame.IsInstalling)
-                {
-                    DownloadQueueController?.Cancel(newGame.Id);
-                }
+                    // Ignore non-RomM games
+                    if (newGame.PluginId != Id)
+                    {
+                        continue;
+                    }
+
+                    // This is the cancel signal
+                    if (oldGame.IsInstalling && !newGame.IsInstalling)
+                    {
+                        DownloadQueueController?.Cancel(newGame.Id);
+                    }
                 
-                if (Settings.KeepRomMSynced == true)
-                {
-                    Task.Run(async () =>
+                    if (Settings.KeepRomMSynced == true)
                     {
                         if (ignoredGameIds.ContainsKey(newGame.Id))
                         {
@@ -728,12 +728,7 @@ namespace RomM
                             try
                             {
                                 IList<RomMCollection> favoriteCollections = FetchFavorites();
-                                var favoriteCollection = favoriteCollections.FirstOrDefault(c => c.IsFavorite);
-
-                                if (favoriteCollection == null)
-                                {
-                                    favoriteCollection = CreateFavorites();
-                                }
+                                var favoriteCollection = favoriteCollections.FirstOrDefault(c => c.IsFavorite) ?? CreateFavorites();
 
                                 var romIds = favoriteCollection?.RomIds ?? new List<int>();
                                 if (newGame.Favorite == false)
@@ -781,9 +776,9 @@ namespace RomM
                                 Logger.Error(ex, $"RomM Status Sync Failed for {romMId}");
                             }
                         }
-                    });
+                    }
                 }
-            }
+            });
         }
     }
 }
