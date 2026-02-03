@@ -284,21 +284,22 @@ namespace RomM
                     {
                         if (update.NewData.PluginId != Id) continue;
 
-                        if ( ignoredGameIds.ContainsKey(update.NewData.Id))
+                        if (ignoredGameIds.ContainsKey(update.NewData.Id))
                         {
                             // This GameId is marked as an internal update, should be ignored this time
                             ignoredGameIds.TryRemove(update.NewData.Id, out _);
+                            continue;
                         }
 
                         var version = update.NewData.Version;
-                        if (version != null || !version.StartsWith("RomM:"))
+                        if (version == null || !version.StartsWith("RomM:"))
                         {
                             Logger.Warn($"Couldn't find RomMId for {update.NewData.Name}.");
                             continue;
                         }
 
                         int romMId;
-                        if (int.TryParse(version.Split(':')[1], out romMId))
+                        if (!int.TryParse(version.Split(':')[1], out romMId))
                         {
                             Logger.Error($"Malformed version string? {version} > {romMId}");
                             continue;
