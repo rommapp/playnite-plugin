@@ -290,12 +290,24 @@ namespace RomM
                             ignoredGameIds.TryRemove(update.NewData.Id, out _);
                         }
 
-                        var gameInfo = RomMGameInfo.FromGame<RomMGameInfo>(update.NewData);
+                        var version = update.NewData.Version;
+                        if (version != null || !version.StartsWith("RomM:"))
+                        {
+                            Logger.Warn($"Couldn't find RomMId for {update.NewData.Name}.");
+                            continue;
+                        }
+
+                        int romMId;
+                        if (int.TryParse(version.Split(':')[1], out romMId))
+                        {
+                            Logger.Error($"Malformed version string? {version} > {romMId}");
+                            continue;
+                        }
 
                         //Check if this Update changed the favorit and sync it
                         if (update.OldData.Favorite != update.NewData.Favorite)
                         {
-                            Logger.Info($"Favorites changed for {gameInfo.RomMId}.");
+                            Logger.Info($"Favorites changed for {romMId}.");
                             try
                             {
                                 IList<RomMCollection> favoriteCollections = FetchFavorites();
@@ -309,11 +321,11 @@ namespace RomM
                                 var romIds = favoriteCollection?.RomIds ?? new List<int>();
                                 if (update.NewData.Favorite == false)
                                 {
-                                    romIds.Remove(gameInfo.RomMId);
+                                    romIds.Remove(romMId);
                                 }
                                 else
                                 {
-                                    romIds.Add(gameInfo.RomMId);
+                                    romIds.Add(romMId);
                                 }
 
                                 UpdateFavorites(favoriteCollection, romIds);
@@ -343,13 +355,13 @@ namespace RomM
                                         status = RomMRomUser.CompletionStatusMap.FirstOrDefault((kv) => kv.Value == status && kv.Value != "Playing" && kv.Value != "Plan to Play" && kv.Value != "Not Played").Key
                                     }
                                 };
-                                string apiRomMRomUserProps = CombineUrl(Settings.RomMHost, $"api/roms/{gameInfo.RomMId}/props");
+                                string apiRomMRomUserProps = CombineUrl(Settings.RomMHost, $"api/roms/{romMId}/props");
                                 HttpResponseMessage response = HttpClientSingleton.Instance.PutAsync(apiRomMRomUserProps, new StringContent(JsonConvert.SerializeObject(updatePayload), Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
                                 response.EnsureSuccessStatusCode();
                             }
                             catch (Exception ex)
                             {
-                                Logger.Error(ex, $"RomM Status Sync Failed for {gameInfo.RomMId}");
+                                Logger.Error(ex, $"RomM Status Sync Failed for {romMId}");
                             }
                         }
                     }
@@ -549,8 +561,7 @@ namespace RomM
                             MappingId = mapping.MappingId,
                             FileName = fileName,
                             DownloadUrl = CombineUrl(Settings.RomMHost, $"api/roms/{item.Id}/content/{fileName}"),
-                            HasMultipleFiles = item.HasMultipleFiles,
-                            RomMId = item.Id
+                            HasMultipleFiles = item.HasMultipleFiles
                         };
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
@@ -579,6 +590,9 @@ namespace RomM
                                 ignoredGameIds.TryAdd(game.Id, 0);
                                 Playnite.Database.Games.Update(game);
                             }
+                            // Using the Version-Field for storing the ID instead of "RomMGameInfo"
+                            // Could be useful in the future: https://github.com/JosefNemec/Playnite/issues/801
+                            game.Version = $"RomM:{item.Id}";
                             continue;
                         }
 
@@ -623,7 +637,8 @@ namespace RomM
                                     Path = CombineUrl(Settings.RomMHost, $"rom/{item.Id}"),
                                     IsPlayAction = false
                                 }
-                            }
+                            },
+                            Version = $"RomM:{item.Id}"
                         });
                     }
 
