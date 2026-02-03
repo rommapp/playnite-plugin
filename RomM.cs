@@ -107,7 +107,7 @@ namespace RomM
 
         internal IList<RomMCollection> FetchFavorites()
         {
-            string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections?isFavorite=true&isPublic=false");
+            string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections");
             try
             {
                 // Make the request and get the response
@@ -146,7 +146,7 @@ namespace RomM
             }
         }
 
-        internal async void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
+        internal void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
         {
             if (favoriteCollection == null)
             {
@@ -282,7 +282,13 @@ namespace RomM
                 {
                     foreach (var update in args.UpdatedItems)
                     {
-                        if (update.NewData.PluginId != Id || ignoredGameIds.ContainsKey(update.NewData.Id)) continue;
+                        if (update.NewData.PluginId != Id) continue;
+
+                        if ( ignoredGameIds.ContainsKey(update.NewData.Id))
+                        {
+                            // This GameId is marked as an internal update, should be ignored this time
+                            ignoredGameIds.TryRemove(update.NewData.Id, out _);
+                        }
 
                         var gameInfo = RomMGameInfo.FromGame<RomMGameInfo>(update.NewData);
 
@@ -570,20 +576,16 @@ namespace RomM
                                 game.Favorite = favorites.Exists(f => f == item.Id);
                                 game.CompletionStatusId = Playnite.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Id;
 
-                                try
-                                {
-                                    ignoredGameIds.TryAdd(game.Id, 0);
-                                    Playnite.Database.Games.Update(game);
-                                }
-                                finally
-                                {
-                                    Task.Delay(500).ContinueWith(_t => ignoredGameIds.TryRemove(game.Id, out _));
-                                }
+                                ignoredGameIds.TryAdd(game.Id, 0);
+                                Playnite.Database.Games.Update(game);
                             }
                             continue;
                         }
 
                         var gameNameWithTags = $"{gameName}{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
+
+                        var status = PlayniteApi.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus);
+                        var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
 
                         // Add newly found game
                         games.Add(new GameMetadata
@@ -603,7 +605,7 @@ namespace RomM
                             Favorite = favorites.Exists(f => f == item.Id),
                             LastActivity = item.RomUser.LastPlayed,
                             UserScore = item.RomUser.Rating * 10, //RomM-Rating is 1-10, Playnite 1-100, so it can unfortunately only by synced one direction without loosing decimals
-                            CompletionStatus = new MetadataNameProperty(PlayniteApi.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Name) ?? null,
+                            CompletionStatus = completionStatusProperty,
                             GameActions = new List<GameAction>
                             {
                                 new GameAction
