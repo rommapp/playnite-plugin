@@ -129,6 +129,11 @@
                 <CheckBox IsChecked="{Binding NotifyOnInstallComplete, Mode=TwoWay}" Margin="0,0,0,10">
                     <TextBlock Text="Enable notification upon game install completion" TextWrapping="Wrap"/>
                 </CheckBox>
+                <Label Content="Status Sync" FontWeight="Bold" Margin="0,10,0,0" />
+                <Separator Margin="0,5,0,10" />
+                <CheckBox IsChecked="{Binding KeepRomMSynced, Mode=TwoWay}" Margin="0,0,0,10">
+                    <TextBlock Text="Keep completion status and favorites in sync with RomM" TextWrapping="Wrap"/>
+                </CheckBox>
                 
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>

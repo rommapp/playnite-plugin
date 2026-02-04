@@ -4,12 +4,14 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
-using RomM.Downloads;
 using RomM.Games;
+using RomM.Downloads;
+using RomM.Models.RomM.Collection;
 using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
 using RomM.Settings;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
@@ -116,6 +118,69 @@ namespace RomM
             }
         }
 
+        internal IList<RomMCollection> FetchFavorites()
+        {
+            string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            try
+            {
+                // Make the request and get the response
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiFavoriteUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonConvert.DeserializeObject<List<RomMCollection>>(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new List<RomMCollection>();
+            }
+        }
+
+        internal RomMCollection CreateFavorites()
+        {
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections?is_favorite=true&is_public=false");
+            try
+            {
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent("Favorites"), "name");
+
+                HttpResponseMessage postResponse = HttpClientSingleton.Instance.PostAsync(apiCollectionUrl, formData).GetAwaiter().GetResult();
+                postResponse.EnsureSuccessStatusCode();
+
+                string body = postResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonConvert.DeserializeObject<RomMCollection>(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return null;
+            }
+        }
+
+        internal void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
+        {
+            if (favoriteCollection == null)
+            {
+                Logger.Error($"Can't update favorites, collection is null");
+                return;
+            }
+
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            try
+            {
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent(JsonConvert.SerializeObject(romIds)), "rom_ids");
+                HttpResponseMessage putResponse = HttpClientSingleton.Instance.PutAsync($"{apiCollectionUrl}/{favoriteCollection.Id}", formData).GetAwaiter().GetResult();
+                putResponse.EnsureSuccessStatusCode();
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+            }
+        }
+
         internal RomMRom FetchRom(string romId)
         {
             string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
@@ -191,8 +256,6 @@ namespace RomM
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
 
-            Playnite.Database.Games.ItemUpdated += OnItemUpdated;
-
             // Portable path fix: expand "{PlayniteDir}" to absolute paths in DB on startup
             if (Playnite.Paths.IsPortable)
             {
@@ -220,12 +283,14 @@ namespace RomM
                     }
                 }
             }
+
+            Playnite.Database.Games.ItemUpdated += OnItemUpdated;
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             base.OnApplicationStopped(args);
-
+            
             Playnite.Database.Games.ItemUpdated -= OnItemUpdated;
 
             // Portable path fix: restore "{PlayniteDir}" tokens before exiting
@@ -316,6 +381,9 @@ namespace RomM
                 Logger.Warn("No emulators are configured or enabled in RomM settings. No games will be fetched.");
                 return games;
             }
+
+            IList<RomMCollection> favoritCollections = FetchFavorites();
+            var favorites = favoritCollections.FirstOrDefault(c => c.IsFavorite)?.RomIds ?? new List<int>();
 
             foreach (var mapping in enabledMappings)
             {
@@ -413,6 +481,8 @@ namespace RomM
                         ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
                         : mapping.DestinationPathResolved;
 
+                    var completionStatusMap = PlayniteApi.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
+
                     foreach (var item in allRoms)
                     {
                         if (args.CancelToken.IsCancellationRequested)
@@ -446,8 +516,43 @@ namespace RomM
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
 
-                        if (Playnite.Database.Games.Any(g => g.GameId == gameId))
+                        string completionStatus;
+                        // Determine status in Playnite. Backlogged and "now playing" take precedent over the status options
+                        if (item.RomUser.Backlogged || item.RomUser.NowPlaying)
                         {
+                            completionStatus = item.RomUser.NowPlaying ? RomMRomUser.CompletionStatusMap["now_playing"] : RomMRomUser.CompletionStatusMap["backlogged"];
+                        }
+                        else
+                        {
+                            completionStatus = RomMRomUser.CompletionStatusMap[item.RomUser.Status ?? "not_played"];
+                        }
+
+                        completionStatusMap.TryGetValue(completionStatus, out var statusId);
+
+                        var status = PlayniteApi.Database.CompletionStatuses.Get(statusId);
+                        var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
+
+                        // Check if the game is already installed
+                        var game = Playnite.Database.Games.FirstOrDefault(g => g.GameId == gameId);
+                        if (game != null)
+                        {
+                            //If it is already installed, we sync over metadata like favorite and status!
+                            if (Settings.KeepRomMSynced == true)
+                            {
+                                game.Favorite = favorites.Exists(f => f == item.Id);
+                                
+                                if (statusId != Guid.Empty)
+                                {
+                                    game.CompletionStatusId = statusId;
+                                }
+
+                                // Using the Version-Field for storing the ID instead of "RomMGameInfo"
+                                // Could be useful in the future: https://github.com/JosefNemec/Playnite/issues/801
+                                game.Version = $"RomM:{item.Id}";
+
+                                ignoredGameIds.TryAdd(game.Id, 0);
+                                Playnite.Database.Games.Update(game);
+                            }
                             continue;
                         }
 
@@ -457,6 +562,7 @@ namespace RomM
                             $"{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}" +
                             $"{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
 
+                        // Add newly found game
                         games.Add(new GameMetadata
                         {
                             Source = SourceName,
@@ -476,6 +582,10 @@ namespace RomM
                             InstallSize = item.FileSizeBytes,
                             Description = item.Summary,
                             CoverImage = !string.IsNullOrEmpty(urlCover) ? new MetadataFile(urlCover) : null,
+                            Favorite = favorites.Exists(f => f == item.Id),
+                            LastActivity = item.RomUser.LastPlayed,
+                            UserScore = item.RomUser.Rating * 10, //RomM-Rating is 1-10, Playnite 1-100, so it can unfortunately only by synced one direction without loosing decimals
+                            CompletionStatus = completionStatusProperty,
                             GameActions = new List<GameAction>
                             {
                                 new GameAction
@@ -493,7 +603,8 @@ namespace RomM
                                     Path = CombineUrl(Settings.RomMHost, $"rom/{item.Id}"),
                                     IsPlayAction = false
                                 }
-                            }
+                            },
+                            Version = $"RomM:{item.Id}"
                         });
                     }
 
@@ -575,25 +686,108 @@ namespace RomM
             }
         }
 
+        private readonly ConcurrentDictionary<Guid, byte> ignoredGameIds = new ConcurrentDictionary<Guid, byte>();
         private void OnItemUpdated(object sender, ItemUpdatedEventArgs<Game> e)
         {
-            foreach (var update in e.UpdatedItems)
+            Task.Run(async () =>
             {
-                var oldGame = update.OldData;
-                var newGame = update.NewData;
-
-                // Ignore non-RomM games
-                if (newGame.PluginId != Id)
+                foreach (var update in e.UpdatedItems)
                 {
-                    continue;
-                }
+                    var oldGame = update.OldData;
+                    var newGame = update.NewData;
 
-                // This is the cancel signal
-                if (oldGame.IsInstalling && !newGame.IsInstalling)
-                {
-                    DownloadQueueController?.Cancel(newGame.Id);
+                    // Ignore non-RomM games
+                    if (newGame.PluginId != Id)
+                    {
+                        continue;
+                    }
+
+                    // This is the cancel signal
+                    if (oldGame.IsInstalling && !newGame.IsInstalling)
+                    {
+                        DownloadQueueController?.Cancel(newGame.Id);
+                    }
+                
+                    if (Settings.KeepRomMSynced == true)
+                    {
+                        if (ignoredGameIds.ContainsKey(newGame.Id))
+                        {
+                            // This GameId is marked as an internal update, should be ignored this time
+                            ignoredGameIds.TryRemove(newGame.Id, out _);
+                            continue;
+                        }
+                        
+                        var version = newGame.Version;
+                        if (version == null || !version.StartsWith("RomM:"))
+                        {
+                            Logger.Warn($"Couldn't find RomMId for {update.NewData.Name}.");
+                            continue;
+                        }
+
+                        int romMId;
+                        if (!int.TryParse(version.Split(':')[1], out romMId))
+                        {
+                            Logger.Error($"Malformed version string? {version} > {romMId}");
+                            continue;
+                        }
+                        
+                        if (oldGame.Favorite != newGame.Favorite)
+                        {
+                            Logger.Info($"Favorites changed for {romMId}.");
+                            try
+                            {
+                                IList<RomMCollection> favoriteCollections = FetchFavorites();
+                                var favoriteCollection = favoriteCollections.FirstOrDefault(c => c.IsFavorite) ?? CreateFavorites();
+
+                                var romIds = favoriteCollection?.RomIds ?? new List<int>();
+                                if (newGame.Favorite == false)
+                                {
+                                    romIds.Remove(romMId);
+                                }
+                                else
+                                {
+                                    romIds.Add(romMId);
+                                }
+
+                                UpdateFavorites(favoriteCollection, romIds);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error(ex, "RomM Favorite Sync Failed");
+                            }
+                        }
+                        
+                        if (oldGame.CompletionStatus != newGame.CompletionStatus)
+                        {
+                            try
+                            {
+                                // This would be easier if status would be merged: https://github.com/rommapp/romm/issues/2971
+                                // For now we check if it is either "playing" or "plan to play" and set the booleans, otherwise we set the status
+                                // If this issue is accepted and fixed, we can just reverse the CompletionStatusMap dictionary
+                                if (newGame.CompletionStatus == null) continue;
+                                var status = newGame.CompletionStatus.Name;
+
+                                var updatePayload = new
+                                {
+                                    data = new
+                                    {
+                                        backlogged = status == "Plan to Play",
+                                        now_playing = status == "Playing",
+                                        status = RomMRomUser.CompletionStatusMap.FirstOrDefault((kv) => kv.Value == status && kv.Value != "Playing" && kv.Value != "Plan to Play" && kv.Value != "Not Played").Key
+                                    }
+                                };
+                                string apiRomMRomUserProps = CombineUrl(Settings.RomMHost, $"api/roms/{romMId}/props");
+                                HttpResponseMessage response = HttpClientSingleton.Instance.PutAsync(apiRomMRomUserProps, new StringContent(JsonConvert.SerializeObject(updatePayload), Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+                                response.EnsureSuccessStatusCode();
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error(ex, $"RomM Status Sync Failed for {romMId}");
+                            }
+                        }
+                    }
                 }
-            }
+            });
         }
     }
 }
