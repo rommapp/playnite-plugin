@@ -481,6 +481,8 @@ namespace RomM
                         ? mapping.DestinationPathResolved.Replace(PlayniteApi.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
                         : mapping.DestinationPathResolved;
 
+                    var completionStatusMap = PlayniteApi.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
+
                     foreach (var item in allRoms)
                     {
                         if (args.CancelToken.IsCancellationRequested)
@@ -525,6 +527,11 @@ namespace RomM
                             completionStatus = RomMRomUser.CompletionStatusMap[item.RomUser.Status ?? "not_played"];
                         }
 
+                        completionStatusMap.TryGetValue(completionStatus, out var statusId);
+
+                        var status = PlayniteApi.Database.CompletionStatuses.Get(statusId);
+                        var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
+
                         // Check if the game is already installed
                         var game = Playnite.Database.Games.FirstOrDefault(g => g.GameId == gameId);
                         if (game != null)
@@ -533,14 +540,19 @@ namespace RomM
                             if (Settings.KeepRomMSynced == true)
                             {
                                 game.Favorite = favorites.Exists(f => f == item.Id);
-                                game.CompletionStatusId = Playnite.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus).Id;
+                                
+                                if (statusId != Guid.Empty)
+                                {
+                                    game.CompletionStatusId = statusId;
+                                }
+
+                                // Using the Version-Field for storing the ID instead of "RomMGameInfo"
+                                // Could be useful in the future: https://github.com/JosefNemec/Playnite/issues/801
+                                game.Version = $"RomM:{item.Id}";
 
                                 ignoredGameIds.TryAdd(game.Id, 0);
                                 Playnite.Database.Games.Update(game);
                             }
-                            // Using the Version-Field for storing the ID instead of "RomMGameInfo"
-                            // Could be useful in the future: https://github.com/JosefNemec/Playnite/issues/801
-                            game.Version = $"RomM:{item.Id}";
                             continue;
                         }
 
@@ -549,9 +561,6 @@ namespace RomM
                             $"{(item.Regions.Count > 0 ? $" ({string.Join(", ", item.Regions)})" : "")}" +
                             $"{(!string.IsNullOrEmpty(item.Revision) ? $" (Rev {item.Revision})" : "")}" +
                             $"{(item.Tags.Count > 0 ? $" ({string.Join(", ", item.Tags)})" : "")}";
-
-                        var status = PlayniteApi.Database.CompletionStatuses.FirstOrDefault(cs => cs.Name == completionStatus);
-                        var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
 
                         // Add newly found game
                         games.Add(new GameMetadata
