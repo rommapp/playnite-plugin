@@ -160,6 +160,9 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("files")]
         public List<RomMFile> Files { get; set; }
 
+        [JsonProperty("siblings")]
+        public List<RomMSibling> Siblings { get; set; }
+
         [JsonProperty("full_path")]
         public string FullPath { get; set; }
 
@@ -174,5 +177,17 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("sort_comparator")]
         public string SortComparator { get; set; }
+    }
+
+    public class RomMSibling
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("file_name")]
+        public string FileName { get; set; }
+
+        [JsonProperty("is_main_sibling")]
+        public bool IsMainSibling { get; set; }
     }
 }

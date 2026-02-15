@@ -483,7 +483,40 @@ namespace RomM
 
                     var completionStatusMap = PlayniteApi.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
 
+                    var siblingIdsToSkip = new HashSet<int>();
+                    var processedSiblingsGroup = new HashSet<int>();
+
                     foreach (var item in allRoms)
+                    {
+                        if (item.Siblings != null && item.Siblings.Count > 0 && !processedSiblingsGroup.Contains(item.Id))
+                        {
+                            var groupRomIds = new HashSet<int> { item.Id };
+                            groupRomIds.UnionWith(item.Siblings.Select(s => s.Id));
+                            processedSiblingsGroup.UnionWith(groupRomIds);
+
+                            var mainSiblingId = item.Siblings.FirstOrDefault(s => s.IsMainSibling)?.Id;
+
+                            if (mainSiblingId.HasValue)
+                            {
+                                foreach (var sibling in item.Siblings.Where(s => !s.IsMainSibling))
+                                {
+                                    siblingIdsToSkip.Add(sibling.Id);
+                                }
+                                siblingIdsToSkip.Add(item.Id);
+                            }
+                            else
+                            {
+                                foreach (var sibling in item.Siblings)
+                                {
+                                    siblingIdsToSkip.Add(sibling.Id);
+                                }
+                            }
+                        }
+                    }
+
+                    var filteredRoms = allRoms.Where(r => !siblingIdsToSkip.Contains(r.Id)).ToList();
+
+                    foreach (var item in filteredRoms)
                     {
                         if (args.CancelToken.IsCancellationRequested)
                             break;
