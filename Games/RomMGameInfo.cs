@@ -68,7 +68,7 @@ namespace RomM.Games
             }
         }
 
-        public InstallController GetInstallController(Game game, RomM romm) => new RomMInstallController(game, romm);
+        public InstallController GetInstallController(Game game, RomM romm, bool HasSiblings, int SelectedSibling) => new RomMInstallController(game, romm, HasSiblings, SelectedSibling);
 
         public UninstallController GetUninstallController(Game game, RomM romm) => new RomMUninstallController(game, romm);
 

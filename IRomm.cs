@@ -6,7 +6,8 @@ namespace RomM
 	{
 		ILogger Logger { get; }
 		IPlayniteAPI Playnite { get; }
-		Settings.SettingsViewModel Settings { get; }
+		Settings.SettingsViewModel Settings { get; }	
+		string ROMsWithSiblingsPath { get; }
         Downloads.DownloadQueueController DownloadQueueController { get; }
         string GetPluginUserDataPath();
 	}
