@@ -769,11 +769,6 @@ namespace RomM
                     Description = "Switch ROM Version!",
                     Action = (gameMenuItem) =>
                     {
-                        if (args.Games.First().IsInstalled)
-                        {
-                            Playnite.UninstallGame(args.Games.First().Id);
-                        }
-
                         Playnite.InstallGame(args.Games.First().Id);
                     }
                 });
@@ -820,7 +815,7 @@ namespace RomM
                         ShowCloseButton = false,
                     });
 
-                    window.Height = 200;
+                    window.Height = 215;
                     window.Width = 600;
 
                     window.Title = "Select Version to install!";
@@ -838,8 +833,18 @@ namespace RomM
                     }
                     else
                     {
+                        //Uninstall old ROM before installing new one
+                        if(args.Game.IsInstalled)
+                        {
+                            Playnite.UninstallGame(args.Game.Id);
+                        }
+
                        hasSiblings = true;
-                       siblingID = VersionSelectorControl.Siblings.Where(x => x.isSelected).First().Id;   
+                       siblingID = VersionSelectorControl.Siblings.Where(x => x.isSelected).First().Id;
+
+                       //Write result back to json file
+                       siblingInfos = VersionSelectorControl.Siblings.ToList();
+                       File.WriteAllText($"{ROMsWithSiblingsPath}{romMId}.json", JsonConvert.SerializeObject(siblingInfos));
                     }
                 }
 

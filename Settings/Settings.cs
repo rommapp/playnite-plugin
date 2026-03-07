@@ -61,6 +61,7 @@ namespace RomM.Settings
                 KeepRomMSynced = savedSettings.KeepRomMSynced;
                 Use7z = savedSettings.Use7z;
                 PathTo7z = savedSettings.PathTo7z;
+                MergeRevisions = savedSettings.MergeRevisions;
             }
             
             if (Mappings == null)

@@ -20,14 +20,14 @@
                     </ItemsControl>
                 </StackPanel>
             </ScrollViewer>
-            <Grid Margin="5">
+            <Grid Margin="5,5,5,10">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="445"/>
+                    <ColumnDefinition Width="435"/>
                     <ColumnDefinition Width="75"/>
                     <ColumnDefinition Width="75"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="35"/>
                 </Grid.RowDefinitions>
                 <Button Name="Cancel" Click="Click_Cancel" Grid.Row="0" Grid.Column="1" Margin="5,0,0,0" Background="#808080">
                     <Label Content="Cancel" Grid.Row="0" Grid.Column="0"/>

@@ -183,7 +183,6 @@ namespace RomM.Games
         {
             var game = _romM.Playnite.Database.Games[Game.Id];
             game.IsInstalling = false;
-            game.IsInstalled = false;
             _romM.Playnite.Database.Games.Update(game);
 
             InvokeOnInstallationCancelled(new GameInstallationCancelledEventArgs());
