@@ -47,6 +47,27 @@ namespace RomM.Models.RomM.Rom
         public string FullPath { get; set; }
     }
 
+    public class RomMSibling : ObservableObject
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("fs_name_no_tags")]
+        public string FileNameNoTags { get; set; }
+
+        [JsonProperty("fs_name_no_ext")]
+        public string FileNameNoExt { get; set; }
+
+        // Don't add JsonProperty data not from server
+        public string FileName { get; set; }
+        public string DownloadURL { get; set; }
+        public bool HasMultipleFiles { get; set; }
+        public bool isSelected { get; set; } = false;
+    }
+
     public class RomMRom
     {
         [JsonProperty("id")]
@@ -159,6 +180,9 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("files")]
         public List<RomMFile> Files { get; set; }
+
+        [JsonProperty("siblings")]
+        public List<RomMSibling> Siblings { get; set; }
 
         [JsonProperty("full_path")]
         public string FullPath { get; set; }

@@ -2,11 +2,13 @@
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using RomM.Downloads;
+using RomM.Models.RomM.Rom;
 using SharpCompress.Archives;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace RomM.Games
 {
@@ -14,16 +16,77 @@ namespace RomM.Games
     {
         protected readonly IRomM _romM;
         public ILogger Logger => LogManager.GetLogger();
+        public bool HasSiblings = false;
+        public int SelectedSibling = -1;
 
-        internal RomMInstallController(Game game, IRomM romM) : base(game)
+        internal RomMInstallController(Game game, IRomM romM, bool hasSiblings, int selectedSibling) : base(game)
         {
             Name = "Download";
             _romM = romM;
+            HasSiblings = hasSiblings;
+            SelectedSibling = selectedSibling;
         }
 
         public override void Install(InstallActionArgs args)
         {
             var info = Game.GetRomMGameInfo();
+
+            if (SelectedSibling == -2)
+            {
+                CancelInstall();
+                return;
+            }
+                
+            // Replace info if a different version of the game is selected
+            if (HasSiblings && SelectedSibling != -1) 
+            {
+                List<RomMSibling> siblingInfos = new List<RomMSibling>();
+
+                var version = Game.Version;
+                if (version == null || !version.StartsWith("RomM:"))
+                {
+                    _romM.Playnite.Notifications.Add(
+                        Game.GameId,
+                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{$"Couldn't find RomMId for {Game.Name}."}",
+                        NotificationType.Error);
+
+                    CancelInstall();
+                    return;
+                }
+
+                int romMId;
+                if (!int.TryParse(version.Split(':')[1], out romMId))
+                {
+                    _romM.Playnite.Notifications.Add(
+                        Game.GameId,
+                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{$"Malformed version string? {version} > {romMId}"}",
+                        NotificationType.Error);
+
+                    CancelInstall();
+                    return;
+                }
+
+                siblingInfos = JsonConvert.DeserializeObject<List<RomMSibling>>(File.ReadAllText($"{_romM.ROMsWithSiblingsPath}{romMId}.json"));
+                
+                var selectedSibling = siblingInfos.Find(x => x.Id == SelectedSibling);
+                if (selectedSibling != null)
+                {
+                    info.FileName = selectedSibling.FileName;
+                    info.DownloadUrl = selectedSibling.DownloadURL;
+                    // This has to be changed as systems can have single ROM and Multi ROM files. E.g. .chd vs .bin/.cue
+                    info.HasMultipleFiles = selectedSibling.HasMultipleFiles;
+                }
+                else
+                {
+                    _romM.Playnite.Notifications.Add(
+                        Game.GameId,
+                        $"Failed to find selected version of {Game.Name}.{Environment.NewLine}Selected sibling ID {SelectedSibling} was not found. Reimport libary!",
+                        NotificationType.Error);
+                    CancelInstall();
+                    return;
+                }
+
+            }
 
             var dstPath = info.Mapping?.DestinationPathResolved
                 ?? throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
@@ -123,6 +186,15 @@ namespace RomM.Games
 
             // Enqueue (non-blocking)
             _romM.DownloadQueueController.Enqueue(req);
+        }
+
+        private void CancelInstall()
+        {
+            var game = _romM.Playnite.Database.Games[Game.Id];
+            game.IsInstalling = false;
+            _romM.Playnite.Database.Games.Update(game);
+
+            InvokeOnInstallationCancelled(new GameInstallationCancelledEventArgs());
         }
 
         private static string[] GetRomFiles(string installDir, List<string> supportedFileTypes)

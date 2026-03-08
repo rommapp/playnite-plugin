@@ -6,6 +6,7 @@ using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using RomM.Games;
 using RomM.Downloads;
+using RomM.VersionSelector;
 using RomM.Models.RomM.Collection;
 using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
@@ -23,6 +24,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace RomM
@@ -66,6 +68,9 @@ namespace RomM
         public ILogger Logger => LogManager.GetLogger();
         public IPlayniteAPI Playnite { get; private set; }
         public SettingsViewModel Settings { get; private set; }
+
+        public string ROMsWithSiblingsPath { get; private set; }
+
         public DownloadQueueController DownloadQueueController { get; private set; }
 
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
@@ -81,6 +86,7 @@ namespace RomM
             {
                 HasSettings = true
             };
+            ROMsWithSiblingsPath = $"{Playnite.Paths.ExtensionsDataPath}\\{Id}\\ROMsWithSiblings\\";
 
             // Initialise the download queue
             downloadsVm = new DownloadQueueViewModel();
@@ -285,6 +291,40 @@ namespace RomM
             }
 
             Playnite.Database.Games.ItemUpdated += OnItemUpdated;
+
+            PlayniteApi.Database.Games.ItemCollectionChanged += (_, argus) =>
+            {
+                // Remove json file if game is removed from playnite
+                if (argus.RemovedItems.Count > 0)
+                {
+                    foreach (var item in argus.RemovedItems)
+                    {
+                        if (item.PluginId == PluginId)
+                        {
+                            var version = item.Version;
+                            if (version == null || !version.StartsWith("RomM:"))
+                            {
+                                Logger.Warn($"Couldn't find RomMId for {item.Name}.");
+                                continue;
+                            }
+
+                            int romMId;
+                            if (!int.TryParse(version.Split(':')[1], out romMId))
+                            {
+                                Logger.Error($"Malformed version string? {version} > {romMId}");
+                                continue;
+                            }
+
+                            if (File.Exists($"{ROMsWithSiblingsPath}{romMId}.json"))
+                            {
+                                File.Delete($"{ROMsWithSiblingsPath}{romMId}.json");
+                            }
+                            
+                        }
+                    }
+                }
+            };
+
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -483,13 +523,49 @@ namespace RomM
 
                     var completionStatusMap = PlayniteApi.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
 
+                    if (!Directory.Exists(ROMsWithSiblingsPath))
+                        Directory.CreateDirectory(ROMsWithSiblingsPath);
+
+                    List<int> ImportedROMsWithSiblings = new List<int>();
+                    if (Settings.MergeRevisions)
+                    {
+                        foreach (string filename in Directory.EnumerateFiles(ROMsWithSiblingsPath, "*.json", SearchOption.TopDirectoryOnly))
+                        {
+                            int FileId;
+                            if (!int.TryParse(Path.GetFileNameWithoutExtension(filename), out FileId))
+                            {
+                                continue;
+                            }
+
+                            ImportedROMsWithSiblings.Add(FileId);
+                        }
+                    } 
+
                     foreach (var item in allRoms)
                     {
                         if (args.CancelToken.IsCancellationRequested)
                             break;
 
+                        // Check for siblings and if one has already been imported skip
+                        if (Settings.MergeRevisions && item.Siblings.Count > 0)
+                        {
+                            bool foundSibling = false;
+
+                            foreach (var sibling in item.Siblings)
+                            {
+                                if (ImportedROMsWithSiblings.Contains(sibling.Id))
+                                {
+                                    foundSibling = true; 
+                                    break;
+                                }
+                            }
+
+                            if (foundSibling)
+                                continue;
+                        }
+
                         var gameName = item.Name;
-                        //Not sure if this a server bug or if my RomM server is borked but some games like Wii U dont have any of these enabled
+                        // Not sure if this a server bug or if my RomM server is borked but some games like Wii U dont have any of these enabled
                         if (!item.HasSimpleSingleFile & !item.HasNestedSingleFile & !item.HasMultipleFiles)
                             item.HasMultipleFiles = true;
 
@@ -516,6 +592,62 @@ namespace RomM
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
 
+                        // Save sibling data so user can select the version they want installed
+                        if (Settings.MergeRevisions && item.Siblings.Count > 0)
+                        {
+                            List<RomMSibling> gameInfos = new List<RomMSibling>();
+
+                            var baseSibling = new RomMSibling
+                            {
+                                Id = item.Id,
+                                Name = item.Name,
+                                FileNameNoTags = item.FileNameNoTags,
+                                FileNameNoExt = item.FileNameNoExt,
+                                FileName = fileName,
+                                HasMultipleFiles = item.HasMultipleFiles,
+                                DownloadURL = CombineUrl(Settings.RomMHost, $"api/roms/{item.Id}/content/{fileName}"),
+                                isSelected = true
+                            };
+                            gameInfos.Add(baseSibling);
+
+                            foreach (var sibling in item.Siblings)
+                            {
+                                var siblingItem = allRoms.Find(x => x.Id == sibling.Id);
+
+                                if (siblingItem == null)
+                                {
+                                    Logger.Error($"Unable to find sibling data for id:{sibling.Id}");
+                                    continue;
+                                }                              
+
+                                var siblingfileName = "";
+                                try
+                                {
+                                    siblingfileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error($"ROM: {item.Id} Error:{ex.ToString()}! Skipping ROM!");
+                                    continue;
+                                }
+
+                                if (string.IsNullOrWhiteSpace(siblingfileName))
+                                {
+                                    Logger.Warn($"Rom {siblingItem.Id} returned empty/invalid filename, skipping.");
+                                    continue;
+                                }
+
+                                sibling.FileName = siblingfileName;
+                                sibling.DownloadURL = CombineUrl(Settings.RomMHost, $"api/roms/{sibling.Id}/content/{siblingfileName}");
+                                sibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
+
+                                gameInfos.Add(sibling);
+                            }
+
+                            File.WriteAllText($"{ROMsWithSiblingsPath}{item.Id}.json", JsonConvert.SerializeObject(gameInfos));
+                            ImportedROMsWithSiblings.Add(item.Id);
+                        }
+
                         string completionStatus;
                         // Determine status in Playnite. Backlogged and "now playing" take precedent over the status options
                         if (item.RomUser.Backlogged || item.RomUser.NowPlaying)
@@ -536,7 +668,7 @@ namespace RomM
                         var game = Playnite.Database.Games.FirstOrDefault(g => g.GameId == gameId);
                         if (game != null)
                         {
-                            //If it is already installed, we sync over metadata like favorite and status!
+                            // If it is already installed, we sync over metadata like favorite and status
                             if (Settings.KeepRomMSynced == true)
                             {
                                 game.Favorite = favorites.Exists(f => f == item.Id);
@@ -660,11 +792,120 @@ namespace RomM
             return new SettingsView();
         }
 
+        public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
+        {
+            List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
+
+            if (args.Games.First().PluginId == PluginId)
+            {
+                var version = args.Games.First().Version;
+                if (version == null || !version.StartsWith("RomM:"))
+                {
+                    Logger.Warn($"Couldn't find RomMId for {args.Games.First().Name}.");
+                    return gameMenuItems;
+                }
+
+                int romMId;
+                if (!int.TryParse(version.Split(':')[1], out romMId))
+                {
+                    Logger.Error($"Malformed version string? {version} > {romMId}");
+                    return gameMenuItems;
+                }
+
+                if (Settings.MergeRevisions && File.Exists($"{ROMsWithSiblingsPath}{romMId}.json") && args.Games.First().IsInstalled)
+                {
+                    gameMenuItems.Add(new GameMenuItem
+                    {
+                        //MenuSection = "@",
+                        Description = "Switch ROM Version!",
+                        Action = (gameMenuItem) =>
+                        {
+                            Playnite.InstallGame(args.Games.First().Id);
+                        }
+                    });
+                }
+            }
+            return gameMenuItems;
+        }
+
         public override IEnumerable<InstallController> GetInstallActions(GetInstallActionsArgs args)
         {
             if (args.Game.PluginId == Id)
             {
-                yield return args.Game.GetRomMGameInfo().GetInstallController(args.Game, this);
+                bool hasSiblings = false;
+                int siblingID = -1;
+
+                var version = args.Game.Version;
+                if (version == null || !version.StartsWith("RomM:"))
+                {
+                    Logger.Warn($"Couldn't find RomMId for {args.Game.Name}.");
+                    //Set SiblingId to -2 to cancel request
+                    siblingID = -2;
+                }
+
+                int romMId = -1;
+                if (siblingID != -2)
+                {
+                    if (!int.TryParse(version.Split(':')[1], out romMId))
+                    {
+                        Logger.Error($"Malformed version string? {version} > {romMId}");
+                        siblingID = -2;
+                    }
+                }
+
+                // If Siblings are avaiable prompt user with version selection
+                if (Settings.MergeRevisions && File.Exists($"{ROMsWithSiblingsPath}{romMId}.json") && siblingID != -2)
+                {
+                    List<RomMSibling> siblingInfos = new List<RomMSibling>();
+                    string json = File.ReadAllText($"{ROMsWithSiblingsPath}{romMId}.json");
+                    siblingInfos = JsonConvert.DeserializeObject<List<RomMSibling>>(json);
+
+                    RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(siblingInfos);
+
+                    var window = Playnite.Dialogs.CreateWindow(new WindowCreationOptions
+                    {
+                        ShowMinimizeButton = false,
+                        ShowMaximizeButton = false,
+                        ShowCloseButton = false,
+                    });
+
+                    window.Height = 215;
+                    window.Width = 600;
+
+                    window.Title = "Select Version to install!";
+                    window.ShowInTaskbar = false;
+                    window.ResizeMode = ResizeMode.NoResize;
+                    window.Owner = API.Instance.Dialogs.GetCurrentAppWindow();
+                    window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                    window.Content = VersionSelectorControl;
+
+                    window.ShowDialog();
+
+                    if (VersionSelectorControl.Cancelled)
+                    {
+                        siblingID = -2;
+                    }
+                    else
+                    {
+                        //Uninstall old ROM before installing new one
+                        if (args.Game.IsInstalled)
+                        {
+                            Playnite.UninstallGame(args.Game.Id);
+
+                            args.Game.IsInstalling = true;
+                            Playnite.Database.Games.Update(args.Game);
+                        }
+
+                       hasSiblings = true;
+                       siblingID = VersionSelectorControl.Siblings.Where(x => x.isSelected).First().Id;
+
+                       //Write result back to json file
+                       siblingInfos = VersionSelectorControl.Siblings.ToList();
+                       File.WriteAllText($"{ROMsWithSiblingsPath}{romMId}.json", JsonConvert.SerializeObject(siblingInfos));
+                    }
+                }
+
+                yield return args.Game.GetRomMGameInfo().GetInstallController(args.Game, this, hasSiblings, siblingID);
             }
         }
 
