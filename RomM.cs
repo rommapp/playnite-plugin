@@ -85,6 +85,7 @@ namespace RomM
             Properties = new LibraryPluginProperties
             {
                 HasSettings = true
+            };
             ROMsWithSiblingsPath = $"{Playnite.Paths.ExtensionsDataPath}\\{Id}\\ROMsWithSiblings\\";
 
             // Initialise the download queue
