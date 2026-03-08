@@ -583,10 +583,20 @@ namespace RomM
                                 if (siblingItem == null)
                                     Logger.Error($"Unable to find sibling data for id:{sibling.Id}");
 
-                                var siblingfileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName);
-                                if (string.IsNullOrWhiteSpace(fileName))
+                                var siblingfileName = "";
+                                try
                                 {
-                                    Logger.Warn($"Rom {item.Id} returned empty/invalid filename, skipping.");
+                                    siblingfileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error($"ROM: {item.Id} Error:{ex.ToString()}! Skipping ROM!");
+                                    continue;
+                                }
+
+                                if (string.IsNullOrWhiteSpace(siblingfileName))
+                                {
+                                    Logger.Warn($"Rom {siblingItem.Id} returned empty/invalid filename, skipping.");
                                     continue;
                                 }
 
