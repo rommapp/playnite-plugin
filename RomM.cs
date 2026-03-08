@@ -291,6 +291,40 @@ namespace RomM
             }
 
             Playnite.Database.Games.ItemUpdated += OnItemUpdated;
+
+            PlayniteApi.Database.Games.ItemCollectionChanged += (_, argus) =>
+            {
+                //Remove json file if game is removed from playnite
+                if(argus.RemovedItems.Count > 0)
+                {
+                    foreach (var item in argus.RemovedItems)
+                    {
+                        if(item.PluginId == PluginId)
+                        {
+                            var version = item.Version;
+                            if (version == null || !version.StartsWith("RomM:"))
+                            {
+                                Logger.Warn($"Couldn't find RomMId for {item.Name}.");
+                                continue;
+                            }
+
+                            int romMId;
+                            if (!int.TryParse(version.Split(':')[1], out romMId))
+                            {
+                                Logger.Error($"Malformed version string? {version} > {romMId}");
+                                continue;
+                            }
+
+                            if(File.Exists($"{ROMsWithSiblingsPath}{romMId}.json"))
+                            {
+                                File.Delete($"{ROMsWithSiblingsPath}{romMId}.json");
+                            }
+                            
+                        }
+                    }
+                }
+            };
+
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
