@@ -762,7 +762,7 @@ namespace RomM
         {
             List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
 
-            if(args.Games.Any(g => g.PluginId == PluginId))
+            if(args.Games.First().PluginId == PluginId)
             {
                 var version = args.Games.First().Version;
                 if (version == null || !version.StartsWith("RomM:"))
