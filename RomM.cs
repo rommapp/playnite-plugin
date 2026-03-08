@@ -579,7 +579,10 @@ namespace RomM
                                 var siblingItem = allRoms.Find(x => x.Id == sibling.Id);
 
                                 if (siblingItem == null)
+                                {
                                     Logger.Error($"Unable to find sibling data for id:{sibling.Id}");
+                                    continue;
+                                }                              
 
                                 var siblingfileName = "";
                                 try
