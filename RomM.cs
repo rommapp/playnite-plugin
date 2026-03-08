@@ -85,9 +85,7 @@ namespace RomM
             Properties = new LibraryPluginProperties
             {
                 HasSettings = true
-            };
-
-            ROMsWithSiblingsPath = $"{Playnite.Paths.ExtensionsDataPath}\\{Id}\\ROMsWithSibings\\";
+            ROMsWithSiblingsPath = $"{Playnite.Paths.ExtensionsDataPath}\\{Id}\\ROMsWithSiblings\\";
 
             // Initialise the download queue
             downloadsVm = new DownloadQueueViewModel();
@@ -499,7 +497,7 @@ namespace RomM
                         foreach (string filename in Directory.EnumerateFiles(ROMsWithSiblingsPath, "*.json", SearchOption.TopDirectoryOnly))
                         {
                             int FileId;
-                            if (!int.TryParse(filename.Split('.')[0], out FileId))
+                            if (!int.TryParse(Path.GetFileNameWithoutExtension(filename), out FileId))
                             {
                                 continue;
                             }
@@ -763,12 +761,14 @@ namespace RomM
             if (version == null || !version.StartsWith("RomM:"))
             {
                 Logger.Warn($"Couldn't find RomMId for {args.Games.First().Name}.");
+                return gameMenuItems;
             }
 
             int romMId;
             if (!int.TryParse(version.Split(':')[1], out romMId))
             {
                 Logger.Error($"Malformed version string? {version} > {romMId}");
+                return gameMenuItems;
             }
 
             if (Settings.MergeRevisions && File.Exists($"{ROMsWithSiblingsPath}{romMId}.json") && args.Games.First().IsInstalled)
