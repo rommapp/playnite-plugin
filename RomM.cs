@@ -570,6 +570,7 @@ namespace RomM
                                 FileNameNoTags = item.FileNameNoTags,
                                 FileNameNoExt = item.FileNameNoExt,
                                 FileName = fileName,
+                                HasMultipleFiles = item.HasMultipleFiles,
                                 DownloadURL = CombineUrl(Settings.RomMHost, $"api/roms/{item.Id}/content/{fileName}"),
                                 isSelected = true
                             };
@@ -806,11 +807,14 @@ namespace RomM
                     siblingID = -2;
                 }
 
-                int romMId;
-                if (!int.TryParse(version.Split(':')[1], out romMId) && siblingID != -2)
+                int romMId = -1;
+                if (siblingID != -2)
                 {
-                    Logger.Error($"Malformed version string? {version} > {romMId}");
-                    siblingID = -2;
+                    if (!int.TryParse(version.Split(':')[1], out romMId))
+                    {
+                        Logger.Error($"Malformed version string? {version} > {romMId}");
+                        siblingID = -2;
+                    }
                 }
 
                 //If Siblings are avaiable prompt user with version selection
@@ -851,6 +855,9 @@ namespace RomM
                         if(args.Game.IsInstalled)
                         {
                             Playnite.UninstallGame(args.Game.Id);
+
+                            args.Game.IsInstalling = true;
+                            Playnite.Database.Games.Update(args.Game);
                         }
 
                        hasSiblings = true;
