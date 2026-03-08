@@ -31,13 +31,13 @@ namespace RomM.Games
         {
             var info = Game.GetRomMGameInfo();
 
-            if(SelectedSibling == -2)
+            if (SelectedSibling == -2)
             {
                 CancelInstall();
                 return;
             }
                 
-            //Replace info if a different version of the game is selected
+            // Replace info if a different version of the game is selected
             if (HasSiblings && SelectedSibling != -1) 
             {
                 List<RomMSibling> siblingInfos = new List<RomMSibling>();
@@ -73,7 +73,7 @@ namespace RomM.Games
                 {
                     info.FileName = selectedSibling.FileName;
                     info.DownloadUrl = selectedSibling.DownloadURL;
-                    //This has to be changed as systems can have single ROM and Multi ROM files. E.g. .chd vs .bin/.cue
+                    // This has to be changed as systems can have single ROM and Multi ROM files. E.g. .chd vs .bin/.cue
                     info.HasMultipleFiles = selectedSibling.HasMultipleFiles;
                 }
                 else

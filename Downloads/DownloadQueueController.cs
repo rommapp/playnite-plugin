@@ -181,7 +181,7 @@ namespace RomM.Downloads
                 item.SetStatus(DownloadStatus.Extracting, "Extracting...");
                 Logger.Info($"Extracting {req.GamePath}...");
 
-                if(req.Use7z && !string.IsNullOrEmpty(req.PathTo7Z) && req.PathTo7Z.EndsWith("7z.exe", StringComparison.OrdinalIgnoreCase))
+                if (req.Use7z && !string.IsNullOrEmpty(req.PathTo7Z) && req.PathTo7Z.EndsWith("7z.exe", StringComparison.OrdinalIgnoreCase))
                 {
                     ExtractArchiveWith7z(req.PathTo7Z, req.GamePath, req.InstallDir, item, ct);
                 }

@@ -294,12 +294,12 @@ namespace RomM
 
             PlayniteApi.Database.Games.ItemCollectionChanged += (_, argus) =>
             {
-                //Remove json file if game is removed from playnite
-                if(argus.RemovedItems.Count > 0)
+                // Remove json file if game is removed from playnite
+                if (argus.RemovedItems.Count > 0)
                 {
                     foreach (var item in argus.RemovedItems)
                     {
-                        if(item.PluginId == PluginId)
+                        if (item.PluginId == PluginId)
                         {
                             var version = item.Version;
                             if (version == null || !version.StartsWith("RomM:"))
@@ -315,7 +315,7 @@ namespace RomM
                                 continue;
                             }
 
-                            if(File.Exists($"{ROMsWithSiblingsPath}{romMId}.json"))
+                            if (File.Exists($"{ROMsWithSiblingsPath}{romMId}.json"))
                             {
                                 File.Delete($"{ROMsWithSiblingsPath}{romMId}.json");
                             }
@@ -527,7 +527,7 @@ namespace RomM
                         Directory.CreateDirectory(ROMsWithSiblingsPath);
 
                     List<int> ImportedROMsWithSiblings = new List<int>();
-                    if(Settings.MergeRevisions)
+                    if (Settings.MergeRevisions)
                     {
                         foreach (string filename in Directory.EnumerateFiles(ROMsWithSiblingsPath, "*.json", SearchOption.TopDirectoryOnly))
                         {
@@ -546,8 +546,8 @@ namespace RomM
                         if (args.CancelToken.IsCancellationRequested)
                             break;
 
-                        //Check for siblings and if one has already been imported skip
-                        if(Settings.MergeRevisions && item.Siblings.Count > 0)
+                        // Check for siblings and if one has already been imported skip
+                        if (Settings.MergeRevisions && item.Siblings.Count > 0)
                         {
                             bool foundSibling = false;
 
@@ -565,7 +565,7 @@ namespace RomM
                         }
 
                         var gameName = item.Name;
-                        //Not sure if this a server bug or if my RomM server is borked but some games like Wii U dont have any of these enabled
+                        // Not sure if this a server bug or if my RomM server is borked but some games like Wii U dont have any of these enabled
                         if (!item.HasSimpleSingleFile & !item.HasNestedSingleFile & !item.HasMultipleFiles)
                             item.HasMultipleFiles = true;
 
@@ -592,7 +592,7 @@ namespace RomM
                         var gameId = info.AsGameId();
                         responseGameIDs.Add(gameId);
 
-                        //Save sibling data so user can select the version they want installed!
+                        // Save sibling data so user can select the version they want installed
                         if (Settings.MergeRevisions && item.Siblings.Count > 0)
                         {
                             List<RomMSibling> gameInfos = new List<RomMSibling>();
@@ -668,7 +668,7 @@ namespace RomM
                         var game = Playnite.Database.Games.FirstOrDefault(g => g.GameId == gameId);
                         if (game != null)
                         {
-                            //If it is already installed, we sync over metadata like favorite and status!
+                            // If it is already installed, we sync over metadata like favorite and status
                             if (Settings.KeepRomMSynced == true)
                             {
                                 game.Favorite = favorites.Exists(f => f == item.Id);
@@ -796,7 +796,7 @@ namespace RomM
         {
             List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
 
-            if(args.Games.First().PluginId == PluginId)
+            if (args.Games.First().PluginId == PluginId)
             {
                 var version = args.Games.First().Version;
                 if (version == null || !version.StartsWith("RomM:"))
@@ -839,7 +839,7 @@ namespace RomM
                 if (version == null || !version.StartsWith("RomM:"))
                 {
                     Logger.Warn($"Couldn't find RomMId for {args.Game.Name}.");
-                    //Set SiblingId to -2 to cancel request!
+                    //Set SiblingId to -2 to cancel request
                     siblingID = -2;
                 }
 
@@ -853,7 +853,7 @@ namespace RomM
                     }
                 }
 
-                //If Siblings are avaiable prompt user with version selection
+                // If Siblings are avaiable prompt user with version selection
                 if (Settings.MergeRevisions && File.Exists($"{ROMsWithSiblingsPath}{romMId}.json") && siblingID != -2)
                 {
                     List<RomMSibling> siblingInfos = new List<RomMSibling>();
@@ -888,7 +888,7 @@ namespace RomM
                     else
                     {
                         //Uninstall old ROM before installing new one
-                        if(args.Game.IsInstalled)
+                        if (args.Game.IsInstalled)
                         {
                             Playnite.UninstallGame(args.Game.Id);
 

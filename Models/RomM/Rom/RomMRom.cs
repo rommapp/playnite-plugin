@@ -61,7 +61,7 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("fs_name_no_ext")]
         public string FileNameNoExt { get; set; }
 
-        //Don't add JsonProperty data not from server
+        // Don't add JsonProperty data not from server
         public string FileName { get; set; }
         public string DownloadURL { get; set; }
         public bool HasMultipleFiles { get; set; }
