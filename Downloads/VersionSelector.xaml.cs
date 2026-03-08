@@ -11,7 +11,7 @@ namespace RomM.VersionSelector
     {
 
         public ObservableCollection<RomMSibling> Siblings { get; set; }
-        public bool Cancelled { get; set; } = false;
+        public bool Cancelled { get; set; } = true;
 
         public RomMVersionSelector(List<RomMSibling> siblings)
         {
@@ -23,12 +23,12 @@ namespace RomM.VersionSelector
 
         private void Click_Cancel(object sender, RoutedEventArgs e)
         {
-            Cancelled = true;
             ((Window)Parent).Close();
         }
 
         private void Click_Install(object sender, RoutedEventArgs e)
         {
+            Cancelled = false;
             ((Window)Parent).Close();
         }
     }

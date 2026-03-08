@@ -76,6 +76,15 @@ namespace RomM.Games
                     //This has to be changed as systems can have single ROM and Multi ROM files. E.g. .chd vs .bin/.cue
                     info.HasMultipleFiles = selectedSibling.HasMultipleFiles;
                 }
+                else
+                {
+                    _romM.Playnite.Notifications.Add(
+                        Game.GameId,
+                        $"Failed to find selected version of {Game.Name}.{Environment.NewLine}Selected sibling ID {SelectedSibling} was not found. Reimport libary!",
+                        NotificationType.Error);
+                    CancelInstall();
+                    return;
+                }
 
             }
 

@@ -762,33 +762,35 @@ namespace RomM
         {
             List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
 
-            var version = args.Games.First().Version;
-            if (version == null || !version.StartsWith("RomM:"))
+            if(args.Games.Any(g => g.PluginId == PluginId))
             {
-                Logger.Warn($"Couldn't find RomMId for {args.Games.First().Name}.");
-                return gameMenuItems;
-            }
-
-            int romMId;
-            if (!int.TryParse(version.Split(':')[1], out romMId))
-            {
-                Logger.Error($"Malformed version string? {version} > {romMId}");
-                return gameMenuItems;
-            }
-
-            if (Settings.MergeRevisions && File.Exists($"{ROMsWithSiblingsPath}{romMId}.json") && args.Games.First().IsInstalled)
-            {
-                gameMenuItems.Add(new GameMenuItem
+                var version = args.Games.First().Version;
+                if (version == null || !version.StartsWith("RomM:"))
                 {
-                    //MenuSection = "@",
-                    Description = "Switch ROM Version!",
-                    Action = (gameMenuItem) =>
-                    {
-                        Playnite.InstallGame(args.Games.First().Id);
-                    }
-                });
-            }
+                    Logger.Warn($"Couldn't find RomMId for {args.Games.First().Name}.");
+                    return gameMenuItems;
+                }
 
+                int romMId;
+                if (!int.TryParse(version.Split(':')[1], out romMId))
+                {
+                    Logger.Error($"Malformed version string? {version} > {romMId}");
+                    return gameMenuItems;
+                }
+
+                if (Settings.MergeRevisions && File.Exists($"{ROMsWithSiblingsPath}{romMId}.json") && args.Games.First().IsInstalled)
+                {
+                    gameMenuItems.Add(new GameMenuItem
+                    {
+                        //MenuSection = "@",
+                        Description = "Switch ROM Version!",
+                        Action = (gameMenuItem) =>
+                        {
+                            Playnite.InstallGame(args.Games.First().Id);
+                        }
+                    });
+                }
+            }
             return gameMenuItems;
         }
 
