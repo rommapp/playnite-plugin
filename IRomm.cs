@@ -4,10 +4,9 @@ namespace RomM
 {
 	internal interface IRomM
 	{
-		ILogger Logger { get; }
+        ILogger Logger { get; }
 		IPlayniteAPI Playnite { get; }
 		Settings.SettingsViewModel Settings { get; }	
-		string ROMsWithSiblingsPath { get; }
         Downloads.DownloadQueueController DownloadQueueController { get; }
         string GetPluginUserDataPath();
 	}
