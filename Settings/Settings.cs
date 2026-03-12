@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Web;
 
 namespace RomM.Settings
 {
@@ -34,10 +35,11 @@ namespace RomM.Settings
         public bool Use7z { get; set; } = false;
         public string PathTo7z { get; set; } = "";
         public bool MergeRevisions { get; set; } = false;
+        public bool KeepDeletedGames { get; set; } = false;
+        public string ExcludeGenres { get; set; } = "";
+        public bool SkipMissingFiles { get; set; } = false;
 
-        public SettingsViewModel()
-        {
-        }
+        public SettingsViewModel(){}
 
         internal SettingsViewModel(Plugin plugin, IRomM romM)
         {
@@ -49,9 +51,12 @@ namespace RomM.Settings
             bool forceSave = false;
             var savedSettings = plugin.LoadPluginSettings<SettingsViewModel>();
 
-            if (savedSettings == null) {
+            if (savedSettings == null) 
+            {
                 forceSave = true;
-            } else {
+            } 
+            else 
+            {
                 ScanGamesInFullScreen = savedSettings.ScanGamesInFullScreen;
                 NotifyOnInstallComplete = savedSettings.NotifyOnInstallComplete;
                 RomMHost = savedSettings.RomMHost;
@@ -62,6 +67,8 @@ namespace RomM.Settings
                 Use7z = savedSettings.Use7z;
                 PathTo7z = savedSettings.PathTo7z;
                 MergeRevisions = savedSettings.MergeRevisions;
+                KeepDeletedGames = savedSettings.KeepDeletedGames;
+                ExcludeGenres = savedSettings.ExcludeGenres;
             }
             
             if (Mappings == null)

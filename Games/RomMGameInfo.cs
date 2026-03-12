@@ -68,7 +68,7 @@ namespace RomM.Games
             }
         }
 
-        public InstallController GetInstallController(Game game, RomM romm, RomMSavedSibing GameData) => new RomMInstallController(game, romm, GameData);
+        public InstallController GetInstallController(Game game, RomM romm, GameInstallInfo GameData) => new RomMInstallController(game, romm, GameData);
 
         public UninstallController GetUninstallController(Game game, RomM romm) => new RomMUninstallController(game, romm);
 

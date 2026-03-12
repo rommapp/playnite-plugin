@@ -121,11 +121,31 @@
                 </Grid>
                 <Label Content="Library scanning" FontWeight="Bold" Margin="0,10,0,0" />
                 <Separator Margin="0,5,0,10" />
+
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Exclude Genres" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="5"/>
+
+                    <Grid>
+                        <TextBox  Width="250"  VerticalAlignment="Center" HorizontalAlignment="Left" x:Name="SearchTermTextBox" Margin="5" Text="{Binding ExcludeGenres, Mode=TwoWay}"/>
+                        <TextBlock IsHitTestVisible="False" Text="Adventure;Platform;RPG;" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0" Foreground="DarkGray">
+                            <TextBlock.Style>
+                                <Style TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=SearchTermTextBox}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </StackPanel>
                 <CheckBox IsChecked="{Binding ScanGamesInFullScreen, Mode=TwoWay}" Margin="0,0,0,10">
                     <TextBlock Text="Enable game scanning in fullscreen mode" TextWrapping="Wrap"/>
                 </CheckBox>
                 <CheckBox IsChecked="{Binding MergeRevisions, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Merge ROM Revisions" TextWrapping="Wrap"/>
+                    <TextBlock Text="Merge ROM revisions" TextWrapping="Wrap"/>
                 </CheckBox>
                 <Label Content="Installation" FontWeight="Bold" Margin="0,10,0,0" />
                 <Separator Margin="0,5,0,10" />
@@ -137,7 +157,13 @@
                 <CheckBox IsChecked="{Binding KeepRomMSynced, Mode=TwoWay}" Margin="0,0,0,10">
                     <TextBlock Text="Keep completion status and favorites in sync with RomM" TextWrapping="Wrap"/>
                 </CheckBox>
-                
+                <CheckBox IsChecked="{Binding KeepDeletedGames, Mode=TwoWay}" Margin="0,0,0,10">
+                    <TextBlock Text="Keep games deleted from RomM server" TextWrapping="Wrap"/>
+                </CheckBox>
+                <CheckBox IsChecked="{Binding SkipMissingFiles, Mode=TwoWay}" Margin="0,0,0,10">
+                    <TextBlock Text="Skip importing ROMs that are missing from RomM servers filesystem" TextWrapping="Wrap"/>
+                </CheckBox>
+
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>

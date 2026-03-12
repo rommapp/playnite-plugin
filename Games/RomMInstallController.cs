@@ -21,9 +21,9 @@ namespace RomM.Games
     {
         protected readonly IRomM _romM;
         public ILogger Logger => LogManager.GetLogger();
-        public RomMSavedSibing _gameData;
+        public GameInstallInfo _gameData;
 
-        internal RomMInstallController(Game game, IRomM romM, RomMSavedSibing GameData) : base(game)
+        internal RomMInstallController(Game game, IRomM romM, GameInstallInfo GameData) : base(game)
         {
             Name = "Download";
             _romM = romM;
@@ -81,7 +81,7 @@ namespace RomM.Games
                     var actualRomFiles = GetRomFiles(installDir, supported);
 
                     // Prefer .m3u if requested
-                    var useM3u = _gameData.Mapping != null && _gameData.Mapping.UseM3u;
+                    var useM3u = _gameData.Mapping != null && _gameData.Mapping.UseM3u && supported.Any(x => x.ToLower() == "m3u");
                     if (useM3u)
                     {
                         var m3uFile = actualRomFiles.FirstOrDefault(m =>
@@ -173,7 +173,7 @@ namespace RomM.Games
             }).ToArray();
         }
 
-        private static List<string> GetEmulatorSupportedFileTypes(RomMSavedSibing info)
+        private static List<string> GetEmulatorSupportedFileTypes(GameInstallInfo info)
         {
             if (info.Mapping.EmulatorProfile is CustomEmulatorProfile)
             {

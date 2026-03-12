@@ -353,14 +353,6 @@ namespace RomM
             }
         }
 
-        // Old-style overload (keeps older call sites working)
-        public static Task<HttpResponseMessage> GetAsync(
-            string url,
-            HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
-        {
-            return HttpClientSingleton.Instance.GetAsync(url, completionOption);
-        }
-
         // New-style overload (used by DownloadQueueController)
         public static Task<HttpResponseMessage> GetAsync(
             string url,
@@ -436,6 +428,38 @@ namespace RomM
                 }
 
                 string url = CombineUrl(Settings.RomMHost, "api/roms");
+
+                if (Settings.SkipMissingFiles)
+                {
+                    url += "?missing=false";
+                }
+
+                // Exclude genres from import
+                List<string> excludeGenres = Settings.ExcludeGenres.Split(';').ToList();
+                if(!string.IsNullOrEmpty(Settings.ExcludeGenres))
+                {
+                    // Add ? if it hasn't been added already
+                    if (!Settings.SkipMissingFiles)
+                    {
+                        url += "?";
+                    }
+
+                    if (excludeGenres.Count > 0)
+                    {
+                        
+                        foreach (var genre in excludeGenres)
+                        {
+                            url += $"genres={HttpUtility.UrlEncode(genre)}&";
+                        }
+                    }
+                    else
+                    {
+                        url += $"genres={HttpUtility.UrlEncode(Settings.ExcludeGenres)}";
+                    }
+                }
+
+
+
                 RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
 
                 if (apiPlatform == null)
@@ -458,11 +482,12 @@ namespace RomM
 
                     NameValueCollection queryParams = new NameValueCollection
                     {
-                        { "limit", pageSize.ToString() },
-                        { "offset", offset.ToString() },
                         { "platform_ids", apiPlatform.Id.ToString() },
+                        { "genres_logic", "none" },
                         { "order_by", "name" },
                         { "order_dir", "asc" },
+                        { "limit", pageSize.ToString() },
+                        { "offset", offset.ToString() },
                     };
 
                     try
@@ -565,7 +590,7 @@ namespace RomM
             if (args.Game.PluginId == Id)
             {
                 string gameID = args.Game.GameId;
-                RomMSavedSibing romData = new RomMSavedSibing();
+                GameInstallInfo romData = new GameInstallInfo();
                 RomMRomLocal gameData = new RomMRomLocal();
 
                 // Pull game file from RomM data directory
@@ -593,7 +618,7 @@ namespace RomM
                     yield return new RomMInstallController(args.Game, this, romData);
 
                 // Set ROM data to base ROM
-                romData = new RomMSavedSibing
+                romData = new GameInstallInfo
                 {
                     Id = gameData.Id,
                     FileName = gameData.FileName,
@@ -606,11 +631,25 @@ namespace RomM
                 // If Siblings are avaiable prompt user with version selection
                 if (Settings.MergeRevisions && gameData.Siblings.Count > 0)
                 {
-                    List<RomMSavedSibing> gameVersions = new List<RomMSavedSibing>();
+                    List<GameInstallInfo> gameVersions = new List<GameInstallInfo>();
 
                     // Add roms to list to be selected
                     gameVersions.Add(romData);
-                    gameVersions.AddRange(gameData.Siblings);
+
+                    foreach (var sibling in gameData.Siblings)
+                    {
+                        var siblingROMData = new GameInstallInfo
+                        {
+                            Id = sibling.Id,
+                            FileName = sibling.FileName,
+                            HasMultipleFiles = sibling.HasMultipleFiles,
+                            DownloadURL = sibling.DownloadURL,
+                            IsSelected = sibling.IsSelected,
+                            Mapping = gameData.Mapping
+                        };
+
+                        gameVersions.Add(siblingROMData);
+                    }
 
                     RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(gameVersions);
                     var window = Playnite.Dialogs.CreateWindow(new WindowCreationOptions
@@ -650,7 +689,21 @@ namespace RomM
                         // Write result back to json file
                         gameData.IsSelected = VersionSelectorControl.RomVersions[0].IsSelected;
                         VersionSelectorControl.RomVersions.RemoveAt(0);
-                        gameData.Siblings = VersionSelectorControl.RomVersions.ToList();
+
+                        // There is probalby a LINQ you can do for this instead of clear and replace all siblings as
+                        // only the isSelected option needs altering
+                        gameData.Siblings.Clear();
+                        foreach (var versions in VersionSelectorControl.RomVersions)
+                        {
+                            gameData.Siblings.Add(new RomMSavedSibing
+                            {
+                                Id = versions.Id,
+                                FileName = versions.FileName,
+                                HasMultipleFiles = versions.HasMultipleFiles,
+                                DownloadURL = versions.DownloadURL,
+                                IsSelected = versions.IsSelected,
+                            });
+                        }
                         File.WriteAllText($"{ROMDataPath}{romMSHA1}.json", JsonConvert.SerializeObject(gameData));
                     }
                 }

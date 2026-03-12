@@ -12,7 +12,7 @@ namespace RomM.Models.RomM.Rom
         Other = 1
     }
 
-    public struct RomMSavedSibing
+    public struct GameInstallInfo
     {
         public int Id { get; set; }
         public string FileName { get; set; }
@@ -20,6 +20,15 @@ namespace RomM.Models.RomM.Rom
         public string DownloadURL { get; set; }
         public bool IsSelected { get; set; }
         public EmulatorMapping Mapping { get; set; }
+    }
+
+    public struct RomMSavedSibing
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; }
+        public bool HasMultipleFiles { get; set; }
+        public string DownloadURL { get; set; }
+        public bool IsSelected { get; set; }
     }
 
     public class RomMRomLocal

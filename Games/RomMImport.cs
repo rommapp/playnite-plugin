@@ -116,8 +116,24 @@ namespace RomM.Games
                     continue;
                 }
 
-                var importedGame = ImportGame(ROM, statusID);
+                // Migrate old RomMGameInfo id to new romMId:SHA1 id
+                if (UpdatedOldGameID(ROM))
+                {
+                    ImportedGamesIDs.Add(gameID);
+                    continue;
+                }
+                    
+                // If keep deleted games is enabled and a deleted game gets re-added back to the server under a new romMId, Update playnite entry
+                if(_plugin.Settings.KeepDeletedGames)
+                {
+                    if(UpdatedDeletedGame(ROM))
+                    {
+                        ImportedGamesIDs.Add(gameID);
+                        continue;
+                    }
+                }
 
+                var importedGame = ImportGame(ROM, statusID);
                 if (importedGame != null)
                 {
                     games.Add(importedGame); 
@@ -131,9 +147,10 @@ namespace RomM.Games
             }
             _plugin.Logger.Debug($"Finished adding new games for {_mapping.Platform.Name}");
 
-           
-            RemoveMissingGames(ImportedGamesIDs);
-
+            if (!_plugin.Settings.KeepDeletedGames)
+            {
+                RemoveMissingGames(ImportedGamesIDs);
+            }
 
             return games;
         }
@@ -258,6 +275,45 @@ namespace RomM.Games
 
             _plugin.Logger.Debug($"Finished removing not found games for {_mapping.Platform.Name}");
         }
+        private bool UpdatedOldGameID(RomMRom ROM)
+        {
+            var filename = ROM.HasMultipleFiles ? Path.GetFileName(ROM.FileName) : Path.GetFileName(ROM.Files.First().FileName);
+            var info = new RomMGameInfo
+            {
+                MappingId = _mapping.MappingId,
+                FileName = filename,
+                DownloadUrl = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{filename}"),
+                HasMultipleFiles = ROM.HasMultipleFiles
+            };
+
+            // Check to see if a game already exists with
+            var oldgame = _plugin.Playnite.Database.Games.FirstOrDefault(g => g.GameId == info.AsGameId());
+            if (oldgame != null)
+            {
+                oldgame.GameId = $"{ROM.Id}:{ROM.SHA1}";
+                _plugin.Playnite.Database.Games.Update(oldgame);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        private bool UpdatedDeletedGame(RomMRom ROM)
+        {
+            // Check to see if a game already exists with an old romMId
+            var oldgame = _plugin.Playnite.Database.Games.FirstOrDefault(g => g.GameId.Split(':')[1] == ROM.SHA1);
+            if (oldgame != null)
+            {
+                oldgame.GameId = $"{ROM.Id}:{ROM.SHA1}";
+                _plugin.Playnite.Database.Games.Update(oldgame);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
 
         private MainSibling CheckForMainSibling(RomMRom ROM)
         {
@@ -323,11 +379,10 @@ namespace RomM.Games
                                 }
 
                                 newSibling.Id = sibling.Id;
-                                newSibling.FileName = ROM.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.First().FileName);
+                                newSibling.FileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.First().FileName);
                                 newSibling.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{newSibling.Id}/content/{newSibling.FileName}");
-                                newSibling.HasMultipleFiles = ROM.HasMultipleFiles;
+                                newSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
                                 newSibling.IsSelected = false;
-                                newSibling.Mapping = _mapping;
 
                                 _ROMs.Find(x => x.Id == siblingItem.Id).Processed = true;
                                 toSave.Siblings.Add(newSibling);
@@ -368,11 +423,10 @@ namespace RomM.Games
 
                         RomMSavedSibing saveSibling = new RomMSavedSibing();
                         saveSibling.Id = siblingItem.Id;
-                        saveSibling.FileName = ROM.HasMultipleFiles ? Path.GetFileName(ROM.FileName) : Path.GetFileName(ROM.Files.First().FileName);
+                        saveSibling.FileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.First().FileName);
                         saveSibling.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{saveSibling.Id}/content/{saveSibling.FileName}");
-                        saveSibling.HasMultipleFiles = ROM.HasMultipleFiles;
+                        saveSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
                         saveSibling.IsSelected = false;
-                        saveSibling.Mapping = _mapping;
 
                         _ROMs.Find(x => x.Id == siblingItem.Id).Processed = true;
 
@@ -422,7 +476,6 @@ namespace RomM.Games
 
             return statusId;
         }
-
 
         private Game PluginMetaData(Game Game)
         {

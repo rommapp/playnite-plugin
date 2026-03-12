@@ -46,6 +46,7 @@ namespace RomM.Settings
             string path;
             if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
 
+            PathTo7zText.Text = path;
             SettingsViewModel.Instance.PathTo7z = path;
         }
 
