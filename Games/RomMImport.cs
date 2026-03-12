@@ -51,7 +51,6 @@ namespace RomM.Games
         }
 
         // Main library import functions
-
         public List<Game> ProcessData()
         {
             var games = new List<Game>();
@@ -170,7 +169,7 @@ namespace RomM.Games
 
             var metadata = new GameMetadata
             {
-                Source = _plugin.SourceName,
+                Source = _plugin.Source,
                 GameId = $"{ROM.Id}:{ROM.SHA1}",
 
                 Name = ROM.Name,
@@ -238,7 +237,7 @@ namespace RomM.Games
         private void RemoveMissingGames(List<string> ImportedGames)
         {
             var gamesInDatabase = _plugin.Playnite.Database.Games.Where(g =>
-                        g.Source != null && g.Source.Name == _plugin.SourceName.ToString() &&
+                        g.Source != null && g.Source.Name == _plugin.Source.ToString() &&
                         g.Platforms != null && g.Platforms.Any(p => p.Name == _mapping.Platform.Name)
                     );
 
@@ -424,7 +423,6 @@ namespace RomM.Games
             return statusId;
         }
 
-        
 
         private Game PluginMetaData(Game Game)
         {

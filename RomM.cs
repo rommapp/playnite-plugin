@@ -12,7 +12,6 @@ using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
 using RomM.Settings;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
@@ -68,10 +67,11 @@ namespace RomM
         public ILogger Logger => LogManager.GetLogger();
         public IPlayniteAPI Playnite { get; private set; }
         public SettingsViewModel Settings { get; private set; }
+        
         public string ROMDataPath { get; private set; }
+        public MetadataProperty Source { get; private set; }
 
         public DownloadQueueController DownloadQueueController { get; private set; }
-
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
         private readonly DownloadQueueViewModel downloadsVm;
 
@@ -123,7 +123,6 @@ namespace RomM
                 return new List<RomMPlatform>();
             }
         }
-
         internal IList<RomMCollection> FetchFavorites()
         {
             string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections");
@@ -164,7 +163,6 @@ namespace RomM
                 return null;
             }
         }
-
         internal void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
         {
             if (favoriteCollection == null)
@@ -187,7 +185,7 @@ namespace RomM
             }
         }
 
-        internal RomMRom FetchRom(string romId)
+        public RomMRom FetchRom(string romId)
         {
             string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
             try
@@ -264,6 +262,7 @@ namespace RomM
             Settings = new SettingsViewModel(this, this);
             HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
+            Source = SourceName;
 
             // Portable path fix: expand "{PlayniteDir}" to absolute paths in DB on startup
             if (Playnite.Paths.IsPortable)
@@ -522,6 +521,15 @@ namespace RomM
             return games;
         }
 
+        public override ISettings GetSettings(bool firstRunSettings)
+        {
+            return Settings;
+        }
+        public override UserControl GetSettingsView(bool firstRunSettings)
+        {
+            return new SettingsView();
+        }
+
         public override IEnumerable<SidebarItem> GetSidebarItems()
         {
             if (DownloadsSidebar != null)
@@ -529,17 +537,6 @@ namespace RomM
                 yield return DownloadsSidebar;
             }
         }
-
-        public override ISettings GetSettings(bool firstRunSettings)
-        {
-            return Settings;
-        }
-
-        public override UserControl GetSettingsView(bool firstRunSettings)
-        {
-            return new SettingsView();
-        }
-
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
         {
             List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
@@ -568,13 +565,35 @@ namespace RomM
             if (args.Game.PluginId == Id)
             {
                 string gameID = args.Game.GameId;
-                int romMId = int.Parse(gameID.Split(':')[0]);
+                RomMSavedSibing romData = new RomMSavedSibing();
+                RomMRomLocal gameData = new RomMRomLocal();
+
+                // Pull game file from RomM data directory
+                int romMId;
                 string romMSHA1 = gameID.Split(':')[1];
+                if (!int.TryParse(args.Game.GameId.Split(':')[0], out romMId) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
+                {
+                    Logger.Error($"{args.Game.Name} GameID is malformed!");
+                    romData.Id = (int)InstallStatus.Cancelled;
+                    yield return new RomMInstallController(args.Game, this, romData);
+                }
 
-                string json = File.ReadAllText($"{ROMDataPath}{romMSHA1}.json");
-                var gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
+                try
+                {
+                    string json = File.ReadAllText($"{ROMDataPath}{romMSHA1}.json");
+                    gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
+                }
+                catch (Exception)
+                {
+                    Logger.Error($"{args.Game.Name} GameID is malformed or {romMSHA1} json file is corrupted!");
+                    romData.Id = (int)InstallStatus.Cancelled; 
+                }
 
-                RomMSavedSibing romData = new RomMSavedSibing
+                if(romData.Id == (int)InstallStatus.Cancelled)
+                    yield return new RomMInstallController(args.Game, this, romData);
+
+                // Set ROM data to base ROM
+                romData = new RomMSavedSibing
                 {
                     Id = gameData.Id,
                     FileName = gameData.FileName,
@@ -639,15 +658,13 @@ namespace RomM
                 yield return new RomMInstallController(args.Game, this, romData);
             }
         }
-
         public override IEnumerable<UninstallController> GetUninstallActions(GetUninstallActionsArgs args)
         {
             if (args.Game.PluginId == Id)
             {
-                yield return args.Game.GetRomMGameInfo().GetUninstallController(args.Game, this);
+                yield return new RomMUninstallController(args.Game, this);
             }
         }
-
         public override void OnGameInstalled(OnGameInstalledEventArgs args)
         {
             base.OnGameInstalled(args);
@@ -658,7 +675,11 @@ namespace RomM
             }
         }
 
-        private readonly ConcurrentDictionary<Guid, byte> ignoredGameIds = new ConcurrentDictionary<Guid, byte>();
+        public override LibraryMetadataProvider GetMetadataDownloader()
+        {
+            return new RomMMetadataProvider(this);
+        }
+
         private void OnItemUpdated(object sender, ItemUpdatedEventArgs<Game> e)
         {
             Task.Run(async () =>
@@ -682,15 +703,12 @@ namespace RomM
                 
                     if (Settings.KeepRomMSynced == true)
                     {
-                        if (ignoredGameIds.ContainsKey(newGame.Id))
+                        int romMId;                    
+                        if(!int.TryParse(newGame.GameId.Split(':')[0], out romMId))
                         {
-                            // This GameId is marked as an internal update, should be ignored this time
-                            ignoredGameIds.TryRemove(newGame.Id, out _);
-                            continue;
-                        }     
+                            Logger.Error($"{newGame.Name} GameID is malformed!");
+                        }
 
-                        int romMId = int.Parse(newGame.GameId.Split(':')[0]);
-                        
                         if (oldGame.Favorite != newGame.Favorite)
                         {
                             Logger.Info($"Favorites changed for {romMId}.");
