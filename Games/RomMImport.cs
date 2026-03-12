@@ -8,6 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace RomM.Games
 {
@@ -74,6 +76,27 @@ namespace RomM.Games
                     _plugin.Playnite.Notifications.Add(new NotificationMessage(_plugin.Id.ToString(), $"Filename for ROM ID: {ROM.Id} doesn't exist!\nDoes ROM exist on the servers filesystem?", NotificationType.Error));
                     continue;
                 }
+
+                // Some newer platforms don't get a hash value so we will compromise with this
+                if (string.IsNullOrEmpty(ROM.SHA1))
+                {
+                    var tohash = $"{ROM.Name}{ROM.FileSizeBytes}";
+
+                    using (SHA1Managed sha1 = new SHA1Managed())
+                    {
+                        var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(tohash));
+                        var sb = new StringBuilder(hash.Length * 2);
+
+                        foreach (byte b in hash)
+                        {
+                            // can be "x2" if you want lowercase
+                            sb.Append(b.ToString("X2"));
+                        }
+
+                        ROM.SHA1 = sb.ToString();
+                    }           
+                }
+                    
 
                 // Fail-safe incase none of these are set to true
                 if (!ROM.HasSimpleSingleFile & !ROM.HasNestedSingleFile & !ROM.HasMultipleFiles)
