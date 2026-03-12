@@ -571,15 +571,27 @@ namespace RomM
 
                 if (Settings.MergeRevisions && File.Exists($"{ROMDataPath}{args.Games.First().GameId.Split(':')[1]}.json") && args.Games.First().IsInstalled)
                 {
-                    gameMenuItems.Add(new GameMenuItem
+                    try
                     {
-                        //MenuSection = "@",
-                        Description = "Switch ROM Version!",
-                        Action = (gameMenuItem) =>
+                        string json = File.ReadAllText($"{ROMDataPath}{args.Games.First().GameId.Split(':')[1]}.json");
+                        var gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
+                        if(gameData.Siblings.Count > 0)
                         {
-                            Playnite.InstallGame(args.Games.First().Id);
+                            gameMenuItems.Add(new GameMenuItem
+                            {
+                                //MenuSection = "@",
+                                Description = "Switch ROM Version!",
+                                Action = (gameMenuItem) =>
+                                {
+                                    Playnite.InstallGame(args.Games.First().Id);
+                                }
+                            });
                         }
-                    });
+                    }
+                    catch (Exception)
+                    {
+                        Logger.Error($"{args.Games.First().Name} GameID is malformed or json file is corrupted!");
+                    } 
                 }
             }
             return gameMenuItems;

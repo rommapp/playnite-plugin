@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Web;
 
 namespace RomM.Games
 {
@@ -50,6 +51,25 @@ namespace RomM.Games
         private string CombineUrl(string baseUrl, string relativePath)
         {
             return $"{baseUrl?.TrimEnd('/')}/{relativePath?.TrimStart('/') ?? ""}";
+        }
+
+        private string DetermineFilename(RomMRom ROM)
+        {
+            if (ROM.HasMultipleFiles)
+                return Path.GetFileName(ROM.FileName);
+			
+	    // Find file at the base of the games directory so files from update,dlc,etc don't get installed as main file
+            if (ROM.HasNestedSingleFile)
+            {
+                foreach (var file in ROM.Files)
+                {
+                    int count = file.FullPath.Count(x => x == '/');
+                    if (count == 3)
+                        return Path.GetFileName(file.FileName);
+                }
+            }
+
+            return Path.GetFileName(ROM.Files.First().FileName);
         }
 
         // Main library import functions
@@ -300,7 +320,7 @@ namespace RomM.Games
         }
         private bool UpdatedOldGameID(RomMRom ROM)
         {
-            var filename = ROM.HasMultipleFiles ? Path.GetFileName(ROM.FileName) : Path.GetFileName(ROM.Files.First().FileName);
+            var filename = DetermineFilename(ROM);
             var info = new RomMGameInfo
             {
                 MappingId = _mapping.MappingId,
@@ -402,7 +422,7 @@ namespace RomM.Games
                                 }
 
                                 newSibling.Id = sibling.Id;
-                                newSibling.FileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.First().FileName);
+                                newSibling.FileName = DetermineFilename(siblingItem);
                                 newSibling.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{newSibling.Id}/content/{newSibling.FileName}");
                                 newSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
                                 newSibling.IsSelected = false;
@@ -421,11 +441,12 @@ namespace RomM.Games
                 }
                 else // Game hasn't been import or isnt installed
                 {
+
                     // Save base ROM data
                     toSave.Id = ROM.Id;
                     toSave.Name = ROM.Name;
                     toSave.SHA1 = ROM.SHA1;
-                    toSave.FileName = ROM.HasMultipleFiles ? Path.GetFileName(ROM.FileName) : Path.GetFileName(ROM.Files.First().FileName);
+                    toSave.FileName = DetermineFilename(ROM);
                     toSave.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
                     toSave.HasMultipleFiles = ROM.HasMultipleFiles;
                     toSave.IsSelected = false;
@@ -446,7 +467,7 @@ namespace RomM.Games
 
                         RomMSavedSibing saveSibling = new RomMSavedSibing();
                         saveSibling.Id = siblingItem.Id;
-                        saveSibling.FileName = siblingItem.HasMultipleFiles ? Path.GetFileName(siblingItem.FileName) : Path.GetFileName(siblingItem.Files.First().FileName);
+                        saveSibling.FileName = DetermineFilename(siblingItem);
                         saveSibling.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{saveSibling.Id}/content/{saveSibling.FileName}");
                         saveSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
                         saveSibling.IsSelected = false;
@@ -464,7 +485,7 @@ namespace RomM.Games
                 toSave.Id = ROM.Id;
                 toSave.Name = ROM.Name;
                 toSave.SHA1 = ROM.SHA1;
-                toSave.FileName = ROM.HasMultipleFiles ? Path.GetFileName(ROM.FileName) : Path.GetFileName(ROM.Files.First().FileName);
+                toSave.FileName = DetermineFilename(ROM);
                 toSave.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
                 toSave.HasMultipleFiles = ROM.HasMultipleFiles;
                 toSave.IsSelected = false;
