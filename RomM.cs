@@ -229,11 +229,17 @@ namespace RomM
                     {
                         if (item.PluginId == PluginId)
                         {
-                            if (File.Exists($"{ROMDataPath}{item.GameId.Split(':')[1]}.json"))
+                            if (item.GameId.Contains(':'))
                             {
-                                File.Delete($"{ROMDataPath}{item.GameId.Split(':')[1]}.json");
+                                if (File.Exists($"{ROMDataPath}{item.GameId.Split(':')[1]}.json"))
+                                {
+                                    File.Delete($"{ROMDataPath}{item.GameId.Split(':')[1]}.json");
+                                }
                             }
-
+                            else
+                            {
+                                Logger.Error($"Game {item.Name} id is malformed!");
+                            }
                         }
                     }
                 }

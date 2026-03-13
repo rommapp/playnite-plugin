@@ -127,7 +127,7 @@ namespace RomM.Games
                 {
                     _romM.Playnite.Notifications.Add(
                         Game.GameId,
-                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex}",
+                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
                         NotificationType.Error);
 
                     Game.IsInstalling = false;
