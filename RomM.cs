@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
@@ -8,12 +7,10 @@ using RomM.Games;
 using RomM.Downloads;
 using RomM.VersionSelector;
 using RomM.Models.RomM.Collection;
-using RomM.Models.RomM.Platform;
 using RomM.Models.RomM.Rom;
 using RomM.Settings;
 using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -22,7 +19,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -66,15 +62,14 @@ namespace RomM
 
         public ILogger Logger => LogManager.GetLogger();
         public IPlayniteAPI Playnite { get; private set; }
-        public SettingsViewModel Settings { get; private set; }
-        
+        public SettingsViewModel Settings { get; private set; }     
         public string ROMDataPath { get; private set; }
         public MetadataProperty Source { get; private set; }
 
         public DownloadQueueController DownloadQueueController { get; private set; }
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
         private readonly DownloadQueueViewModel downloadsVm;
-
+        
         // Implementing Client adds ability to open it via special menu in playnite
         public override LibraryClient Client { get; } = new RomMClient();
 
@@ -101,88 +96,11 @@ namespace RomM
             }
         }
 
-        private string CombineUrl(string baseUrl, string relativePath)
+
+    #region Helper functions
+        public string CombineUrl(string baseUrl, string relativePath)
         {
             return $"{baseUrl?.TrimEnd('/')}/{relativePath?.TrimStart('/') ?? ""}";
-        }
-
-        internal IList<RomMPlatform> FetchPlatforms()
-        {
-            string apiPlatformsUrl = CombineUrl(Settings.RomMHost, "api/platforms");
-            try
-            {
-                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiPlatformsUrl).GetAwaiter().GetResult();
-                response.EnsureSuccessStatusCode();
-
-                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                return JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
-            }
-            catch (HttpRequestException e)
-            {
-                Logger.Error($"Request exception: {e.Message}");
-                return new List<RomMPlatform>();
-            }
-        }
-        internal IList<RomMCollection> FetchFavorites()
-        {
-            string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections");
-            try
-            {
-                // Make the request and get the response
-                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiFavoriteUrl).GetAwaiter().GetResult();
-                response.EnsureSuccessStatusCode();
-
-                // Assuming the response is in JSON format
-                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                return JsonConvert.DeserializeObject<List<RomMCollection>>(body);
-            }
-            catch (HttpRequestException e)
-            {
-                Logger.Error($"Request exception: {e.Message}");
-                return new List<RomMCollection>();
-            }
-        }
-
-        internal RomMCollection CreateFavorites()
-        {
-            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections?is_favorite=true&is_public=false");
-            try
-            {
-                var formData = new MultipartFormDataContent();
-                formData.Add(new StringContent("Favorites"), "name");
-
-                HttpResponseMessage postResponse = HttpClientSingleton.Instance.PostAsync(apiCollectionUrl, formData).GetAwaiter().GetResult();
-                postResponse.EnsureSuccessStatusCode();
-
-                string body = postResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                return JsonConvert.DeserializeObject<RomMCollection>(body);
-            }
-            catch (HttpRequestException e)
-            {
-                Logger.Error($"Request exception: {e.Message}");
-                return null;
-            }
-        }
-        internal void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
-        {
-            if (favoriteCollection == null)
-            {
-                Logger.Error($"Can't update favorites, collection is null");
-                return;
-            }
-
-            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
-            try
-            {
-                var formData = new MultipartFormDataContent();
-                formData.Add(new StringContent(JsonConvert.SerializeObject(romIds)), "rom_ids");
-                HttpResponseMessage putResponse = HttpClientSingleton.Instance.PutAsync($"{apiCollectionUrl}/{favoriteCollection.Id}", formData).GetAwaiter().GetResult();
-                putResponse.EnsureSuccessStatusCode();
-            }
-            catch (HttpRequestException e)
-            {
-                Logger.Error($"Request exception: {e.Message}");
-            }
         }
 
         public RomMRom FetchRom(string romId)
@@ -252,6 +170,14 @@ namespace RomM
             }
         }
 
+        // New-style overload (used by DownloadQueueController)
+        public static Task<HttpResponseMessage> GetAsync(string url, HttpCompletionOption completionOption, CancellationToken ct)
+        {
+            return HttpClientSingleton.Instance.GetAsync(url, completionOption, ct);
+        }
+    #endregion
+
+    #region Playnite functions
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             base.OnApplicationStarted(args);
@@ -307,18 +233,17 @@ namespace RomM
                             {
                                 File.Delete($"{ROMDataPath}{item.GameId.Split(':')[1]}.json");
                             }
-                            
+
                         }
                     }
                 }
             };
 
         }
-
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             base.OnApplicationStopped(args);
-            
+
             Playnite.Database.Games.ItemUpdated -= OnItemUpdated;
 
             // Portable path fix: restore "{PlayniteDir}" tokens before exiting
@@ -353,30 +278,6 @@ namespace RomM
             }
         }
 
-        // New-style overload (used by DownloadQueueController)
-        public static Task<HttpResponseMessage> GetAsync(
-            string url,
-            HttpCompletionOption completionOption,
-            CancellationToken ct)
-        {
-            return HttpClientSingleton.Instance.GetAsync(url, completionOption, ct);
-        }
-
-        public static async Task<HttpResponseMessage> GetAsyncWithParams(string baseUrl, NameValueCollection queryParams)
-        {
-            var uriBuilder = new UriBuilder(baseUrl);
-            var query = HttpUtility.ParseQueryString(uriBuilder.Query);
-
-            foreach (string key in queryParams)
-            {
-                query[key] = queryParams[key];
-            }
-
-            uriBuilder.Query = query.ToString();
-
-            return await HttpClientSingleton.Instance.GetAsync(uriBuilder.Uri);
-        }
-
         public override IEnumerable<Game> ImportGames(LibraryImportGamesArgs args)
         {
             if (Playnite.ApplicationInfo.Mode == ApplicationMode.Fullscreen && !Settings.ScanGamesInFullScreen)
@@ -392,158 +293,7 @@ namespace RomM
                 return new List<Game>();
             }
 
-            IList<RomMPlatform> apiPlatforms = FetchPlatforms();
-            List<Game> games = new List<Game>();
-            IEnumerable<EmulatorMapping> enabledMappings = SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled);
-
-            if (enabledMappings == null || !enabledMappings.Any())
-            {
-                Playnite.Notifications.Add(Id.ToString(), "No emulators are configured or enabled in RomM settings. No games will be fetched.", NotificationType.Error);
-                return games;
-            }
-
-            IList<RomMCollection> favoritCollections = FetchFavorites();
-            var favorites = favoritCollections.FirstOrDefault(c => c.IsFavorite)?.RomIds ?? new List<int>();
-
-            foreach (var mapping in enabledMappings)
-            {
-                if (args.CancelToken.IsCancellationRequested)
-                    break;
-
-                // Check mapping has an Emulator, Profile & Platform assigned to it
-                if (mapping.Emulator == null)
-                {
-                    Logger.Warn($"Emulator {mapping.EmulatorId} not found, skipping.");
-                    continue;
-                }
-                if (mapping.EmulatorProfile == null)
-                {
-                    Logger.Warn($"Emulator profile {mapping.EmulatorProfileId} for emulator {mapping.EmulatorId} not found, skipping.");
-                    continue;
-                }
-                if (mapping.Platform == null)
-                {
-                    Logger.Warn($"Platform {mapping.PlatformId} not found, skipping.");
-                    continue;
-                }
-
-                string url = CombineUrl(Settings.RomMHost, "api/roms");
-
-                if (Settings.SkipMissingFiles)
-                {
-                    url += "?missing=false";
-                }
-
-                // Exclude genres from import
-                List<string> excludeGenres = Settings.ExcludeGenres.Split(';').ToList();
-                if(!string.IsNullOrEmpty(Settings.ExcludeGenres))
-                {
-                    // Add ? if it hasn't been added already
-                    if (!Settings.SkipMissingFiles)
-                    {
-                        url += "?";
-                    }
-
-                    if (excludeGenres.Count > 0)
-                    {
-                        
-                        foreach (var genre in excludeGenres)
-                        {
-                            url += $"genres={HttpUtility.UrlEncode(genre)}&";
-                        }
-                    }
-                    else
-                    {
-                        url += $"genres={HttpUtility.UrlEncode(Settings.ExcludeGenres)}";
-                    }
-                }
-
-
-
-                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
-
-                if (apiPlatform == null)
-                {
-                    Playnite.Notifications.Add(Id.ToString(), $"Platform {mapping.Platform.Name} with IGDB ID {mapping.Platform.IgdbId} not found in RomM, skipping.", NotificationType.Error);
-                    continue;
-                }
-
-                Logger.Debug($"Starting to fetch games for {apiPlatform.Name}.");
-
-                const int pageSize = 72;
-                int offset = 0;
-                bool hasMoreData = true;
-                var allRoms = new List<RomMRom>();
-
-                while (hasMoreData)
-                {
-                    if (args.CancelToken.IsCancellationRequested)
-                        break;
-
-                    NameValueCollection queryParams = new NameValueCollection
-                    {
-                        { "platform_ids", apiPlatform.Id.ToString() },
-                        { "genres_logic", "none" },
-                        { "order_by", "name" },
-                        { "order_dir", "asc" },
-                        { "limit", pageSize.ToString() },
-                        { "offset", offset.ToString() },
-                    };
-
-                    try
-                    {
-                        HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
-                        response.EnsureSuccessStatusCode();
-
-                        Logger.Debug($"Parsing response for {apiPlatform.Name} batch {offset / pageSize + 1}.");
-
-                        Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
-                        List<RomMRom> roms;
-                        using (StreamReader reader = new StreamReader(body))
-                        {
-                            var jsonResponse = JObject.Parse(reader.ReadToEnd());
-                            roms = jsonResponse["items"].ToObject<List<RomMRom>>();
-                        }
-
-                        Logger.Debug($"Parsed {roms.Count} roms for batch {offset / pageSize + 1}.");
-                        allRoms.AddRange(roms);
-
-                        if (roms.Count < pageSize)
-                        {
-                            Logger.Debug($"Received less than {pageSize} roms for {apiPlatform.Name}, assuming no more games.");
-                            hasMoreData = false;
-                            break;
-                        }
-
-                        offset += pageSize;
-                    }
-                    catch (HttpRequestException e)
-                    {
-                        Logger.Error($"Request exception: {e.Message}");
-                        hasMoreData = false;
-                    }
-                }
-
-                try
-                {
-                    Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
-
-                    
-
-                    // Import games for current mapping 
-                    //TODO: Setup ProcessData to run async
-                    RomMImport newImport = new RomMImport(this, args, mapping, allRoms, favorites);
-                    newImport.ProcessData();
-
-                }
-                catch (HttpRequestException e)
-                {
-                    Logger.Error($"Request exception: {e.Message}");
-                    return games;
-                }
-            }
-
-            return games;
+            return new RomMImportController(this).Import(args);
         }
 
         public override ISettings GetSettings(bool firstRunSettings)
@@ -744,6 +494,69 @@ namespace RomM
         {
             return new RomMMetadataProvider(this);
         }
+        #endregion
+
+    #region RomM Status Syncing
+        public IList<RomMCollection> FetchFavorites()
+        {
+            string apiFavoriteUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            try
+            {
+                // Make the request and get the response
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync(apiFavoriteUrl).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                // Assuming the response is in JSON format
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonConvert.DeserializeObject<List<RomMCollection>>(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return new List<RomMCollection>();
+            }
+        }
+        internal RomMCollection CreateFavorites()
+        {
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections?is_favorite=true&is_public=false");
+            try
+            {
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent("Favorites"), "name");
+
+                HttpResponseMessage postResponse = HttpClientSingleton.Instance.PostAsync(apiCollectionUrl, formData).GetAwaiter().GetResult();
+                postResponse.EnsureSuccessStatusCode();
+
+                string body = postResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonConvert.DeserializeObject<RomMCollection>(body);
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+                return null;
+            }
+        }
+        internal void UpdateFavorites(RomMCollection favoriteCollection, List<int> romIds)
+        {
+            if (favoriteCollection == null)
+            {
+                Logger.Error($"Can't update favorites, collection is null");
+                return;
+            }
+
+            string apiCollectionUrl = CombineUrl(Settings.RomMHost, "api/collections");
+            try
+            {
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent(JsonConvert.SerializeObject(romIds)), "rom_ids");
+                HttpResponseMessage putResponse = HttpClientSingleton.Instance.PutAsync($"{apiCollectionUrl}/{favoriteCollection.Id}", formData).GetAwaiter().GetResult();
+                putResponse.EnsureSuccessStatusCode();
+            }
+            catch (HttpRequestException e)
+            {
+                Logger.Error($"Request exception: {e.Message}");
+            }
+        }
 
         private void OnItemUpdated(object sender, ItemUpdatedEventArgs<Game> e)
         {
@@ -832,5 +645,6 @@ namespace RomM
                 }
             });
         }
+    #endregion
     }
 }

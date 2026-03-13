@@ -10,7 +10,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web;
 
 namespace RomM.Games
 {
@@ -23,8 +22,6 @@ namespace RomM.Games
         Dictionary<string, Guid> _completionStatusMap;
         List<int> _favourites;
 
-        List<MetadataPlugin> _metadataPlugins = new List<MetadataPlugin>();
-
         public RomMImport(RomM plugin, LibraryImportGamesArgs args, EmulatorMapping mapping, List<RomMRom> roms, List<int> favourites)
         {
             _plugin = plugin;
@@ -33,24 +30,6 @@ namespace RomM.Games
             _ROMs = roms;
             _completionStatusMap = plugin.Playnite.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
             _favourites = favourites;
-
-            foreach (var addons in plugin.Playnite.Addons.Plugins)
-            {
-                try
-                {
-                    var metadataPlugin = (MetadataPlugin)addons;
-                    _metadataPlugins.Add(metadataPlugin);
-                }
-                catch (Exception)
-                {
-                }
-            }
-        }
-
-        // Helper functions
-        private string CombineUrl(string baseUrl, string relativePath)
-        {
-            return $"{baseUrl?.TrimEnd('/')}/{relativePath?.TrimStart('/') ?? ""}";
         }
 
         private string DetermineFilename(RomMRom ROM)
@@ -271,7 +250,7 @@ namespace RomM.Games
                                 {
                                     Type = GameActionType.URL,
                                     Name = "View in RomM",
-                                    Path = CombineUrl(_plugin.Settings.RomMHost, $"rom/{ROM.Id}"),
+                                    Path = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"rom/{ROM.Id}"),
                                     IsPlayAction = false
                                 }
                             }
@@ -284,13 +263,6 @@ namespace RomM.Games
             {
                 game.Manual = $"{_plugin.Settings.RomMHost}/assets/romm/resources/{ROM.ManualPath}";
             }
-
-            // NOTE: Due to the switch from GetGames to ImportGames metadata plugins don't run.
-            // This is currently commented out as the user should be given the option to run metadata scans with library import
-            // and a more sophisticated system need implementing to import that data
-            //Pull metadata from plugins
-            //game = PluginMetaData(game);
-            //_plugin.Playnite.Database.Games.Update(game);
 
             return game;
         }
@@ -325,7 +297,7 @@ namespace RomM.Games
             {
                 MappingId = _mapping.MappingId,
                 FileName = filename,
-                DownloadUrl = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{filename}"),
+                DownloadUrl = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{filename}"),
                 HasMultipleFiles = ROM.HasMultipleFiles
             };
 
@@ -423,7 +395,7 @@ namespace RomM.Games
 
                                 newSibling.Id = sibling.Id;
                                 newSibling.FileName = DetermineFilename(siblingItem);
-                                newSibling.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{newSibling.Id}/content/{newSibling.FileName}");
+                                newSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{newSibling.Id}/content/{newSibling.FileName}");
                                 newSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
                                 newSibling.IsSelected = false;
 
@@ -447,7 +419,7 @@ namespace RomM.Games
                     toSave.Name = ROM.Name;
                     toSave.SHA1 = ROM.SHA1;
                     toSave.FileName = DetermineFilename(ROM);
-                    toSave.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
+                    toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
                     toSave.HasMultipleFiles = ROM.HasMultipleFiles;
                     toSave.IsSelected = false;
                     toSave.Mapping = _mapping;
@@ -468,7 +440,7 @@ namespace RomM.Games
                         RomMSavedSibing saveSibling = new RomMSavedSibing();
                         saveSibling.Id = siblingItem.Id;
                         saveSibling.FileName = DetermineFilename(siblingItem);
-                        saveSibling.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{saveSibling.Id}/content/{saveSibling.FileName}");
+                        saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{saveSibling.Id}/content/{saveSibling.FileName}");
                         saveSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
                         saveSibling.IsSelected = false;
 
@@ -486,7 +458,7 @@ namespace RomM.Games
                 toSave.Name = ROM.Name;
                 toSave.SHA1 = ROM.SHA1;
                 toSave.FileName = DetermineFilename(ROM);
-                toSave.DownloadURL = CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
+                toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
                 toSave.HasMultipleFiles = ROM.HasMultipleFiles;
                 toSave.IsSelected = false;
                 toSave.Mapping = _mapping;
@@ -519,50 +491,6 @@ namespace RomM.Games
             var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
 
             return statusId;
-        }
-
-        private Game PluginMetaData(Game Game)
-        {
-            foreach (var plugin in _metadataPlugins)
-            {
-                try
-                {
-                    var pluginProvider = plugin.GetMetadataProvider(new MetadataRequestOptions(Game, true));
-
-                    try
-                    {
-                        if (pluginProvider.AvailableFields.Any(x => x == MetadataField.Icon))
-                        {
-                            Game.Icon = string.IsNullOrEmpty(Game.Icon) ? pluginProvider.GetIcon(new GetMetadataFieldArgs()).Path : Game.Icon;
-                        }
-                    }
-                    catch{}
-                    try
-                    {
-                        if (pluginProvider.AvailableFields.Any(x => x == MetadataField.BackgroundImage))
-                        {
-                            Game.BackgroundImage = string.IsNullOrEmpty(Game.BackgroundImage) ? pluginProvider.GetBackgroundImage(new GetMetadataFieldArgs()).Path : Game.BackgroundImage;
-                        }
-                    }
-                    catch{}
-                    try
-                    {
-                        if (pluginProvider.AvailableFields.Any(x => x == MetadataField.CoverImage))
-                        {
-                            Game.CoverImage = string.IsNullOrEmpty(Game.CoverImage) ? pluginProvider.GetCoverImage(new GetMetadataFieldArgs()).Path : Game.CoverImage;
-                        }
-                    }
-                    catch{}
-                }
-                catch
-                {
-                    
-                }
-
-               
-            } 
-
-            return Game;
-        }      
+        }    
     }
 }
