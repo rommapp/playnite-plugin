@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -32,23 +33,24 @@ namespace RomM.Games
             _favourites = favourites;
         }
 
-        private string DetermineFilename(RomMRom ROM)
+        private RomMFile DetermineFile(RomMRom ROM)
         {
-            if (ROM.HasMultipleFiles)
-                return Path.GetFileName(ROM.FileName);
-			
-	    // Find file at the base of the games directory so files from update,dlc,etc don't get installed as main file
-            if (ROM.HasNestedSingleFile)
+            if(ROM.Files.Count == 0)
+                return null;
+
+            if(ROM.Files.Count > 1)
             {
+                List<string> fullpaths = new List<string>();
                 foreach (var file in ROM.Files)
                 {
-                    int count = file.FullPath.Count(x => x == '/');
-                    if (count == 3)
-                        return Path.GetFileName(file.FileName);
+                    fullpaths.Add(file.FullPath);
                 }
+
+                fullpaths = fullpaths.OrderBy(x => x.Count(c => c == '/')).ToList();
+                return ROM.Files.Where(x => x.FullPath == fullpaths[0]).FirstOrDefault();
             }
 
-            return Path.GetFileName(ROM.Files.First().FileName);
+            return ROM.Files.FirstOrDefault();
         }
 
         // Main library import functions
@@ -292,7 +294,12 @@ namespace RomM.Games
         }
         private bool UpdatedOldGameID(RomMRom ROM)
         {
-            var filename = DetermineFilename(ROM);
+            var filename = ROM.HasMultipleFiles ? Path.GetFileName(ROM.FileName) : Path.GetFileName(ROM.Files.Where(f => f.FullPath.Count(c => c == '/') <= 3).FirstOrDefault().FileName);
+            if (string.IsNullOrWhiteSpace(filename))
+            {
+                _plugin.Logger.Warn($"Rom {ROM.Id} returned empty/invalid filename, skipping updating game id.");
+                return false;
+            }
             var info = new RomMGameInfo
             {
                 MappingId = _mapping.MappingId,
@@ -353,117 +360,66 @@ namespace RomM.Games
         {
             RomMRomLocal toSave = new RomMRomLocal();
 
+            // Save base ROM data
+            toSave.Id = ROM.Id;
+            toSave.Name = ROM.Name;
+            toSave.SHA1 = ROM.SHA1;
+            toSave.HasMultipleFiles = ROM.HasMultipleFiles;
+            if(!ROM.HasMultipleFiles)
+            {
+                var romfile = DetermineFile(ROM);
+                if (romfile == null)
+                {
+                    _plugin.Logger.Error("Unable to save ROM data as there is no rom file!");
+                    return;
+                }
+
+                toSave.FileName = romfile.FileName;
+                toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}");
+                
+            }
+            else
+            {
+                toSave.FileName = ROM.FileName;
+                toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{ROM.FileName}");
+            } 
+            toSave.IsSelected = false;
+            toSave.Mapping = _mapping;
+
+            // Save sibling data
             if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)
             {
-                // Check to see if game is already installed
-                string GameID = $"{ROM.Id}:{ROM.SHA1}";
-                var game = _plugin.Playnite.Database.Games.FirstOrDefault(x => x.GameId == GameID);
-
-                if(game != null && game.IsInstalled)
+                foreach (var sibling in ROM.Siblings)
                 {
-                    try
+                    var siblingROM = _ROMs.Find(x => x.Id == sibling.Id);
+                    if(siblingROM != null)
                     {
-                        // Load Game data from file 
-                        string olddata = File.ReadAllText($"{_plugin.ROMDataPath}{ROM.SHA1}.json");
-                        toSave = JsonConvert.DeserializeObject<RomMRomLocal>(olddata);
-
-                        List<RomMSavedSibing> toSaveSiblings = toSave.Siblings;
-
-                        // Remove all sibling data so any ROMs still linked to Game will be added back
-                        toSave.Siblings.Clear();
-
-                        // Check to see if sibling still exists
-                        foreach (var sibling in ROM.Siblings)
-                        {
-                            var siblingItem = _ROMs.Find(x => x.Id == sibling.Id);
-
-                            if (toSaveSiblings.Exists(x => x.Id == sibling.Id))
-                            {
-                                // Add sibling back to file
-                                toSave.Siblings.Add(toSaveSiblings.Find(x => x.Id == sibling.Id));
-                            }
-                            else
-                            {
-                                // Add new sibling
-                                var newSibling = new RomMSavedSibing();
-
-                                if (string.IsNullOrEmpty(siblingItem.FileName))
-                                {
-                                    _plugin.Playnite.Notifications.Add(new NotificationMessage(_plugin.Id.ToString(), $"Filename for ROM ID: {siblingItem.Id} doesn't exist!\nDoes ROM exist on the servers filesystem?", NotificationType.Error));
-                                    continue;
-                                }
-
-                                newSibling.Id = sibling.Id;
-                                newSibling.FileName = DetermineFilename(siblingItem);
-                                newSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{newSibling.Id}/content/{newSibling.FileName}");
-                                newSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
-                                newSibling.IsSelected = false;
-
-                                _ROMs.Find(x => x.Id == siblingItem.Id).Processed = true;
-                                toSave.Siblings.Add(newSibling);
-                            }
-                        }
-
-                        // Write old and new data back to file
-                        olddata = JsonConvert.SerializeObject(toSave);
-                        File.WriteAllText($"{_plugin.Playnite.Paths.ExtensionsDataPath}\\{_plugin.Id}\\Games\\{ROM.SHA1}.json", olddata);
-                        return;
-                    }
-                    catch { }
-                }
-                else // Game hasn't been import or isnt installed
-                {
-
-                    // Save base ROM data
-                    toSave.Id = ROM.Id;
-                    toSave.Name = ROM.Name;
-                    toSave.SHA1 = ROM.SHA1;
-                    toSave.FileName = DetermineFilename(ROM);
-                    toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
-                    toSave.HasMultipleFiles = ROM.HasMultipleFiles;
-                    toSave.IsSelected = false;
-                    toSave.Mapping = _mapping;
-
-                    toSave.Siblings = new List<RomMSavedSibing>();
-
-                    // Save sibling data
-                    foreach (var sibling in ROM.Siblings)
-                    {
-                        var siblingItem = _ROMs.Find(x => x.Id == sibling.Id);
-
-                        if (string.IsNullOrEmpty(siblingItem.FileName))
-                        {
-                            _plugin.Playnite.Notifications.Add(new NotificationMessage(_plugin.Id.ToString(), $"Filename for ROM ID: {siblingItem.Id} doesn't exist!\nDoes ROM exist on the servers filesystem?", NotificationType.Error));
-                            continue;
-                        }
-
                         RomMSavedSibing saveSibling = new RomMSavedSibing();
-                        saveSibling.Id = siblingItem.Id;
-                        saveSibling.FileName = DetermineFilename(siblingItem);
-                        saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{saveSibling.Id}/content/{saveSibling.FileName}");
-                        saveSibling.HasMultipleFiles = siblingItem.HasMultipleFiles;
-                        saveSibling.IsSelected = false;
 
-                        _ROMs.Find(x => x.Id == siblingItem.Id).Processed = true;
+                        saveSibling.Id = siblingROM.Id;
+                        saveSibling.HasMultipleFiles = siblingROM.HasMultipleFiles;
+                        if (!siblingROM.HasMultipleFiles)
+                        {
+                            var romfile = DetermineFile(siblingROM);
+                            if (romfile == null)
+                            {
+                                _plugin.Logger.Error("Unable to save sibling ROM data as there is no rom file!");
+                                continue;
+                            }
+
+                            saveSibling.FileName = romfile.FileName;
+                            saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}");
+                        }
+                        else
+                        {
+                            saveSibling.FileName = ROM.FileName;
+                            saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{siblingROM.Id}/content/{siblingROM.FileName}");
+                        }          
+                        saveSibling.IsSelected = false;
 
                         toSave.Siblings.Add(saveSibling);
                     }
                 }
-
-            }
-            else //Merge Revisons not enabled or no siblings present
-            {
-                // Save base ROM data
-                toSave.Id = ROM.Id;
-                toSave.Name = ROM.Name;
-                toSave.SHA1 = ROM.SHA1;
-                toSave.FileName = DetermineFilename(ROM);
-                toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{toSave.Id}/content/{toSave.FileName}");
-                toSave.HasMultipleFiles = ROM.HasMultipleFiles;
-                toSave.IsSelected = false;
-                toSave.Mapping = _mapping;
-
-                toSave.Siblings = new List<RomMSavedSibing>();
             }
 
             // Write data to file

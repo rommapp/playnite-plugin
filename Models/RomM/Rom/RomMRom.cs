@@ -37,6 +37,9 @@ namespace RomM.Models.RomM.Rom
 
     public class RomMFile
     {
+        [JsonProperty("id")]
+        public int? Id { get; set; }
+
         [JsonProperty("file_name")]
         public string FileName { get; set; }
 
