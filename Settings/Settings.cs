@@ -57,7 +57,14 @@ namespace RomM.Settings
             get => _romMHost;
             set
             {
-                _romMHost = value.Last() == '/' ? value.Substring(0, value.Length-1) : value;
+                if(value.Length == 0)
+                {
+                    _romMHost = "";
+                }
+                else
+                {
+                    _romMHost = value.Last() == '/' ? value.Substring(0, value.Length - 1) : value;
+                }
                 OnPropertyChanged();
             }
         }
