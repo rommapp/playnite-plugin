@@ -375,8 +375,10 @@ namespace RomM.Games
                 }
 
                 toSave.FileName = romfile.FileName;
-                toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}");
-                
+                toSave.DownloadURL = float.Parse(_plugin.Settings.ServerVersion.Substring(0,3)) <= 4.7 ?
+                                           _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}") :
+                                           _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
+
             }
             else
             {
@@ -408,7 +410,9 @@ namespace RomM.Games
                             }
 
                             saveSibling.FileName = romfile.FileName;
-                            saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}");
+                            toSave.DownloadURL = float.Parse(_plugin.Settings.ServerVersion.Substring(0, 3)) <= 4.7 ?
+                                           _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}") :
+                                           _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
                         }
                         else
                         {

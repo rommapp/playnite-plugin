@@ -1,12 +1,19 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Playnite.SDK;
 using Playnite.SDK.Plugins;
+using RomM.Models.RomM;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Reflection;
+using System.Threading;
 using System.Web;
+using System.Windows.Data;
+using System.Windows.Media.Imaging;
 
 namespace RomM.Settings
 {
@@ -24,20 +31,152 @@ namespace RomM.Settings
 
         public static SettingsViewModel Instance { get; private set; }
 
+        #region Backing Variables
+
+        private string _romMHost = "";
+        private string _romMServerVersion = "---";
+        private string _romMClientToken = "";
+        private bool _useBasicAuth = false;
+        private string _romMUsername = "";
+        private string _romMPassword = "";
+        
+        private string _defaultprofilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
+        private string _profilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
+        private string _romMUser = "----";
+        private string _profileType = "----";
+        private bool _connectionFailed = false;
+
+        private string _excludeGenres = "";
+        private string _7zPath = "";
+
+        #endregion
+
+
+        public string RomMHost
+        {
+            get => _romMHost;
+            set
+            {
+                _romMHost = value.Last() == '/' ? value.Substring(0, value.Length-1) : value;
+                OnPropertyChanged();
+            }
+        }
+        public string RomMClientToken
+        {
+            get => _romMClientToken;
+            set
+            {
+                _romMClientToken = value;
+                OnPropertyChanged();
+            }
+        }
+        public bool UseBasicAuth
+        {
+            get => _useBasicAuth;
+            set
+            {
+                _useBasicAuth = value;
+                OnPropertyChanged();
+            }
+        }
+        public string RomMUsername
+        {
+            get => _romMUsername;
+            set
+            {
+                _romMUsername = value;
+                OnPropertyChanged();
+            }
+        }
+        public string RomMPassword
+        {
+            get => _romMPassword;
+            set
+            {
+                _romMPassword = value;
+                OnPropertyChanged();
+            }
+        }
+        public string RomMUser
+        {
+            get => _romMUser;
+            set
+            {
+                _romMUser = value;
+                OnPropertyChanged();
+            }
+        }
+        public string ClientTokenURL
+        {
+            get => $"{RomMHost}/client-api-tokens";
+            set { }
+        }
+
+        public bool ConnectionFailed
+        {
+            get => _connectionFailed;
+            set
+            {
+                _connectionFailed = value;
+                OnPropertyChanged();
+            }
+        }
+        public string ServerVersion
+        {
+            get => _romMServerVersion;
+            set
+            {
+                _romMServerVersion = value;
+                OnPropertyChanged();
+            }
+        }
+        public string ProfilePath 
+        { 
+            get => _profilepath; 
+            set
+            {
+                _profilepath = value;
+                OnPropertyChanged();
+            }
+        }
+        public string RomMProfileType
+        {
+            get => _profileType;
+            set
+            {
+                _profileType = value;
+                OnPropertyChanged();
+            }
+        }
+
+
         public bool ScanGamesInFullScreen { get; set; } = false;
         public bool NotifyOnInstallComplete { get; set; } = false;
         public bool KeepRomMSynced { get; set; } = false;
-        public string RomMHost { get; set; } = "";
-        public string RomMUsername { get; set; } = "";
-        public string RomMPassword { get; set; } = "";
-        public ObservableCollection<EmulatorMapping> Mappings { get; set; }
-
         public bool Use7z { get; set; } = false;
-        public string PathTo7z { get; set; } = "";
+        public string PathTo7z
+        {
+            get => _7zPath;
+            set
+            {
+                _7zPath = value;
+                OnPropertyChanged();
+            }
+        } 
         public bool MergeRevisions { get; set; } = false;
         public bool KeepDeletedGames { get; set; } = false;
-        public string ExcludeGenres { get; set; } = "";
+        public string ExcludeGenres
+        {
+            get => _excludeGenres;
+            set
+            {
+                _excludeGenres = value;
+                OnPropertyChanged();
+            }
+        }
         public bool SkipMissingFiles { get; set; } = false;
+
+        public ObservableCollection<EmulatorMapping> Mappings { get; set; }
 
         public SettingsViewModel(){}
 
@@ -56,19 +195,22 @@ namespace RomM.Settings
                 forceSave = true;
             } 
             else 
-            {
-                ScanGamesInFullScreen = savedSettings.ScanGamesInFullScreen;
-                NotifyOnInstallComplete = savedSettings.NotifyOnInstallComplete;
+            {  
                 RomMHost = savedSettings.RomMHost;
+                RomMClientToken = savedSettings.RomMClientToken;
                 RomMUsername = savedSettings.RomMUsername;
                 RomMPassword = savedSettings.RomMPassword;
+                UseBasicAuth = savedSettings.UseBasicAuth;
+
                 Mappings = savedSettings.Mappings;
                 KeepRomMSynced = savedSettings.KeepRomMSynced;
+                ScanGamesInFullScreen = savedSettings.ScanGamesInFullScreen;
+                NotifyOnInstallComplete = savedSettings.NotifyOnInstallComplete;
                 Use7z = savedSettings.Use7z;
                 PathTo7z = savedSettings.PathTo7z;
                 MergeRevisions = savedSettings.MergeRevisions;
                 KeepDeletedGames = savedSettings.KeepDeletedGames;
-                ExcludeGenres = savedSettings.ExcludeGenres;
+                ExcludeGenres = savedSettings.ExcludeGenres;                       
             }
             
             if (Mappings == null)
@@ -87,6 +229,94 @@ namespace RomM.Settings
             {
                 SavePluginSettings(this);
             }
+        }
+
+        public bool TestConnection()
+        {
+            try
+            {
+                if(string.IsNullOrEmpty(RomMHost))
+                {
+                    PlayniteAPI.Notifications.Add(new NotificationMessage(RomM.Id.ToString(), "RomM host not set!", NotificationType.Error));
+                    return false;
+                }
+
+                if(UseBasicAuth)
+                {
+                    if(string.IsNullOrEmpty(RomMUsername) || string.IsNullOrEmpty(RomMPassword))
+                    {
+                        throw new ArgumentException("username or password not set!");
+                    }
+
+                    HttpClientSingleton.ConfigureBasicAuth(RomMUsername, RomMPassword);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(RomMClientToken))
+                    {
+                        throw new ArgumentException("client token not set!");
+                    }
+
+                    HttpClientSingleton.Instance.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", RomMClientToken);
+                }
+
+                // Check server is present
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/heartbeat", HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationToken()).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+
+                using (StreamReader reader = new StreamReader(body))
+                {
+                    var jsonResponse = JObject.Parse(reader.ReadToEnd());
+                    ServerInfo info = jsonResponse["SYSTEM"].ToObject<ServerInfo>();
+
+                    ServerVersion = info.Version;
+                }
+
+                // Get user info
+                response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/users/me", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationToken()).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                RomMUser userinfo;
+
+                using (StreamReader reader = new StreamReader(body))
+                {
+                    var jsonResponse = JObject.Parse(reader.ReadToEnd());
+                    userinfo = jsonResponse.ToObject<RomMUser>();
+                }
+
+                if (!string.IsNullOrEmpty(userinfo.IconPath))
+                {
+                    response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/raw/assets/{userinfo.IconPath}", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationToken()).GetAwaiter().GetResult();
+                    response.EnsureSuccessStatusCode();
+                    var imagebytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    File.WriteAllBytes($"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}\\avatar.png", imagebytes);
+                    ProfilePath = $"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}\\avatar.png";
+                }
+                else
+                {
+                    ProfilePath = _defaultprofilepath;
+                }
+
+                RomMProfileType = userinfo.Role;
+                RomMUser = userinfo.Username;
+                ConnectionFailed = false;
+            }
+            catch (Exception ex)
+            {
+                ConnectionFailed = true;
+                ProfilePath = _defaultprofilepath;
+                RomMUser = "----";
+                RomMProfileType = "----";
+                ServerVersion = "---";
+                LogManager.GetLogger().Error($"Failed to read response! {ex}");
+                PlayniteAPI.Notifications.Add(new NotificationMessage(RomM.Id.ToString(), $"RomM - Failed to poll server: {ex.Message}", NotificationType.Error));
+                return false;
+            }
+
+            return true;
         }
 
         public void BeginEdit()
@@ -141,6 +371,31 @@ namespace RomM.Settings
 
             errors = mappingErrors;
             return errors.Count == 0;
+        }
+    }
+
+	// Used to load profile image into cache so it can be changed while the application is running
+    public class ImageCacheConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType,
+            object parameter, System.Globalization.CultureInfo culture)
+        {
+
+            var path = (string)value;
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(path);
+            image.EndInit();
+
+            return image;
+
+        }
+
+        public object ConvertBack(object value, Type targetType,
+            object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotImplementedException("Not implemented.");
         }
     }
 }

@@ -186,7 +186,16 @@ namespace RomM
                 Directory.CreateDirectory($"{ROMDataPath}");
 
             Settings = new SettingsViewModel(this, this);
-            HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
+
+            if (Settings.UseBasicAuth)
+            {
+                HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
+            }
+            else
+            {
+                HttpClientSingleton.Instance.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Settings.RomMClientToken);
+            }
+            
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
             Source = SourceName;
 
@@ -291,11 +300,8 @@ namespace RomM
                 return new List<Game>();
             }
 
-            if (string.IsNullOrEmpty(Settings.RomMHost) ||
-                string.IsNullOrEmpty(Settings.RomMUsername) ||
-                string.IsNullOrEmpty(Settings.RomMPassword))
+            if(!Settings.TestConnection())
             {
-                Playnite.Notifications.Add(Id.ToString(), "RomM host, username or password is not set.", NotificationType.Error);
                 return new List<Game>();
             }
 

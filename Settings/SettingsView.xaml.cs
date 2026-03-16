@@ -15,6 +15,33 @@ namespace RomM.Settings
             InitializeComponent();
         }
 
+        private void Click_TestConnection(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.TestConnection();
+            e.Handled = true;
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            try
+            {
+                if (e.Uri.Scheme == Uri.UriSchemeHttp || e.Uri.Scheme == Uri.UriSchemeHttps)
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = e.Uri.AbsoluteUri,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to open URL: {ex.Message}");
+            }
+            e.Handled = true;
+        }
+
         private void Click_Delete(object sender, RoutedEventArgs e)
         {
             if (((FrameworkElement)sender).DataContext is EmulatorMapping mapping)
@@ -39,15 +66,6 @@ namespace RomM.Settings
             }
 
             mapping.DestinationPath = path;
-        }
-
-        private void Click_Browse7zDestination(object sender, RoutedEventArgs e)
-        {
-            string path;
-            if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
-
-            PathTo7zText.Text = path;
-            SettingsViewModel.Instance.PathTo7z = path;
         }
 
         private static string GetSelectedFolderPath()
@@ -75,27 +93,15 @@ namespace RomM.Settings
 
         private void DataGrid_CurrentCellChanged(object sender, EventArgs e)
         {
-            
+
         }
 
-        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        private void Click_Browse7zDestination(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                if (e.Uri.Scheme == Uri.UriSchemeHttp || e.Uri.Scheme == Uri.UriSchemeHttps)
-                {
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = e.Uri.AbsoluteUri,
-                        UseShellExecute = true
-                    };
-                    Process.Start(psi);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to open URL: {ex.Message}");
-            }
+            string path;
+            if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
+
+            SettingsViewModel.Instance.PathTo7z = path;
             e.Handled = true;
         }
     }
