@@ -39,6 +39,8 @@ namespace RomM.Settings
         private IEnumerable<RomMPlatform> _availablePlatforms;
         [JsonIgnore]
         public int _romMPlatformId = -1;
+        [JsonIgnore]
+        private string _destinationPath = "";
 
         public EmulatorMapping(List<RomMPlatform> romMPlatforms)
         {
@@ -194,9 +196,17 @@ namespace RomM.Settings
             }
         }
 
-        public string DestinationPath { get; set; }
+        public string DestinationPath
+        {
+            get => _destinationPath;
+            set
+            {
+                _destinationPath = value;
+                OnPropertyChanged();
+    }
+}
 
-        [JsonIgnore]
+[JsonIgnore]
         public static IEnumerable<Emulator> AvailableEmulators => SettingsViewModel.Instance.PlayniteAPI.Database.Emulators?.OrderBy(x => x.Name) ?? Enumerable.Empty<Emulator>();
         [JsonIgnore]
         public IEnumerable<EmulatorProfile> AvailableProfiles
