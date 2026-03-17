@@ -1,6 +1,14 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Playnite.SDK;
+using RomM.Models.RomM;
+using RomM.Models.RomM.Platform;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -40,6 +48,32 @@ namespace RomM.Settings
                 System.Diagnostics.Debug.WriteLine($"Failed to open URL: {ex.Message}");
             }
             e.Handled = true;
+        }
+
+        private void Click_PullPlatforms(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.PlatformSynced = false;
+            SettingsViewModel.Instance.PlatformSyncFailed = false;
+
+            try
+            {
+                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync($"{SettingsViewModel.Instance.RomMHost}/api/platforms").GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                SettingsViewModel.Instance.RomMPlatforms = JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
+                SettingsViewModel.Instance.PlatformSynced = true;  
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger().Error($"RomM - failed to get platforms: {ex}");
+                SettingsViewModel.Instance.PlatformSyncFailed = true;
+            }
+        }
+
+        private void Click_AddMapping(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.Mappings.Add(new EmulatorMapping(SettingsViewModel.Instance.RomMPlatforms));
         }
 
         private void Click_Delete(object sender, RoutedEventArgs e)

@@ -81,7 +81,7 @@ namespace RomM.Games
                     var actualRomFiles = GetRomFiles(installDir, supported);
 
                     // Prefer .m3u if requested
-                    var useM3u = _gameData.Mapping != null && _gameData.Mapping.UseM3u && supported.Any(x => x.ToLower() == "m3u");
+                    var useM3u = _gameData.Mapping != null && _gameData.Mapping.UseM3U && supported.Any(x => x.ToLower() == "m3u");
                     if (useM3u)
                     {
                         var m3uFile = actualRomFiles.FirstOrDefault(m =>

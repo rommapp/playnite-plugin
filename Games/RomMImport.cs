@@ -8,7 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -90,8 +89,7 @@ namespace RomM.Games
 
                         foreach (byte b in hash)
                         {
-                            // can be "x2" if you want lowercase
-                            sb.Append(b.ToString("X2"));
+                            sb.Append(b.ToString("x2"));
                         }
 
                         ROM.SHA1 = sb.ToString();
@@ -169,7 +167,7 @@ namespace RomM.Games
                     continue;
                 }
             }
-            _plugin.Logger.Debug($"Finished adding new games for {_mapping.Platform.Name}");
+            _plugin.Logger.Debug($"Finished adding new games for {_mapping.RomMPlatform.Name}");
 
             if (!_plugin.Settings.KeepDeletedGames)
             {
@@ -216,7 +214,7 @@ namespace RomM.Games
                 Name = ROM.Name,
                 Description = ROM.Summary,
 
-                Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(_mapping.Platform.Name ?? "") },
+                Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(_mapping.RomMPlatform.Name ?? "") },
                 Regions = new HashSet<MetadataProperty>(ROM.Regions.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
                 Genres = new HashSet<MetadataProperty>(ROM.Metadatum.Genres.Where(r => !string.IsNullOrEmpty(r)).Select(r => new MetadataNameProperty(r.ToString()))),
                 AgeRatings = agerating,
@@ -272,10 +270,10 @@ namespace RomM.Games
         {
             var gamesInDatabase = _plugin.Playnite.Database.Games.Where(g =>
                         g.Source != null && g.Source.Name == _plugin.Source.ToString() &&
-                        g.Platforms != null && g.Platforms.Any(p => p.Name == _mapping.Platform.Name)
+                        g.Platforms != null && g.Platforms.Any(p => p.Name == _mapping.RomMPlatform.Name)
                     );
 
-            _plugin.Logger.Debug($"Starting to remove not found games for {_mapping.Platform.Name}.");
+            _plugin.Logger.Debug($"Starting to remove not found games for {_mapping.RomMPlatform.Name}.");
 
             foreach (var game in gamesInDatabase)
             {
@@ -290,7 +288,7 @@ namespace RomM.Games
                 _plugin.Playnite.Database.Games.Remove(game.Id);
             }
 
-            _plugin.Logger.Debug($"Finished removing not found games for {_mapping.Platform.Name}");
+            _plugin.Logger.Debug($"Finished removing not found games for {_mapping.RomMPlatform.Name}");
         }
         private bool UpdatedOldGameID(RomMRom ROM)
         {
@@ -386,7 +384,7 @@ namespace RomM.Games
                 toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{ROM.FileName}");
             } 
             toSave.IsSelected = false;
-            toSave.Mapping = _mapping;
+            toSave.MappingID = _mapping.MappingId;
 
             // Save sibling data
             if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)

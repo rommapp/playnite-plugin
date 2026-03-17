@@ -1,4 +1,5 @@
 ﻿using RomM.Settings;
+using System;
 using System.Collections.Generic;
 
 namespace RomM.Models.RomM.Rom
@@ -40,7 +41,7 @@ namespace RomM.Models.RomM.Rom
         public bool HasMultipleFiles { get; set; }
         public string DownloadURL { get; set; }
         public bool IsSelected { get; set; }
-        public EmulatorMapping Mapping { get; set; }
+        public Guid MappingID { get; set; }
 
         public List<RomMSavedSibing> Siblings { get; set; }
 

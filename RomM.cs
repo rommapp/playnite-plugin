@@ -140,12 +140,12 @@ namespace RomM
 
             foreach (var mapping in SettingsViewModel.Instance.Mappings?.Where(m => m.Enabled))
             {
-                if (mapping.Platform.IgdbId.ToString() == platformIgdbId)
+                if (mapping.RomMPlatform.IgdbId.ToString() == platformIgdbId)
                 {
                     var gameName = rom.Name;
 
                     var game = Playnite.Database.Games.FirstOrDefault(g => g.Source.Name == SourceName.ToString() &&
-                                                                           g.Platforms.Any(p => p.Name == mapping.Platform.Name) &&
+                                                                           g.Platforms.Any(p => p.Name == mapping.RomMPlatform.Name) &&
                                                                            g.Name == gameName);
 
                     if (game == null)
@@ -399,7 +399,7 @@ namespace RomM
                     HasMultipleFiles = gameData.HasMultipleFiles,
                     DownloadURL = gameData.DownloadURL,
                     IsSelected = gameData.IsSelected,
-                    Mapping = gameData.Mapping
+                    Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
                 };
 
                 // If Siblings are avaiable prompt user with version selection
@@ -419,7 +419,7 @@ namespace RomM
                             HasMultipleFiles = sibling.HasMultipleFiles,
                             DownloadURL = sibling.DownloadURL,
                             IsSelected = sibling.IsSelected,
-                            Mapping = gameData.Mapping
+                            Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
                         };
 
                         gameVersions.Add(siblingROMData);

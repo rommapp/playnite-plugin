@@ -53,16 +53,16 @@ namespace RomM.Games
                     break;
 
                 // Check mapping has an Emulator, Profile & Platform assigned to it
-                if (mapping.Emulator == null || mapping.EmulatorProfile == null || mapping.Platform == null)
+                if (mapping.Emulator == null || mapping.EmulatorProfile == null || mapping.RomMPlatform == null)
                 {
                     Logger.Warn($"Emulator {mapping.EmulatorId} is misconfigured, skipping.");
                     continue;
                 }
 
-                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.Platform.IgdbId);
+                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.RomMPlatform.IgdbId);
                 if (apiPlatform == null)
                 {
-                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.Platform.Name} with IGDB ID {mapping.Platform.IgdbId} not found in RomM, skipping.", NotificationType.Error);
+                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.RomMPlatform.Name} with ID {mapping.RomMPlatform.Id} not found in RomM, skipping.", NotificationType.Error);
                     continue;
                 }
 

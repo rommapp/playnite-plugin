@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using Playnite.SDK;
 using Playnite.SDK.Plugins;
 using RomM.Models.RomM;
+using RomM.Models.RomM.Platform;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -10,8 +11,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using System.Threading;
-using System.Web;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
 
@@ -20,37 +19,81 @@ namespace RomM.Settings
     public class SettingsViewModel : ObservableObject, ISettings
     {
         private readonly Plugin _plugin;
-
         private SettingsViewModel editingClone { get; set; }
-
         [JsonIgnore]
         internal readonly IPlayniteAPI PlayniteAPI;
-
         [JsonIgnore]
         internal readonly IRomM RomM;
-
         public static SettingsViewModel Instance { get; private set; }
 
         #region Backing Variables
-
+        [JsonIgnore]
         private string _romMHost = "";
+        [JsonIgnore]
         private string _romMServerVersion = "---";
+        [JsonIgnore]
         private string _romMClientToken = "";
-        private bool _useBasicAuth = false;
+        [JsonIgnore]
+        private bool _useBasicAuth = true;
+        [JsonIgnore]
         private string _romMUsername = "";
+        [JsonIgnore]
         private string _romMPassword = "";
-        
-        private string _defaultprofilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
-        private string _profilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
-        private string _romMUser = "----";
-        private string _profileType = "----";
-        private bool _connectionFailed = false;
 
+        [JsonIgnore]
+        private string _defaultprofilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
+        [JsonIgnore]
+        private string _profilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
+        [JsonIgnore]
+        private string _romMUser = "----";
+        [JsonIgnore]
+        private string _profileType = "----";
+        [JsonIgnore]
+        private bool _connectionFailed = false;
+        [JsonIgnore]
+        private bool _platformSynced = false;
+        [JsonIgnore]
+        private bool _platformSyncFailed = false;
+
+        [JsonIgnore]
         private string _excludeGenres = "";
+        [JsonIgnore]
         private string _7zPath = "";
 
+        [JsonIgnore]
+        private List<RomMPlatform> _romMPlatforms = new List<RomMPlatform>();
         #endregion
 
+        [JsonIgnore]
+        public bool ConnectionFailed
+        {
+            get => _connectionFailed;
+            set
+            {
+                _connectionFailed = value;
+                OnPropertyChanged();
+            }
+        }
+        [JsonIgnore]
+        public bool PlatformSynced
+        {
+            get => _platformSynced;
+            set
+            {
+                _platformSynced = value;
+                OnPropertyChanged();
+            }
+        }
+        [JsonIgnore]
+        public bool PlatformSyncFailed
+        {
+            get => _platformSyncFailed;
+            set
+            {
+                _platformSyncFailed = value;
+                OnPropertyChanged();
+            }
+        }
 
         public string RomMHost
         {
@@ -119,15 +162,6 @@ namespace RomM.Settings
             set { }
         }
 
-        public bool ConnectionFailed
-        {
-            get => _connectionFailed;
-            set
-            {
-                _connectionFailed = value;
-                OnPropertyChanged();
-            }
-        }
         public string ServerVersion
         {
             get => _romMServerVersion;
@@ -155,8 +189,7 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
-
-
+ 
         public bool ScanGamesInFullScreen { get; set; } = false;
         public bool NotifyOnInstallComplete { get; set; } = false;
         public bool KeepRomMSynced { get; set; } = false;
@@ -185,6 +218,27 @@ namespace RomM.Settings
 
         public ObservableCollection<EmulatorMapping> Mappings { get; set; }
 
+        public List<RomMPlatform> RomMPlatforms
+        {
+            get => _romMPlatforms;
+            set
+            {
+                if(value != null)
+                {
+                    _romMPlatforms = value;
+                    foreach (var mapping in Mappings)
+                    {
+                        mapping.AvailablePlatforms = value;
+                        if(mapping.RomMPlatformId != -1)
+                        {
+                            mapping.RomMPlatform = value.Find(x => x.Id == mapping.RomMPlatformId);
+                        }
+                    }
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public SettingsViewModel(){}
 
         internal SettingsViewModel(Plugin plugin, IRomM romM)
@@ -210,6 +264,8 @@ namespace RomM.Settings
                 UseBasicAuth = savedSettings.UseBasicAuth;
 
                 Mappings = savedSettings.Mappings;
+                RomMPlatforms = savedSettings.RomMPlatforms;
+
                 KeepRomMSynced = savedSettings.KeepRomMSynced;
                 ScanGamesInFullScreen = savedSettings.ScanGamesInFullScreen;
                 NotifyOnInstallComplete = savedSettings.NotifyOnInstallComplete;
@@ -217,7 +273,7 @@ namespace RomM.Settings
                 PathTo7z = savedSettings.PathTo7z;
                 MergeRevisions = savedSettings.MergeRevisions;
                 KeepDeletedGames = savedSettings.KeepDeletedGames;
-                ExcludeGenres = savedSettings.ExcludeGenres;                       
+                ExcludeGenres = savedSettings.ExcludeGenres;     
             }
             
             if (Mappings == null)
@@ -244,8 +300,7 @@ namespace RomM.Settings
             {
                 if(string.IsNullOrEmpty(RomMHost))
                 {
-                    PlayniteAPI.Notifications.Add(new NotificationMessage(RomM.Id.ToString(), "RomM host not set!", NotificationType.Error));
-                    return false;
+                    throw new ArgumentException("host not set!");
                 }
 
                 if(UseBasicAuth)
