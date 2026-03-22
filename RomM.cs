@@ -403,7 +403,7 @@ namespace RomM
                 };
 
                 // If Siblings are avaiable prompt user with version selection
-                if (Settings.MergeRevisions && gameData.Siblings.Count > 0)
+                if (Settings.MergeRevisions && gameData.Siblings?.Count > 0)
                 {
                     List<GameInstallInfo> gameVersions = new List<GameInstallInfo>();
 
