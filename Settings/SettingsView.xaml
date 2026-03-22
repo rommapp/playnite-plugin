@@ -108,7 +108,7 @@
                                         <Label Content="Profile" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
                                         <ComboBox Name="ComboPlatforms" Grid.Row="1" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" ItemsSource="{Binding AvailableProfiles}" DisplayMemberPath="Name" SelectedItem="{Binding EmulatorProfile, Mode=TwoWay}"/>
 
-                                        <Label Content="Platforms" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
+                                        <Label Content="Platform" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
                                         <ComboBox Name="ComboPlatform" Grid.Row="2" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" IsTextSearchEnabled="True" ItemsSource="{Binding AvailablePlatforms}" DisplayMemberPath="Name" SelectedItem="{Binding RomMPlatform, Mode=TwoWay}"/>
 
                                         <Label Content="Path" Grid.Row="3" Grid.Column="0" Margin="0,0,5,5"/>

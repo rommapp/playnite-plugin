@@ -389,6 +389,8 @@ namespace RomM.Games
             // Save sibling data
             if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)
             {
+                toSave.Siblings = new List<RomMSavedSibing>();
+
                 foreach (var sibling in ROM.Siblings)
                 {
                     var siblingROM = _ROMs.Find(x => x.Id == sibling.Id);

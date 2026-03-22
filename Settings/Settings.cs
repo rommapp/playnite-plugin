@@ -156,6 +156,7 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
+        [JsonIgnore]
         public string ClientTokenURL
         {
             get => $"{RomMHost}/client-api-tokens";
@@ -226,15 +227,12 @@ namespace RomM.Settings
                 if(value != null)
                 {
                     _romMPlatforms = value;
+                    OnPropertyChanged();
+
                     foreach (var mapping in Mappings)
                     {
                         mapping.AvailablePlatforms = value;
-                        if(mapping.RomMPlatformId != -1)
-                        {
-                            mapping.RomMPlatform = value.Find(x => x.Id == mapping.RomMPlatformId);
-                        }
-                    }
-                    OnPropertyChanged();
+                    }              
                 }
             }
         }
@@ -263,8 +261,15 @@ namespace RomM.Settings
                 RomMPassword = savedSettings.RomMPassword;
                 UseBasicAuth = savedSettings.UseBasicAuth;
 
+                RomMUser = savedSettings.RomMUser;
+                RomMProfileType = savedSettings.RomMProfileType;
+                ProfilePath = savedSettings.ProfilePath;
+                ServerVersion = savedSettings.ServerVersion;
+
+                // ----- These need to stay in this order -----
                 Mappings = savedSettings.Mappings;
                 RomMPlatforms = savedSettings.RomMPlatforms;
+                // --------------------------------------------
 
                 KeepRomMSynced = savedSettings.KeepRomMSynced;
                 ScanGamesInFullScreen = savedSettings.ScanGamesInFullScreen;

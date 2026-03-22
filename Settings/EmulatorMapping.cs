@@ -127,7 +127,19 @@ namespace RomM.Settings
             {
                 _emulatorProfile = value;
                 _emulatorProfileId = value.Id;
-                MappingName += (" - " + value.Name); 
+                if (value != null)
+                {
+                    if (Emulator != null)
+                    {
+                        var name = Emulator.Name;
+                        if (EmulatorProfile != null  && EmulatorProfile.Name != "")
+                            name += " - " + EmulatorProfile.Name;
+                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.Name))
+                            name += " - " + RomMPlatform.Name;
+
+                        MappingName = name;
+                    }
+                }
                 OnPropertyChanged(); 
             }
         }
@@ -170,7 +182,18 @@ namespace RomM.Settings
                 if(value != null)
                 {
                     _romMPlatformId = value.Id;
-                    MappingName += (" - " + value.Name);
+
+                    if(Emulator != null)
+                    {
+                        var name = Emulator.Name;
+                        if (EmulatorProfile != null && EmulatorProfile.Name != "")
+                            name += " - " + EmulatorProfile.Name;
+                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.Name))
+                            name += " - " + RomMPlatform.Name;
+
+                        MappingName = name;
+                    }
+
                 }
                 OnPropertyChanged();
             }
@@ -226,6 +249,11 @@ namespace RomM.Settings
             {
                 _availablePlatforms = value;
                 OnPropertyChanged();
+
+                if (_availablePlatforms != null && RomMPlatformId != -1)
+                {
+                    RomMPlatform = AvailablePlatforms.First(x => x.Id == RomMPlatformId);
+                }
             }
         }
 
