@@ -404,7 +404,15 @@ namespace RomM.Settings
             // Code executed when user decides to confirm changes made since BeginEdit was called.
             // This method should save settings made to Option1 and Option2.
             SavePluginSettings(this);
-            HttpClientSingleton.ConfigureBasicAuth(this.RomMUsername, this.RomMPassword);
+            if (UseBasicAuth)
+            {
+                HttpClientSingleton.ConfigureBasicAuth(RomMUsername, RomMPassword);
+            }
+            else
+            {
+                HttpClientSingleton.Instance.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", RomMClientToken);
+            }
+
         }
 
         private void SavePluginSettings<SettingsViewModel>(SettingsViewModel settings)

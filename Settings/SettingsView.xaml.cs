@@ -50,17 +50,17 @@ namespace RomM.Settings
             e.Handled = true;
         }
 
-        private void Click_PullPlatforms(object sender, RoutedEventArgs e)
+        private async void Click_PullPlatforms(object sender, RoutedEventArgs e)
         {
             SettingsViewModel.Instance.PlatformSynced = false;
             SettingsViewModel.Instance.PlatformSyncFailed = false;
 
             try
             {
-                HttpResponseMessage response = HttpClientSingleton.Instance.GetAsync($"{SettingsViewModel.Instance.RomMHost}/api/platforms").GetAwaiter().GetResult();
+                HttpResponseMessage response = await HttpClientSingleton.Instance.GetAsync($"{SettingsViewModel.Instance.RomMHost}/api/platforms");
                 response.EnsureSuccessStatusCode();
 
-                string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                string body = await response.Content.ReadAsStringAsync();
                 SettingsViewModel.Instance.RomMPlatforms = JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
                 SettingsViewModel.Instance.PlatformSynced = true;  
             }

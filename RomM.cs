@@ -367,118 +367,126 @@ namespace RomM
                 GameInstallInfo romData = new GameInstallInfo();
                 RomMRomLocal gameData = new RomMRomLocal();
 
-                // Pull game file from RomM data directory
-                int romMId;
-                string romMSHA1 = gameID.Split(':')[1];
-                if (!int.TryParse(args.Game.GameId.Split(':')[0], out romMId) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
+                if (args.Game.GameId.StartsWith("!0"))
                 {
-                    Logger.Error($"{args.Game.Name} GameID is malformed!");
+                    PlayniteApi.Notifications.Add(new NotificationMessage(PluginId.ToString(), "Old ID detected run update game library before installing!", NotificationType.Error));
                     romData.Id = (int)InstallStatus.Cancelled;
-                    yield return new RomMInstallController(args.Game, this, romData);
                 }
-
-                try
+                else
                 {
-                    string json = File.ReadAllText($"{ROMDataPath}{romMSHA1}.json");
-                    gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
-                }
-                catch (Exception)
-                {
-                    Logger.Error($"{args.Game.Name} GameID is malformed or {romMSHA1} json file is corrupted!");
-                    romData.Id = (int)InstallStatus.Cancelled; 
-                }
-
-                if(romData.Id == (int)InstallStatus.Cancelled)
-                    yield return new RomMInstallController(args.Game, this, romData);
-
-                // Set ROM data to base ROM
-                romData = new GameInstallInfo
-                {
-                    Id = gameData.Id,
-                    FileName = gameData.FileName,
-                    HasMultipleFiles = gameData.HasMultipleFiles,
-                    DownloadURL = gameData.DownloadURL,
-                    IsSelected = gameData.IsSelected,
-                    Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
-                };
-
-                // If Siblings are avaiable prompt user with version selection
-                if (Settings.MergeRevisions && gameData.Siblings?.Count > 0)
-                {
-                    List<GameInstallInfo> gameVersions = new List<GameInstallInfo>();
-
-                    // Add roms to list to be selected
-                    gameVersions.Add(romData);
-
-                    foreach (var sibling in gameData.Siblings)
+                    // Pull game file from RomM data directory
+                    int romMId;
+                    string romMSHA1 = gameID.Split(':')[1];
+                    if (!int.TryParse(args.Game.GameId.Split(':')[0], out romMId) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
                     {
-                        var siblingROMData = new GameInstallInfo
-                        {
-                            Id = sibling.Id,
-                            FileName = sibling.FileName,
-                            HasMultipleFiles = sibling.HasMultipleFiles,
-                            DownloadURL = sibling.DownloadURL,
-                            IsSelected = sibling.IsSelected,
-                            Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
-                        };
-
-                        gameVersions.Add(siblingROMData);
+                        Logger.Error($"{args.Game.Name} GameID is malformed!");
+                        romData.Id = (int)InstallStatus.Cancelled;
+                        yield return new RomMInstallController(args.Game, this, romData);
                     }
 
-                    RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(gameVersions);
-                    var window = Playnite.Dialogs.CreateWindow(new WindowCreationOptions
+                    try
                     {
-                        ShowMinimizeButton = false,
-                        ShowMaximizeButton = false,
-                        ShowCloseButton = false,
-                    });
-
-                    window.Height = 215;
-                    window.Width = 600;
-
-                    window.Title = "Select Version to install!";
-                    window.ShowInTaskbar = false;
-                    window.ResizeMode = ResizeMode.NoResize;
-                    window.Owner = API.Instance.Dialogs.GetCurrentAppWindow();
-                    window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                    window.Content = VersionSelectorControl;
-
-                    window.ShowDialog();
-
-                    if (VersionSelectorControl.Cancelled)
+                        string json = File.ReadAllText($"{ROMDataPath}{romMSHA1}.json");
+                        gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
+                    }
+                    catch (Exception)
                     {
+                        Logger.Error($"{args.Game.Name} GameID is malformed or {romMSHA1} json file is corrupted!");
                         romData.Id = (int)InstallStatus.Cancelled;
                     }
-                    else
+
+                    if (romData.Id == (int)InstallStatus.Cancelled)
+                        yield return new RomMInstallController(args.Game, this, romData);
+
+                    // Set ROM data to base ROM
+                    romData = new GameInstallInfo
                     {
-                        // Uninstall old ROM before installing new one
-                        if (args.Game.IsInstalled)
+                        Id = gameData.Id,
+                        FileName = gameData.FileName,
+                        HasMultipleFiles = gameData.HasMultipleFiles,
+                        DownloadURL = gameData.DownloadURL,
+                        IsSelected = gameData.IsSelected,
+                        Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
+                    };
+
+                    // If Siblings are avaiable prompt user with version selection
+                    if (Settings.MergeRevisions && gameData.Siblings?.Count > 0)
+                    {
+                        List<GameInstallInfo> gameVersions = new List<GameInstallInfo>();
+
+                        // Add roms to list to be selected
+                        gameVersions.Add(romData);
+
+                        foreach (var sibling in gameData.Siblings)
                         {
-                            Playnite.UninstallGame(args.Game.Id);
-
-                            args.Game.IsInstalling = true;
-                            Playnite.Database.Games.Update(args.Game);
-                        }
-
-                        // Write result back to json file
-                        gameData.IsSelected = VersionSelectorControl.RomVersions[0].IsSelected;
-                        VersionSelectorControl.RomVersions.RemoveAt(0);
-
-                        // There is probalby a LINQ you can do for this instead of clear and replace all siblings as
-                        // only the isSelected option needs altering
-                        gameData.Siblings.Clear();
-                        foreach (var versions in VersionSelectorControl.RomVersions)
-                        {
-                            gameData.Siblings.Add(new RomMSavedSibing
+                            var siblingROMData = new GameInstallInfo
                             {
-                                Id = versions.Id,
-                                FileName = versions.FileName,
-                                HasMultipleFiles = versions.HasMultipleFiles,
-                                DownloadURL = versions.DownloadURL,
-                                IsSelected = versions.IsSelected,
-                            });
+                                Id = sibling.Id,
+                                FileName = sibling.FileName,
+                                HasMultipleFiles = sibling.HasMultipleFiles,
+                                DownloadURL = sibling.DownloadURL,
+                                IsSelected = sibling.IsSelected,
+                                Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
+                            };
+
+                            gameVersions.Add(siblingROMData);
                         }
-                        File.WriteAllText($"{ROMDataPath}{romMSHA1}.json", JsonConvert.SerializeObject(gameData));
+
+                        RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(gameVersions);
+                        var window = Playnite.Dialogs.CreateWindow(new WindowCreationOptions
+                        {
+                            ShowMinimizeButton = false,
+                            ShowMaximizeButton = false,
+                            ShowCloseButton = false,
+                        });
+
+                        window.Height = 215;
+                        window.Width = 600;
+
+                        window.Title = "Select Version to install!";
+                        window.ShowInTaskbar = false;
+                        window.ResizeMode = ResizeMode.NoResize;
+                        window.Owner = API.Instance.Dialogs.GetCurrentAppWindow();
+                        window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                        window.Content = VersionSelectorControl;
+
+                        window.ShowDialog();
+
+                        if (VersionSelectorControl.Cancelled)
+                        {
+                            romData.Id = (int)InstallStatus.Cancelled;
+                        }
+                        else
+                        {
+                            // Uninstall old ROM before installing new one
+                            if (args.Game.IsInstalled)
+                            {
+                                Playnite.UninstallGame(args.Game.Id);
+
+                                args.Game.IsInstalling = true;
+                                Playnite.Database.Games.Update(args.Game);
+                            }
+
+                            // Write result back to json file
+                            gameData.IsSelected = VersionSelectorControl.RomVersions[0].IsSelected;
+                            VersionSelectorControl.RomVersions.RemoveAt(0);
+
+                            // There is probalby a LINQ you can do for this instead of clear and replace all siblings as
+                            // only the isSelected option needs altering
+                            gameData.Siblings.Clear();
+                            foreach (var versions in VersionSelectorControl.RomVersions)
+                            {
+                                gameData.Siblings.Add(new RomMSavedSibing
+                                {
+                                    Id = versions.Id,
+                                    FileName = versions.FileName,
+                                    HasMultipleFiles = versions.HasMultipleFiles,
+                                    DownloadURL = versions.DownloadURL,
+                                    IsSelected = versions.IsSelected,
+                                });
+                            }
+                            File.WriteAllText($"{ROMDataPath}{romMSHA1}.json", JsonConvert.SerializeObject(gameData));
+                        }
                     }
                 }
 

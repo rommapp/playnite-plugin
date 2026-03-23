@@ -125,10 +125,11 @@ namespace RomM.Settings
             get => _emulatorProfile;
             set 
             {
-                _emulatorProfile = value;
-                _emulatorProfileId = value.Id;
                 if (value != null)
                 {
+                    _emulatorProfile = value;
+                    _emulatorProfileId = value.Id;
+
                     if (Emulator != null)
                     {
                         var name = Emulator.Name;
@@ -154,7 +155,8 @@ namespace RomM.Settings
             }
         }
 
-        [JsonIgnore]
+        // (Deprecated) DON'T USE
+        [JsonIgnore]   
         public Platform Platform
         {
             get => null;
@@ -162,6 +164,7 @@ namespace RomM.Settings
             {
             }
         }
+        // (Deprecated) DON'T USE
         [JsonIgnore]
         public string PlatformId
         {
@@ -252,7 +255,7 @@ namespace RomM.Settings
 
                 if (_availablePlatforms != null && RomMPlatformId != -1)
                 {
-                    RomMPlatform = AvailablePlatforms.First(x => x.Id == RomMPlatformId);
+                    RomMPlatform = AvailablePlatforms.FirstOrDefault (x => x.Id == RomMPlatformId);
                 }
             }
         }

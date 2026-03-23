@@ -20,11 +20,16 @@ namespace RomM.Games
             int romMId;
             if (!int.TryParse(game.GameId.Split(':')[0], out romMId))
             {
-                _romM.Logger.Error($"{game.Name} GameID is malformed!");
+                _romM.Logger.Error($"[Metadata] {game.Name} GameID is malformed!");
                 return null;
             }
 
             RomMRom romMGame = _romM.FetchRom(romMId.ToString());
+            if(romMGame == null)
+            {
+                _romM.Logger.Error($"[Metadata] {game.Name} failed to get game!");
+                return null;
+            }
 
             var preferedRatingsBoard = _romM.Playnite.ApplicationSettings.AgeRatingOrgPriority;
             var agerating = romMGame.Metadatum.Age_Ratings.Count > 0 ? new HashSet<MetadataProperty>(romMGame.Metadatum.Age_Ratings.Where(r => r.Split(':')[0] == preferedRatingsBoard.ToString()).Select(r => new MetadataNameProperty(r.ToString()))) : null;

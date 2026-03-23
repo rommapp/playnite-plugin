@@ -53,16 +53,16 @@ namespace RomM.Games
                     break;
 
                 // Check mapping has an Emulator, Profile & Platform assigned to it
-                if (mapping.Emulator == null || mapping.EmulatorProfile == null || mapping.RomMPlatform == null)
+                if (mapping.Emulator == null || mapping.EmulatorProfile == null || mapping.RomMPlatform == null || mapping.RomMPlatform.Id == -1)
                 {
-                    Logger.Warn($"Emulator {mapping.EmulatorId} is misconfigured, skipping.");
+                    Logger.Warn($"[Import Controller] Emulator {mapping.MappingId} is misconfigured, skipping.");
                     continue;
                 }
 
-                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.IgdbId == mapping.RomMPlatform.IgdbId);
+                RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.Id == mapping.RomMPlatformId);
                 if (apiPlatform == null)
                 {
-                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.RomMPlatform.Name} with ID {mapping.RomMPlatform.Id} not found in RomM, skipping.", NotificationType.Error);
+                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.RomMPlatform.Name} with ID {mapping.RomMPlatformId} not found in RomM, skipping.", NotificationType.Error);
                     continue;
                 }
 
@@ -71,10 +71,10 @@ namespace RomM.Games
                 var romMROMs = DownloadROMData(args, url, apiPlatform);
                 if(romMROMs == null)
                 {
-                    Logger.Debug($"Failed to get ROMs for {apiPlatform.Name}.");
+                    Logger.Warn($"[Import Controller] Failed to get ROMs for {apiPlatform.Name}.");
                     continue;
                 }
-                Logger.Debug($"Finished parsing response for {apiPlatform.Name}.");
+                Logger.Info($"[Import Controller] Finished parsing response for {apiPlatform.Name}.");
 
                 // Import games for current mapping 
                 tasks.Add(Task<List<Game>>.Factory.StartNew(() =>
@@ -116,12 +116,14 @@ namespace RomM.Games
 
             if (_plugin.Settings.SkipMissingFiles)
             {
-                url += "?missing=false";
+                url += "?missing=false&";
             }
 
             // Exclude genres from import
-            List<string> excludeGenres = _plugin.Settings.ExcludeGenres.Split(';').ToList();
-            if (!string.IsNullOrEmpty(_plugin.Settings.ExcludeGenres))
+            string excludeGenresString = _plugin.Settings.ExcludeGenres.Trim(' ');
+            excludeGenresString = excludeGenresString.Trim(';');
+            List<string> excludeGenres = excludeGenresString.Split(';').ToList();
+            if (!string.IsNullOrEmpty(excludeGenresString))
             {
                 // Add ? if it hasn't been added already
                 if (!_plugin.Settings.SkipMissingFiles)
@@ -129,7 +131,7 @@ namespace RomM.Games
                     url += "?";
                 }
 
-                if (excludeGenres.Count > 0)
+                if (excludeGenres.Count > 1)
                 {
                     foreach (var genre in excludeGenres)
                     {
@@ -138,9 +140,10 @@ namespace RomM.Games
                 }
                 else
                 {
-                    url += $"genres={HttpUtility.UrlEncode(_plugin.Settings.ExcludeGenres)}";
+                    url += $"genres={HttpUtility.UrlEncode(excludeGenresString)}";
                 }
             }
+            url.Trim('&');
 
             return url;
         }
@@ -157,14 +160,14 @@ namespace RomM.Games
             }
             catch (HttpRequestException e)
             {
-                Logger.Error($"Request exception: {e.Message}");
+                Logger.Error($"[Import Controller] Request exception: {e.Message}");
                 return new List<RomMPlatform>();
             }
         }
         
         private List<RomMRom> DownloadROMData(LibraryImportGamesArgs args, string url, RomMPlatform platform)
         {
-            Logger.Debug($"Starting to fetch games for {platform.Name}.");
+            Logger.Info($"[Import Controller] Starting to fetch games for {platform.Name}.");
 
             const int pageSize = 50;
             int offset = 0;
@@ -192,7 +195,7 @@ namespace RomM.Games
                     HttpResponseMessage response = GetAsyncWithParams(url, queryParams).GetAwaiter().GetResult();
                     response.EnsureSuccessStatusCode();
 
-                    Logger.Debug($"Parsing response for {platform.Name} batch {offset / pageSize + 1}.");
+                    Logger.Info($"[Import Controller] Parsing response for {platform.Name} batch {offset / pageSize + 1}.");
 
                     Stream body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
                     List<RomMRom> roms;
@@ -202,12 +205,12 @@ namespace RomM.Games
                         roms = jsonResponse["items"].ToObject<List<RomMRom>>();
                     }
 
-                    Logger.Debug($"Parsed {roms.Count} roms for batch {offset / pageSize + 1}.");
+                    Logger.Info($"[Import Controller] Parsed {roms.Count} roms for batch {offset / pageSize + 1}.");
                     romData.AddRange(roms);
 
                     if (roms.Count < pageSize)
                     {
-                        Logger.Debug($"Received less than {pageSize} roms for {platform.Name}, assuming no more games.");
+                        Logger.Info($"[Import Controller] Received less than {pageSize} roms for {platform.Name}, assuming no more games.");
                         hasMoreData = false;
                         break;
                     }
@@ -216,7 +219,7 @@ namespace RomM.Games
                 }
                 catch (HttpRequestException e)
                 {
-                    Logger.Error($"Request exception: {e.Message}");
+                    Logger.Error($"[Import Controller] Request exception: {e.Message}");
                     hasMoreData = false;
                 }
             }

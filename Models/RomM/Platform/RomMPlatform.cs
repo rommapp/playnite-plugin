@@ -31,7 +31,7 @@ public class RomMPlatform : IEquatable<RomMPlatform>
         }
         public override int GetHashCode()
         {
-            return this.Name.GetHashCode();
+            return this.Id.GetHashCode();
         }
 
         [JsonProperty("id")]
