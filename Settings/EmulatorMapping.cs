@@ -100,12 +100,15 @@ namespace RomM.Settings
             get => _emulator;
             set 
             {
-                _emulator = value;
-                _emulatorId = value.Id;
-                AvailableProfiles = Emulator?.SelectableProfiles;
-                RomMPlatform = new RomMPlatform();
-                MappingName = value.Name;
-                OnPropertyChanged();
+                if (value != null)
+                {
+                    _emulator = value;
+                    _emulatorId = value.Id;
+                    AvailableProfiles = Emulator?.SelectableProfiles;
+                    RomMPlatform = new RomMPlatform();
+                    MappingName = value.Name;
+                    OnPropertyChanged();
+                } 
             }
         }
         public Guid EmulatorId
