@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace RomM.Settings
 {
@@ -23,12 +24,26 @@ namespace RomM.Settings
 
         public static SettingsViewModel Instance { get; private set; }
 
+        // RomM client API tokens are "rmm_" + 64 lowercase hex chars (secrets.token_hex(32) on the server).
+        private static readonly Regex ApiTokenPattern = new Regex(@"^rmm_[0-9a-f]{64}$", RegexOptions.Compiled);
+
+        public static bool IsValidApiToken(string token)
+        {
+            return !string.IsNullOrEmpty(token) && ApiTokenPattern.IsMatch(token);
+        }
+
+        [JsonIgnore]
+        public bool HasAnyAuth =>
+            IsValidApiToken(RomMApiToken?.Trim()) ||
+            (!string.IsNullOrEmpty(RomMUsername) && !string.IsNullOrEmpty(RomMPassword));
+
         public bool ScanGamesInFullScreen { get; set; } = false;
         public bool NotifyOnInstallComplete { get; set; } = false;
         public bool KeepRomMSynced { get; set; } = false;
         public string RomMHost { get; set; } = "";
         public string RomMUsername { get; set; } = "";
         public string RomMPassword { get; set; } = "";
+        public string RomMApiToken { get; set; } = "";
         public ObservableCollection<EmulatorMapping> Mappings { get; set; }
 
         public bool Use7z { get; set; } = false;
@@ -57,6 +72,7 @@ namespace RomM.Settings
                 RomMHost = savedSettings.RomMHost;
                 RomMUsername = savedSettings.RomMUsername;
                 RomMPassword = savedSettings.RomMPassword;
+                RomMApiToken = savedSettings.RomMApiToken ?? "";
                 Mappings = savedSettings.Mappings;
                 KeepRomMSynced = savedSettings.KeepRomMSynced;
                 Use7z = savedSettings.Use7z;
@@ -100,7 +116,7 @@ namespace RomM.Settings
             // Code executed when user decides to confirm changes made since BeginEdit was called.
             // This method should save settings made to Option1 and Option2.
             SavePluginSettings(this);
-            HttpClientSingleton.ConfigureBasicAuth(this.RomMUsername, this.RomMPassword);
+            HttpClientSingleton.ConfigureAuth(this);
         }
 
         private void SavePluginSettings<SettingsViewModel>(SettingsViewModel settings)
@@ -119,6 +135,11 @@ namespace RomM.Settings
         public bool VerifySettings(out List<string> errors)
         {
             var mappingErrors = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(RomMApiToken) && !IsValidApiToken(RomMApiToken.Trim()))
+            {
+                mappingErrors.Add("API Token must start with 'rmm_' followed by 64 lowercase hex characters.");
+            }
 
             Mappings.Where(m => m.Enabled)?.ForEach(m =>
             {
