@@ -52,9 +52,14 @@ namespace RomM
                 return new AuthenticationHeaderValue("Bearer", token);
             }
 
-            var creds = Convert.ToBase64String(
-                Encoding.ASCII.GetBytes($"{settings.RomMUsername}:{settings.RomMPassword}"));
-            return new AuthenticationHeaderValue("Basic", creds);
+            if (!string.IsNullOrEmpty(settings.RomMUsername) && !string.IsNullOrEmpty(settings.RomMPassword))
+            {
+                var creds = Convert.ToBase64String(
+                    Encoding.ASCII.GetBytes($"{settings.RomMUsername}:{settings.RomMPassword}"));
+                return new AuthenticationHeaderValue("Basic", creds);
+            }
+
+            return null;
         }
 
         public static HttpClient Instance => httpClient;
