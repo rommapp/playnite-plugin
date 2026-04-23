@@ -74,9 +74,8 @@ namespace RomM.Settings
                 {
                     req.Headers.Authorization = HttpClientSingleton.BuildAuthHeader(settings);
                     using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+                    using (var resp = await HttpClientSingleton.Instance.SendAsync(req, cts.Token))
                     {
-                        var resp = await HttpClientSingleton.Instance.SendAsync(req, cts.Token);
-
                         if (resp.IsSuccessStatusCode)
                         {
                             dialogs.ShowMessage($"Connection successful ({(int)resp.StatusCode}).", "RomM");
