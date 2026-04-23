@@ -6,18 +6,18 @@
     xmlns:sys="clr-namespace:System;assembly=mscorlib" mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="600" Padding="2,0,2,4">
     <UserControl.Resources>
         <Style x:Key="DimmedWhenTokenSet" TargetType="Label" BasedOn="{StaticResource {x:Type Label}}">
-            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="Opacity" Value="1"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding ElementName=RomMApiToken, Path=Text.Length}" Value="0">
-                    <Setter Property="Opacity" Value="1"/>
+                <DataTrigger Binding="{Binding HasValidApiToken}" Value="True">
+                    <Setter Property="Opacity" Value="0.5"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="DisabledWhenTokenSet" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="IsEnabled" Value="False"/>
+            <Setter Property="IsEnabled" Value="True"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding ElementName=RomMApiToken, Path=Text.Length}" Value="0">
-                    <Setter Property="IsEnabled" Value="True"/>
+                <DataTrigger Binding="{Binding HasValidApiToken}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -52,18 +52,7 @@
                                MaxWidth="260" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextBrush}"
                                FontWeight="Normal" Opacity="0.5"
-                               Text="Enabling the API token disables credential-based auth.">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Visible"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ElementName=RomMApiToken, Path=Text.Length}" Value="0">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                               Text="A valid API token takes precedence over credential auth." />
 
                     <!-- Username Label and TextBox -->
                     <Label Grid.Row="2" Grid.Column="0" Margin="0,0,5,5" Content="Username"

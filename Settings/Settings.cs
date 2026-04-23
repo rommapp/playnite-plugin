@@ -43,7 +43,21 @@ namespace RomM.Settings
         public string RomMHost { get; set; } = "";
         public string RomMUsername { get; set; } = "";
         public string RomMPassword { get; set; } = "";
-        public string RomMApiToken { get; set; } = "";
+        private string _romMApiToken = "";
+        public string RomMApiToken
+        {
+            get => _romMApiToken;
+            set
+            {
+                if (_romMApiToken == value) return;
+                _romMApiToken = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasValidApiToken));
+            }
+        }
+
+        [JsonIgnore]
+        public bool HasValidApiToken => IsValidApiToken(RomMApiToken?.Trim());
         public ObservableCollection<EmulatorMapping> Mappings { get; set; }
 
         public bool Use7z { get; set; } = false;
