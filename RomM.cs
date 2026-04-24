@@ -39,10 +39,27 @@ namespace RomM
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
-        public static void ConfigureBasicAuth(string username, string password)
+        public static void ConfigureAuth(SettingsViewModel settings)
         {
-            var base64Credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
+            httpClient.DefaultRequestHeaders.Authorization = BuildAuthHeader(settings);
+        }
+
+        public static AuthenticationHeaderValue BuildAuthHeader(SettingsViewModel settings)
+        {
+            var token = settings.RomMApiToken?.Trim();
+            if (SettingsViewModel.IsValidApiToken(token))
+            {
+                return new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            if (!string.IsNullOrEmpty(settings.RomMUsername) && !string.IsNullOrEmpty(settings.RomMPassword))
+            {
+                var creds = Convert.ToBase64String(
+                    Encoding.ASCII.GetBytes($"{settings.RomMUsername}:{settings.RomMPassword}"));
+                return new AuthenticationHeaderValue("Basic", creds);
+            }
+
+            return null;
         }
 
         public static HttpClient Instance => httpClient;
@@ -259,7 +276,7 @@ namespace RomM
             base.OnApplicationStarted(args);
 
             Settings = new SettingsViewModel(this, this);
-            HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
+            HttpClientSingleton.ConfigureAuth(Settings);
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
 
             // Portable path fix: expand "{PlayniteDir}" to absolute paths in DB on startup
@@ -404,11 +421,15 @@ namespace RomM
                 return new List<GameMetadata>();
             }
 
-            if (string.IsNullOrEmpty(Settings.RomMHost) ||
-                string.IsNullOrEmpty(Settings.RomMUsername) ||
-                string.IsNullOrEmpty(Settings.RomMPassword))
+            if (string.IsNullOrEmpty(Settings.RomMHost))
             {
-                Logger.Warn("RomM host, username or password is not set.");
+                Logger.Warn("RomM host is not set.");
+                return new List<GameMetadata>();
+            }
+
+            if (!Settings.HasAnyAuth)
+            {
+                Logger.Warn("RomM API token (rmm_ + 64 hex chars) or username/password must be set.");
                 return new List<GameMetadata>();
             }
 

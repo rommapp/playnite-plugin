@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -39,6 +42,72 @@ namespace RomM.Settings
             }
 
             mapping.DestinationPath = path;
+        }
+
+        private async void Click_TestConnection(object sender, RoutedEventArgs e)
+        {
+            var settings = SettingsViewModel.Instance;
+            var dialogs = settings.PlayniteAPI.Dialogs;
+
+            var host = settings.RomMHost?.Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                dialogs.ShowMessage("RomM Host is empty.", "RomM");
+                return;
+            }
+
+            if (!settings.HasAnyAuth)
+            {
+                dialogs.ShowMessage("Provide either a valid API Token or username and password.", "RomM");
+                return;
+            }
+
+            var button = (Button)sender;
+            var originalContent = button.Content;
+
+            try
+            {
+                button.IsEnabled = false;
+                button.Content = "Testing...";
+
+                using (var req = new HttpRequestMessage(HttpMethod.Get, $"{host}/api/users/me"))
+                {
+                    req.Headers.Authorization = HttpClientSingleton.BuildAuthHeader(settings);
+                    using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+                    using (var resp = await HttpClientSingleton.Instance.SendAsync(req, cts.Token))
+                    {
+                        if (resp.IsSuccessStatusCode)
+                        {
+                            dialogs.ShowMessage($"Connection successful ({(int)resp.StatusCode}).", "RomM");
+                        }
+                        else if (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden)
+                        {
+                            dialogs.ShowMessage($"Authentication rejected (HTTP {(int)resp.StatusCode}). Check your API token or username/password.", "RomM");
+                        }
+                        else
+                        {
+                            dialogs.ShowMessage($"Connection failed: HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}", "RomM");
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                dialogs.ShowMessage("Connection timed out after 10 seconds.", "RomM");
+            }
+            catch (HttpRequestException ex)
+            {
+                dialogs.ShowMessage($"Connection failed: {ex.Message}", "RomM");
+            }
+            catch (Exception ex)
+            {
+                dialogs.ShowMessage($"Unexpected error: {ex.Message}", "RomM");
+            }
+            finally
+            {
+                button.IsEnabled = true;
+                button.Content = originalContent;
+            }
         }
 
         private void Click_Browse7zDestination(object sender, RoutedEventArgs e)

@@ -4,6 +4,24 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="RomM.Settings.SettingsView"
     xmlns:local="clr-namespace:RomM.Settings"
     xmlns:sys="clr-namespace:System;assembly=mscorlib" mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="600" Padding="2,0,2,4">
+    <UserControl.Resources>
+        <Style x:Key="DimmedWhenTokenSet" TargetType="Label" BasedOn="{StaticResource {x:Type Label}}">
+            <Setter Property="Opacity" Value="1"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasValidApiToken}" Value="True">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="DisabledWhenTokenSet" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="IsEnabled" Value="True"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasValidApiToken}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
     <DockPanel Margin="20">
         <ScrollViewer DockPanel.Dock="Top">
             <StackPanel x:Name="EmulatorSettingsPanel">
@@ -12,9 +30,12 @@
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -24,13 +45,35 @@
                     <Label Content="RomM Host" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
                     <TextBox x:Name="RomMHost" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMHost, Mode=TwoWay}" />
 
+                    <!-- API Token Label and TextBox -->
+                    <Label Content="API Token" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
+                    <TextBox x:Name="RomMApiToken" Grid.Row="1" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMApiToken, Mode=TwoWay}" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
+                               MaxWidth="260" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextBrush}"
+                               FontWeight="Normal" Opacity="0.5"
+                               Text="A valid API token takes precedence over credential auth." />
+
                     <!-- Username Label and TextBox -->
-                    <Label Content="Username" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
-                    <TextBox x:Name="RomMUsername" Grid.Row="1" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMUsername, Mode=TwoWay}" />
+                    <Label Grid.Row="2" Grid.Column="0" Margin="0,0,5,5" Content="Username"
+                           Style="{StaticResource DimmedWhenTokenSet}"/>
+                    <TextBox x:Name="RomMUsername" Grid.Row="2" Grid.Column="1" Margin="3,2,0,2"
+                             Style="{StaticResource DisabledWhenTokenSet}"
+                             Text="{Binding RomMUsername, Mode=TwoWay}"
+                             ToolTip="Disabled while an API token is set."/>
 
                     <!-- Password Label and TextBox -->
-                    <Label Content="Password" Grid.Row="2" Grid.Column="0" Margin="0,5,5,0"/>
-                    <TextBox x:Name="RomMPassword" Grid.Row="2" Grid.Column="1" Margin="3,2,0,2" Text="{Binding RomMPassword, Mode=TwoWay}"/>
+                    <Label Grid.Row="3" Grid.Column="0" Margin="0,5,5,0" Content="Password"
+                           Style="{StaticResource DimmedWhenTokenSet}"/>
+                    <TextBox x:Name="RomMPassword" Grid.Row="3" Grid.Column="1" Margin="3,2,0,2"
+                             Style="{StaticResource DisabledWhenTokenSet}"
+                             Text="{Binding RomMPassword, Mode=TwoWay}"
+                             ToolTip="Disabled while an API token is set."/>
+
+                    <!-- Test Connection Button -->
+                    <Button x:Name="TestConnectionButton" Grid.Row="4" Grid.Column="1" Margin="3,8,0,0"
+                            HorizontalAlignment="Left" Padding="12,4" Click="Click_TestConnection"
+                            Content="Test connection"/>
                 </Grid>
                 <Label Content="Emulator path mappings" FontWeight="Bold" />
                 <TextBlock HorizontalAlignment="Right" Margin="0,-16,0,0">
