@@ -1,7 +1,9 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+
 using Playnite.SDK;
 using Playnite.SDK.Plugins;
+
 using RomM.Models.RomM;
 using RomM.Models.RomM.Platform;
 using System;
@@ -11,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
 
@@ -106,7 +109,7 @@ namespace RomM.Settings
                 }
                 else
                 {
-                    _romMHost = value.Last() == '/' ? value.Substring(0, value.Length - 1) : value;
+                    _romMHost = value.TrimEnd('/');
                 }
                 OnPropertyChanged();
             }
@@ -237,6 +240,8 @@ namespace RomM.Settings
             }
         }
 
+        public static readonly Regex ApiTokenPattern = new Regex(@"^rmm_[0-9a-f]{64}$", RegexOptions.Compiled);
+
         public SettingsViewModel(){}
 
         internal SettingsViewModel(Plugin plugin, IRomM romM)
@@ -324,7 +329,12 @@ namespace RomM.Settings
                         throw new ArgumentException("client token not set!");
                     }
 
-                    HttpClientSingleton.Instance.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", RomMClientToken);
+                    if(!ApiTokenPattern.IsMatch(RomMClientToken))
+                    {
+                        throw new ArgumentException("client token format invaild!");
+                    }
+
+                    HttpClientSingleton.ConfigureAPIAuth(RomMClientToken);
                 }
 
                 // Check server is present

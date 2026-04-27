@@ -39,6 +39,10 @@ namespace RomM
             var base64Credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
         }
+        public static void ConfigureAPIAuth(string apiToken)
+        {
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
+        }
 
         public static HttpClient Instance => httpClient;
     }
@@ -187,13 +191,13 @@ namespace RomM
 
             Settings = new SettingsViewModel(this, this);
 
-            if (Settings.UseBasicAuth)
+            if (Settings.UseBasicAuth && !string.IsNullOrEmpty(Settings.RomMUsername) && !string.IsNullOrEmpty(Settings.RomMPassword))
             {
                 HttpClientSingleton.ConfigureBasicAuth(Settings.RomMUsername, Settings.RomMPassword);
             }
-            else
+            else if(SettingsViewModel.ApiTokenPattern.IsMatch(Settings.RomMClientToken))
             {
-                HttpClientSingleton.Instance.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Settings.RomMClientToken);
+                HttpClientSingleton.ConfigureAPIAuth(Settings.RomMClientToken);
             }
             
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
