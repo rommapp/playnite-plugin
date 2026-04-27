@@ -52,8 +52,7 @@ namespace RomM.Settings
 
         private async void Click_PullPlatforms(object sender, RoutedEventArgs e)
         {
-            SettingsViewModel.Instance.PlatformSynced = false;
-            SettingsViewModel.Instance.PlatformSyncFailed = false;
+            SettingsViewModel.Instance.Notify = false;
 
             try
             {
@@ -62,12 +61,12 @@ namespace RomM.Settings
 
                 string body = await response.Content.ReadAsStringAsync();
                 SettingsViewModel.Instance.RomMPlatforms = JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
-                SettingsViewModel.Instance.PlatformSynced = true;  
+                SettingsViewModel.Instance.UpdateNotifcationBar("Platforms successfully retrieved!");
             }
             catch (Exception ex)
             {
                 LogManager.GetLogger().Error($"RomM - failed to get platforms: {ex}");
-                SettingsViewModel.Instance.PlatformSyncFailed = true;
+                SettingsViewModel.Instance.UpdateNotifcationBar($"Failed to get platforms: {ex.Message}!", true);
             }
         }
 

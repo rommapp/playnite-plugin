@@ -1,8 +1,10 @@
-﻿<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<UserControl ClipToBounds="True"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="RomM.Settings.SettingsView"
     xmlns:local="clr-namespace:RomM.Settings"
+    xmlns:draw="clr-namespace:System.Drawing;assembly=System.Drawing"
     xmlns:sys="clr-namespace:System;assembly=mscorlib" mc:Ignorable="d" d:DesignHeight="1000" d:DesignWidth="800" Padding="2,0,2,4">
 
     <UserControl.Resources>
@@ -11,220 +13,268 @@
     </UserControl.Resources>
 
     <DockPanel Margin="20">
-        <ScrollViewer DockPanel.Dock="Top">
-            <StackPanel x:Name="EmulatorSettingsPanel">
-                <Label Content="Authentication" FontWeight="Bold" />
-                <Separator Margin="0,5,0,10" />
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="180"/>
-                        <ColumnDefinition Width="255"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="150"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="60"/>
-                        <RowDefinition Height="60"/>
-                        <RowDefinition Height="30"/>
-                        <RowDefinition Height="30"/>
-                        <RowDefinition Height="30"/>
-                        <RowDefinition Height="30"/>
-                        <RowDefinition Height="30"/>
-                    </Grid.RowDefinitions>
+        <Grid>
+            <!-- Notification Bar -->
+            <StackPanel VerticalAlignment="Top" Margin="2,2,2,2" MinHeight="22" MaxHeight="22" HorizontalAlignment="Stretch">
+                <!-- Notification Bar Animation -->
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="RenderTransform">
+                            <Setter.Value>
+                                <TranslateTransform Y="-60" />
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Notify}" Value="True">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation 
+                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                From="-60" To="-22" 
+                                                Duration="0:0:0.4"/>
+                                            <DoubleAnimation 
+                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                From="-22" To="-22" 
+                                                Duration="0:0:10"
+                                                BeginTime="0:0:10.4"/>
 
-                    <!-- RomM User data -->
-                    <Image Name="RomMProfileIcon" Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Source="{Binding ProfilePath, Mode=OneWay, Converter={StaticResource imageCacheConverter}}" Width="120" HorizontalAlignment="Left" Margin="5,5,0,5" />
-                    <Label Name="RomMUser" Content="{Binding RomMUser, Mode=OneWay}" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" FontSize="22" VerticalAlignment="Bottom" Margin="-30,0,0,0"/>
-                    <Label Name="RomMProfileType" Content="{Binding RomMProfileType, Mode=OneWay}" Grid.Row="1" Grid.Column="1" Margin="-30,0,0,0" Foreground="DimGray" FontSize="12" VerticalAlignment="Top"/>
-                    <Button Name="TestServer" Click="Click_TestConnection" Grid.Row="1" Grid.Column="3" Margin="5" HorizontalAlignment="Center" VerticalAlignment="Top">
-                        <Label Content="Test Connection" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Button>
-                    <Label Content="Failed!" Grid.Row="1" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" FontSize="12" Foreground="Red" Visibility="{Binding ConnectionFailed, Converter={StaticResource BoolToVisConverter}}"/>
-                    <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Top">
-                        <Label Name="RomMServerVersionText" Content="Server Ver." Foreground="DimGray" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right"/>
-                        <Label Name="RomMServerVersion" Content="{Binding ServerVersion, Mode=OneWay}" Grid.Row="0" Grid.Column="3" Margin="0" Foreground="DimGray" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right"/>
+                                            <DoubleAnimation 
+                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                From="-22" To="-60" 
+                                                Duration="0:0:0.1"
+                                                BeginTime="0:0:10.5"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Border Grid.Row="0" Grid.Column="0" MaxHeight="22" MinHeight="22" Width="Auto" CornerRadius="3">
+                    <Border.Background>
+                        <SolidColorBrush Color="{Binding NotfiyColour}" Opacity="0.3" />
+                    </Border.Background>
+                    <Grid VerticalAlignment="Center">
+                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="{Binding NotifyIcon, Mode=OneWay}" Foreground="{Binding NotfiyTextColour, Mode=OneWay}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding NotifyText, Mode=OneWay}" Foreground="{Binding NotfiyTextColour, Mode=OneWay}" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
+            <!-- Settings Panel -->
+            <ScrollViewer DockPanel.Dock="Top">
+                <StackPanel x:Name="EmulatorSettingsPanel">
+                    <Label Content="Authentication" FontWeight="Bold" Margin="0,5,0,0"/>
+                    <Separator Margin="0,5,0,10" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="255"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="150"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="60"/>
+                            <RowDefinition Height="60"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- RomM User data -->
+                        <Image Name="RomMProfileIcon" Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Source="{Binding ProfilePath, Mode=OneWay, Converter={StaticResource imageCacheConverter}}" Width="120" HorizontalAlignment="Left" Margin="5,5,0,5" />
+                        <Label Name="RomMUser" Content="{Binding RomMUser, Mode=OneWay}" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" FontSize="22" VerticalAlignment="Bottom" Margin="-30,0,0,0"/>
+                        <Label Name="RomMProfileType" Content="{Binding RomMProfileType, Mode=OneWay}" Grid.Row="1" Grid.Column="1" Margin="-30,0,0,0" Foreground="DimGray" FontSize="12" VerticalAlignment="Top"/>
+                        <Button Name="TestServer" Click="Click_TestConnection" Grid.Row="1" Grid.Column="3" Margin="5" HorizontalAlignment="Center" VerticalAlignment="Top">
+                            <Label Content="Authenticate" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
+
+                        <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Top">
+                            <Label Name="RomMServerVersionText" Content="Server Ver." Foreground="DimGray" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right"/>
+                            <Label Name="RomMServerVersion" Content="{Binding ServerVersion, Mode=OneWay}" Grid.Row="0" Grid.Column="3" Margin="0" Foreground="DimGray" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right"/>
+                        </StackPanel>
+
+                        <!-- RomM Host -->
+                        <Label Content="RomM Host" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
+                        <TextBox x:Name="RomMHost" Grid.Row="2" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMHost, Mode=TwoWay}" />
+
+                        <!-- RomM Client Token -->
+                        <Label Content="RomM Client Token (&gt;=4.8)" Grid.Row="3" Grid.Column="0" Margin="0,0,5,5" VerticalAlignment="Center"/>
+                        <TextBox x:Name="RomMApiKey" Grid.Row="3" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMClientToken, Mode=TwoWay}" />
+                        <TextBlock Grid.Row="3" Grid.Column="2" Margin="5" HorizontalAlignment="Left" VerticalAlignment="Center">
+    <Hyperlink NavigateUri="{Binding ClientTokenURL}" RequestNavigate="Hyperlink_RequestNavigate">
+        Get Token
+    </Hyperlink>
+                        </TextBlock>
+
+                        <CheckBox IsChecked="{Binding UseBasicAuth, Mode=TwoWay}" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Use Basic Auth" TextWrapping="Wrap" FontSize="12"/>
+                        </CheckBox>
+
+                        <!-- Username -->
+                        <Label Content="Username" Grid.Row="5" Grid.Column="0" Margin="40,0,5,5" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
+                        <TextBox x:Name="RomMUsername" Grid.Row="5" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMUsername, Mode=TwoWay}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
+
+                        <!-- Password -->
+                        <Label Content="Password" Grid.Row="6" Grid.Column="0" Margin="40,5,5,0"  Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
+                        <TextBox x:Name="RomMPassword" Grid.Row="6" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMPassword, Mode=TwoWay}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
+                    </Grid>
+                    <Label Content="Emulator path mappings" FontWeight="Bold" />
+                    <TextBlock HorizontalAlignment="Right" Margin="0,-16,0,0">
+<Hyperlink NavigateUri="https://github.com/rommapp/playnite-plugin/blob/main/README.md" RequestNavigate="Hyperlink_RequestNavigate">
+    Help
+</Hyperlink>
+                    </TextBlock>
+                    <Separator Margin="0,5,0,10" />
+
+                    <!-- Emulator Mappings -->
+                    <StackPanel x:Name="MappingsStack">
+                        <ItemsControl ItemsSource="{Binding Mappings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Expander Header="{Binding MappingName, Mode=OneWay}">
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="250"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="26"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="30"/>
+                                                <RowDefinition Height="30"/>
+                                                <RowDefinition Height="30"/>
+                                                <RowDefinition Height="30"/>
+                                                <RowDefinition Height="30"/>
+                                                <RowDefinition Height="10"/>
+                                            </Grid.RowDefinitions>
+
+                                            <Label Content="Emulator" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
+                                            <ComboBox Name="ComboEmulators" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" ItemsSource="{Binding AvailableEmulators}" DisplayMemberPath="Name" SelectedItem="{Binding Emulator, Mode=TwoWay}"/>
+
+                                            <Label Content="Profile" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
+                                            <ComboBox Name="ComboPlatforms" Grid.Row="1" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" ItemsSource="{Binding AvailableProfiles}" DisplayMemberPath="Name" SelectedItem="{Binding EmulatorProfile, Mode=TwoWay}"/>
+
+                                            <Label Content="Platform" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
+                                            <ComboBox Name="ComboPlatform" Grid.Row="2" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" IsTextSearchEnabled="True" ItemsSource="{Binding AvailablePlatforms}" DisplayMemberPath="Name" SelectedItem="{Binding RomMPlatform, Mode=TwoWay}"/>
+
+                                            <Label Content="Path" Grid.Row="3" Grid.Column="0" Margin="0,0,5,5"/>
+                                            <TextBox x:Name="Path" Grid.Row="3" Grid.Column="1" Text="{Binding Path=DestinationPath, Mode=TwoWay}"/>
+                                            <Button Click="Click_BrowseDestination" Grid.Row="3" Grid.Column="2" Margin="0,0,10,0">
+                                                <Label Content="Browse"/>
+                                            </Button>
+
+                                            <Label Content="Enabled" Grid.Row="4" Grid.Column="0" Margin="0,0,5,5"/>
+                                            <CheckBox Grid.Row="4" Grid.Column="1" Width="30" HorizontalAlignment="Left" IsChecked="{Binding Enabled, Mode=TwoWay}"/>
+
+                                            <Label Content="AutoExtract" Grid.Row="1" Grid.Column="3" Margin="0,0,5,5"/>
+                                            <CheckBox Grid.Row="1" Grid.Column="4" Width="30" HorizontalAlignment="Left" IsChecked="{Binding AutoExtract, Mode=TwoWay}" ToolTip="Will extract ROMs if they are stored on the server in Rar, Zip, Tar, 7z, GZip, or BZip2 format!" />
+
+                                            <Label Content="Prefer .m3u" Grid.Row="2" Grid.Column="3" Margin="0,0,5,5"/>
+                                            <CheckBox Grid.Row="2" Grid.Column="4" Width="30" HorizontalAlignment="Left" IsChecked="{Binding UseM3U, Mode=TwoWay}" ToolTip="Will use .m3u file if multi-file ROM and emulator supports .m3u!"/>
+
+                                            <Label Content="Mapping ID" Grid.Row="0" Grid.Column="3" Margin="0,0,5,5"/>
+                                            <TextBox Grid.Row="0" Grid.Column="4" Margin="0,0,10,0" IsReadOnly="True" HorizontalAlignment="Left" Text="{Binding MappingId, Mode=OneWay}"/>
+
+                                            <Button Grid.Row="0" Grid.Column="5" Content="❌" Tag="{Binding}" ToolTip="Delete mapping!" Click="Click_Delete" Foreground="Red" Width="26" Height="26" Margin="0" Padding="0" />
+                                        </Grid>
+                                    </Expander>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
 
-                    <!-- RomM Host -->
-                    <Label Content="RomM Host" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
-                    <TextBox x:Name="RomMHost" Grid.Row="2" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMHost, Mode=TwoWay}" />
-
-                    <!-- RomM Client Token -->
-                    <Label Content="RomM Client Token (&gt;=4.8)" Grid.Row="3" Grid.Column="0" Margin="0,0,5,5" VerticalAlignment="Center"/>
-                    <TextBox x:Name="RomMApiKey" Grid.Row="3" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMClientToken, Mode=TwoWay}" />
-                    <TextBlock Grid.Row="3" Grid.Column="2" Margin="5" HorizontalAlignment="Left" VerticalAlignment="Center">
-                        <Hyperlink NavigateUri="{Binding ClientTokenURL}" RequestNavigate="Hyperlink_RequestNavigate">
-                            Get Token
-                        </Hyperlink>
-                    </TextBlock>
-
-                    <CheckBox IsChecked="{Binding UseBasicAuth, Mode=TwoWay}" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Use Basic Auth" TextWrapping="Wrap" FontSize="12"/>
-                    </CheckBox>
-
-                    <!-- Username -->
-                    <Label Content="Username" Grid.Row="5" Grid.Column="0" Margin="40,0,5,5" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
-                    <TextBox x:Name="RomMUsername" Grid.Row="5" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMUsername, Mode=TwoWay}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
-
-                    <!-- Password -->
-                    <Label Content="Password" Grid.Row="6" Grid.Column="0" Margin="40,5,5,0"  Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
-                    <TextBox x:Name="RomMPassword" Grid.Row="6" Grid.Column="1" Margin="2" Width="250" MaxWidth="250" HorizontalAlignment="Left" Text="{Binding RomMPassword, Mode=TwoWay}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}"/>
-                </Grid>
-                <Label Content="Emulator path mappings" FontWeight="Bold" />
-                <TextBlock HorizontalAlignment="Right" Margin="0,-16,0,0">
-                    <Hyperlink NavigateUri="https://github.com/rommapp/playnite-plugin/blob/main/README.md" RequestNavigate="Hyperlink_RequestNavigate">
-                        Help
-                    </Hyperlink>
-                </TextBlock>
-                <Separator Margin="0,5,0,10" />
-
-                <!-- Emulator Mappings -->
-                <StackPanel x:Name="MappingsStack">
-                    <ItemsControl ItemsSource="{Binding Mappings}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Expander Header="{Binding MappingName, Mode=OneWay}">
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="250"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="26"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="30"/>
-                                            <RowDefinition Height="30"/>
-                                            <RowDefinition Height="30"/>
-                                            <RowDefinition Height="30"/>
-                                            <RowDefinition Height="30"/>
-                                            <RowDefinition Height="10"/>
-                                        </Grid.RowDefinitions>
-
-                                        <Label Content="Emulator" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
-                                        <ComboBox Name="ComboEmulators" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" ItemsSource="{Binding AvailableEmulators}" DisplayMemberPath="Name" SelectedItem="{Binding Emulator, Mode=TwoWay}"/>
-
-                                        <Label Content="Profile" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
-                                        <ComboBox Name="ComboPlatforms" Grid.Row="1" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" ItemsSource="{Binding AvailableProfiles}" DisplayMemberPath="Name" SelectedItem="{Binding EmulatorProfile, Mode=TwoWay}"/>
-
-                                        <Label Content="Platform" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
-                                        <ComboBox Name="ComboPlatform" Grid.Row="2" Grid.Column="1" Margin="3,2,0,2" DockPanel.Dock="Left" IsTextSearchEnabled="True" ItemsSource="{Binding AvailablePlatforms}" DisplayMemberPath="Name" SelectedItem="{Binding RomMPlatform, Mode=TwoWay}"/>
-
-                                        <Label Content="Path" Grid.Row="3" Grid.Column="0" Margin="0,0,5,5"/>
-                                        <TextBox x:Name="Path" Grid.Row="3" Grid.Column="1" Text="{Binding Path=DestinationPath, Mode=TwoWay}"/>
-                                        <Button Click="Click_BrowseDestination" Grid.Row="3" Grid.Column="2" Margin="0,0,10,0">
-                                            <Label Content="Browse"/>
-                                        </Button>
-
-                                        <Label Content="Enabled" Grid.Row="4" Grid.Column="0" Margin="0,0,5,5"/>
-                                        <CheckBox Grid.Row="4" Grid.Column="1" Width="30" HorizontalAlignment="Left" IsChecked="{Binding Enabled, Mode=TwoWay}"/>
-
-                                        <Label Content="AutoExtract" Grid.Row="1" Grid.Column="3" Margin="0,0,5,5"/>
-                                        <CheckBox Grid.Row="1" Grid.Column="4" Width="30" HorizontalAlignment="Left" IsChecked="{Binding AutoExtract, Mode=TwoWay}" ToolTip="Will extract ROMs if they are stored on the server in Rar, Zip, Tar, 7z, GZip, or BZip2 format!" />
-
-                                        <Label Content="Prefer .m3u" Grid.Row="2" Grid.Column="3" Margin="0,0,5,5"/>
-                                        <CheckBox Grid.Row="2" Grid.Column="4" Width="30" HorizontalAlignment="Left" IsChecked="{Binding UseM3U, Mode=TwoWay}" ToolTip="Will use .m3u file if multi-file ROM and emulator supports .m3u!"/>
-
-                                        <Label Content="Mapping ID" Grid.Row="0" Grid.Column="3" Margin="0,0,5,5"/>
-                                        <TextBox Grid.Row="0" Grid.Column="4" Margin="0,0,10,0" IsReadOnly="True" HorizontalAlignment="Left" Text="{Binding MappingId, Mode=OneWay}"/>
-
-                                        <Button Grid.Row="0" Grid.Column="5" Content="❌" Tag="{Binding}" ToolTip="Delete mapping!" Click="Click_Delete" Foreground="Red" Width="26" Height="26" Margin="0" Padding="0" />
-                                    </Grid>
-                                </Expander>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-                
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Button Name="AddMapping" Click="Click_AddMapping" Grid.Row="0" Grid.Column="0" Margin="5" HorizontalAlignment="Left" VerticalAlignment="Top">
-                        <Label Content="Add Mapping"/>
-                    </Button>
-                    <Button Name="GetPlatforms" Click="Click_PullPlatforms" Grid.Row="0" Grid.Column="2" Margin="5" HorizontalAlignment="Right" VerticalAlignment="Top">
-                        <Label Content="Sync RomM Platforms"/>
-                    </Button>
-                    <Label Content="Synced!" Grid.Row="1" Grid.Column="2" HorizontalAlignment="Right" Margin="0,0,41,0" Foreground="Green" Visibility="{Binding PlatformSynced, Converter={StaticResource BoolToVisConverter}}"/>
-                    <Label Content="Failed!" Grid.Row="1" Grid.Column="2" HorizontalAlignment="Right" Margin="0,0,45,0" Foreground="Red" Visibility="{Binding PlatformSyncFailed, Converter={StaticResource BoolToVisConverter}}"/>
-                </Grid>
-             
-                <!-- Library scanning -->
-                <Label Content="Library scanning" FontWeight="Bold" Margin="0,10,0,0" />
-                <Separator Margin="0,5,0,10" />
-
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Exclude Genres" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="5"/>
-                    <Grid>
-                        <TextBox  Width="250"  VerticalAlignment="Center" HorizontalAlignment="Left" x:Name="SearchTermTextBox" Margin="5" Text="{Binding ExcludeGenres, Mode=TwoWay}"/>
-                        <TextBlock IsHitTestVisible="False" Text="Adventure;Platform;RPG;" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0" Foreground="DarkGray">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Text, ElementName=SearchTermTextBox}" Value="">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Button Name="AddMapping" Click="Click_AddMapping" Grid.Row="0" Grid.Column="0" Margin="5" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <Label Content="Add Mapping"/>
+                        </Button>
+                        <Button Name="GetPlatforms" Click="Click_PullPlatforms" Grid.Row="0" Grid.Column="2" Margin="5" HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <Label Content="Sync RomM Platforms"/>
+                        </Button>
                     </Grid>
-                </StackPanel>
-                <CheckBox IsChecked="{Binding ScanGamesInFullScreen, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Enable game scanning in fullscreen mode" TextWrapping="Wrap"/>
-                </CheckBox>
-                <CheckBox IsChecked="{Binding MergeRevisions, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Merge ROM revisions" TextWrapping="Wrap"/>
-                </CheckBox>
-                <CheckBox IsChecked="{Binding KeepDeletedGames, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Keep games deleted from RomM server" TextWrapping="Wrap"/>
-                </CheckBox>
-                <CheckBox IsChecked="{Binding SkipMissingFiles, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Skip importing ROMs that are missing from RomM servers filesystem" TextWrapping="Wrap"/>
-                </CheckBox>
 
-                <!-- Installation -->
-                <Label Content="Installation" FontWeight="Bold" Margin="0,10,0,0" />
-                <Separator Margin="0,5,0,10" />
-                <CheckBox IsChecked="{Binding NotifyOnInstallComplete, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Enable notification upon game install completion" TextWrapping="Wrap"/>
-                </CheckBox>
+                    <!-- Library scanning -->
+                    <Label Content="Library scanning" FontWeight="Bold" Margin="0,10,0,0" />
+                    <Separator Margin="0,5,0,10" />
 
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="300"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <CheckBox IsChecked="{Binding Use7z, Mode=TwoWay}" Grid.Row="0" Grid.Column="0" Margin="0,0,0,10">
-                        <TextBlock Text="Use 7z for archive extraction" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Exclude Genres" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="5"/>
+                        <Grid>
+                            <TextBox  Width="250"  VerticalAlignment="Center" HorizontalAlignment="Left" x:Name="SearchTermTextBox" Margin="5" Text="{Binding ExcludeGenres, Mode=TwoWay}"/>
+                            <TextBlock IsHitTestVisible="False" Text="Adventure;Platform;RPG;" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0" Foreground="DarkGray">
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=SearchTermTextBox}" Value="">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding ScanGamesInFullScreen, Mode=TwoWay}" Margin="0,0,0,10">
+                        <TextBlock Text="Enable game scanning in fullscreen mode" TextWrapping="Wrap"/>
                     </CheckBox>
-                    <TextBox x:Name="PathTo7zText" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" Text="{Binding PathTo7z, Mode=TwoWay}" />
-                    <Button Name="Browse7z" Click="Click_Browse7zDestination" Grid.Row="0" Grid.Column="2">
-                        <Label Content="Browse" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
-                    </Button>
-                </Grid>
+                    <CheckBox IsChecked="{Binding MergeRevisions, Mode=TwoWay}" Margin="0,0,0,10">
+                        <TextBlock Text="Merge ROM revisions" TextWrapping="Wrap"/>
+                    </CheckBox>
+                    <CheckBox IsChecked="{Binding KeepDeletedGames, Mode=TwoWay}" Margin="0,0,0,10">
+                        <TextBlock Text="Keep games deleted from RomM server" TextWrapping="Wrap"/>
+                    </CheckBox>
+                    <CheckBox IsChecked="{Binding SkipMissingFiles, Mode=TwoWay}" Margin="0,0,0,10">
+                        <TextBlock Text="Skip importing ROMs that are missing from RomM servers filesystem" TextWrapping="Wrap"/>
+                    </CheckBox>
 
-                <!-- Status Syncing -->
-                <Label Content="Status Sync" FontWeight="Bold" Margin="0,10,0,0" />
-                <Separator Margin="0,5,0,10" />
-                <CheckBox IsChecked="{Binding KeepRomMSynced, Mode=TwoWay}" Margin="0,0,0,10">
-                    <TextBlock Text="Keep completion status and favorites in sync with RomM" TextWrapping="Wrap"/>
-                </CheckBox>
-            </StackPanel>
-        </ScrollViewer>
+                    <!-- Installation -->
+                    <Label Content="Installation" FontWeight="Bold" Margin="0,10,0,0" />
+                    <Separator Margin="0,5,0,10" />
+                    <CheckBox IsChecked="{Binding NotifyOnInstallComplete, Mode=TwoWay}" Margin="0,0,0,10">
+                        <TextBlock Text="Enable notification upon game install completion" TextWrapping="Wrap"/>
+                    </CheckBox>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="300"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <CheckBox IsChecked="{Binding Use7z, Mode=TwoWay}" Grid.Row="0" Grid.Column="0" Margin="0,0,0,10">
+                            <TextBlock Text="Use 7z for archive extraction" TextWrapping="Wrap"/>
+                        </CheckBox>
+                        <TextBox x:Name="PathTo7zText" Grid.Row="0" Grid.Column="1" Margin="3,2,0,2" Text="{Binding PathTo7z, Mode=TwoWay}" />
+                        <Button Name="Browse7z" Click="Click_Browse7zDestination" Grid.Row="0" Grid.Column="2">
+                            <Label Content="Browse" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Status Syncing -->
+                    <Label Content="Status Sync" FontWeight="Bold" Margin="0,10,0,0" />
+                    <Separator Margin="0,5,0,10" />
+                    <CheckBox IsChecked="{Binding KeepRomMSynced, Mode=TwoWay}" Margin="0,0,0,10">
+                        <TextBlock Text="Keep completion status and favorites in sync with RomM" TextWrapping="Wrap"/>
+                    </CheckBox>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </DockPanel>
 </UserControl>

@@ -6,6 +6,7 @@ using Playnite.SDK.Plugins;
 
 using RomM.Models.RomM;
 using RomM.Models.RomM.Platform;
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -15,6 +16,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace RomM.Settings
@@ -23,80 +25,109 @@ namespace RomM.Settings
     {
         private readonly Plugin _plugin;
         private SettingsViewModel editingClone { get; set; }
-        [JsonIgnore]
-        internal readonly IPlayniteAPI PlayniteAPI;
-        [JsonIgnore]
-        internal readonly IRomM RomM;
+        [JsonIgnore] internal readonly IPlayniteAPI PlayniteAPI;
+        [JsonIgnore] internal readonly IRomM RomM;
         public static SettingsViewModel Instance { get; private set; }
 
         #region Backing Variables
-        [JsonIgnore]
-        private string _romMHost = "";
-        [JsonIgnore]
-        private string _romMServerVersion = "---";
-        [JsonIgnore]
-        private string _romMClientToken = "";
-        [JsonIgnore]
-        private bool _useBasicAuth = true;
-        [JsonIgnore]
-        private string _romMUsername = "";
-        [JsonIgnore]
-        private string _romMPassword = "";
 
-        [JsonIgnore]
-        private string _defaultprofilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
-        [JsonIgnore]
-        private string _profilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
-        [JsonIgnore]
-        private string _romMUser = "----";
-        [JsonIgnore]
-        private string _profileType = "----";
-        [JsonIgnore]
-        private bool _connectionFailed = false;
-        [JsonIgnore]
-        private bool _platformSynced = false;
-        [JsonIgnore]
-        private bool _platformSyncFailed = false;
+        [JsonIgnore] private string _romMHost = "";
+        [JsonIgnore] private string _romMServerVersion = "---";
+        [JsonIgnore] private string _romMClientToken = "";
+        [JsonIgnore] private bool _useBasicAuth = true;
+        [JsonIgnore] private string _romMUsername = "";
+        [JsonIgnore] private string _romMPassword = "";
 
-        [JsonIgnore]
-        private string _excludeGenres = "";
-        [JsonIgnore]
-        private string _7zPath = "";
+        [JsonIgnore] private string _defaultprofilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
+        [JsonIgnore] private string _profilepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"profile.png");
+        [JsonIgnore] private string _romMUser = "----";
+        [JsonIgnore] private string _profileType = "----";
 
-        [JsonIgnore]
-        private List<RomMPlatform> _romMPlatforms = new List<RomMPlatform>();
+        [JsonIgnore] private string _excludeGenres = "";
+        [JsonIgnore] private string _7zPath = "";
+
+        [JsonIgnore] private List<RomMPlatform> _romMPlatforms = new List<RomMPlatform>();
+
+        [JsonIgnore] private bool _notify = false;
+        [JsonIgnore] private string _notifyText = "";
+        [JsonIgnore] private string _notifyIcon = "";
+        [JsonIgnore] private Color _notfiyColour;
+        [JsonIgnore] private Brush _notfiyTextColour;
+
         #endregion
 
+        #region Notifcation Bar
         [JsonIgnore]
-        public bool ConnectionFailed
+        public bool Notify
         {
-            get => _connectionFailed;
+            get => _notify;
             set
             {
-                _connectionFailed = value;
+                _notify = value;
                 OnPropertyChanged();
             }
         }
         [JsonIgnore]
-        public bool PlatformSynced
+        public string NotifyText
         {
-            get => _platformSynced;
+            get => _notifyText;
             set
             {
-                _platformSynced = value;
+                _notifyText = value;
                 OnPropertyChanged();
             }
         }
         [JsonIgnore]
-        public bool PlatformSyncFailed
+        public string NotifyIcon
         {
-            get => _platformSyncFailed;
+            get => _notifyIcon;
             set
             {
-                _platformSyncFailed = value;
+                _notifyIcon = value;
                 OnPropertyChanged();
             }
         }
+        [JsonIgnore]
+        public Color NotfiyColour
+        {
+            get => _notfiyColour;
+            set
+            {
+                _notfiyColour = value;
+                OnPropertyChanged();
+            }
+        }
+        [JsonIgnore]
+        public Brush NotfiyTextColour
+        {
+            get => _notfiyTextColour;
+            set
+            {
+                _notfiyTextColour = value;
+                OnPropertyChanged();
+            }
+        }
+        public void UpdateNotifcationBar(string Message, bool IsError = false)
+        {
+            if (IsError)
+            {
+                NotfiyColour = (Color)ColorConverter.ConvertFromString("#730000");
+                NotfiyTextColour = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ff6b6b"));
+                NotifyIcon = $" \uE730";
+                NotifyText = $"      {Message}";
+                Notify = true;
+            }
+            else
+            {
+                NotfiyColour = (Color)ColorConverter.ConvertFromString("#035900");
+                NotfiyTextColour = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#91ff8e"));
+                NotifyIcon = $" \uE73E";
+                NotifyText = $"      {Message}";
+                Notify = true;
+            }
+        }
+
+        #endregion
 
         public string RomMHost
         {
@@ -123,6 +154,8 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
+        public static readonly Regex ApiTokenPattern = new Regex(@"^rmm_[0-9a-f]{64}$", RegexOptions.Compiled);
+
         public bool UseBasicAuth
         {
             get => _useBasicAuth;
@@ -159,8 +192,8 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
-        [JsonIgnore]
-        public string ClientTokenURL
+
+        [JsonIgnore] public string ClientTokenURL
         {
             get => $"{RomMHost}/client-api-tokens";
             set { }
@@ -240,8 +273,6 @@ namespace RomM.Settings
             }
         }
 
-        public static readonly Regex ApiTokenPattern = new Regex(@"^rmm_[0-9a-f]{64}$", RegexOptions.Compiled);
-
         public SettingsViewModel(){}
 
         internal SettingsViewModel(Plugin plugin, IRomM romM)
@@ -306,18 +337,24 @@ namespace RomM.Settings
 
         public bool TestConnection()
         {
+            Notify = false;
+
             try
             {
                 if(string.IsNullOrEmpty(RomMHost))
                 {
-                    throw new ArgumentException("host not set!");
+                    throw new ArgumentException("Host not set!");
+                }
+                if(!Uri.IsWellFormedUriString(RomMHost, UriKind.RelativeOrAbsolute))
+                {
+                    throw new ArgumentException("Host is not a valid URL!");
                 }
 
                 if(UseBasicAuth)
                 {
                     if(string.IsNullOrEmpty(RomMUsername) || string.IsNullOrEmpty(RomMPassword))
                     {
-                        throw new ArgumentException("username or password not set!");
+                        throw new ArgumentException("Username/Password not set!");
                     }
 
                     HttpClientSingleton.ConfigureBasicAuth(RomMUsername, RomMPassword);
@@ -326,12 +363,12 @@ namespace RomM.Settings
                 {
                     if (string.IsNullOrEmpty(RomMClientToken))
                     {
-                        throw new ArgumentException("client token not set!");
+                        throw new ArgumentException("Client token not set!");
                     }
 
                     if(!ApiTokenPattern.IsMatch(RomMClientToken))
                     {
-                        throw new ArgumentException("client token format invaild!");
+                        throw new ArgumentException("Client token format invaild!");
                     }
 
                     HttpClientSingleton.ConfigureAPIAuth(RomMClientToken);
@@ -379,17 +416,18 @@ namespace RomM.Settings
 
                 RomMProfileType = userinfo.Role;
                 RomMUser = userinfo.Username;
-                ConnectionFailed = false;
+                UpdateNotifcationBar("Authenticated!");
             }
             catch (Exception ex)
             {
-                ConnectionFailed = true;
+                Notify = true;
                 ProfilePath = _defaultprofilepath;
                 RomMUser = "----";
                 RomMProfileType = "----";
                 ServerVersion = "---";
                 LogManager.GetLogger().Error($"Failed to read response! {ex}");
-                PlayniteAPI.Notifications.Add(new NotificationMessage(RomM.Id.ToString(), $"RomM - Failed to poll server: {ex.Message}", NotificationType.Error));
+                UpdateNotifcationBar($"Authentication failed: {ex.Message}", true);
+                PlayniteAPI.Notifications.Add(new NotificationMessage($"RomMPlugin.Authentication.Failed.{ex.Message}", $"RomM - Authentication failed: {ex.Message}", NotificationType.Error));
                 return false;
             }
 
@@ -447,10 +485,12 @@ namespace RomM.Settings
                 if (string.IsNullOrEmpty(m.DestinationPathResolved))
                 {
                     mappingErrors.Add($"{m.MappingId}: No destination path specified.");
+                    UpdateNotifcationBar($"{m.MappingId}: No destination path specified.", true);
                 }
                 else if (!Directory.Exists(m.DestinationPathResolved))
                 {
                     mappingErrors.Add($"{m.MappingId}: Destination path doesn't exist ({m.DestinationPathResolved}).");
+                    UpdateNotifcationBar($"{m.MappingId}: Destination path doesn't exist ({m.DestinationPathResolved}).", true);
                 }
             });
 
@@ -458,6 +498,7 @@ namespace RomM.Settings
             return errors.Count == 0;
         }
     }
+
 
 	// Used to load profile image into cache so it can be changed while the application is running
     public class ImageCacheConverter : IValueConverter
