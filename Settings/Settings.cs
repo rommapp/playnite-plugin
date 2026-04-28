@@ -51,8 +51,8 @@ namespace RomM.Settings
         [JsonIgnore] private bool _notify = false;
         [JsonIgnore] private string _notifyText = "";
         [JsonIgnore] private string _notifyIcon = "";
-        [JsonIgnore] private Color _notfiyColour;
-        [JsonIgnore] private Brush _notfiyTextColour;
+        [JsonIgnore] private Color _notfiyColour = Colors.DarkSlateGray;
+        [JsonIgnore] private Brush _notfiyTextColour = new SolidColorBrush(Colors.LightGray);
 
         #endregion
 
@@ -513,6 +513,7 @@ namespace RomM.Settings
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.UriSource = new Uri(path);
             image.EndInit();
+            image.Freeze();
 
             return image;
 
