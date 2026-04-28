@@ -335,7 +335,7 @@ namespace RomM.Settings
             }
         }
 
-        public bool TestConnection()
+        public bool TestConnection(bool UpdateNotificationBar = false)
         {
             Notify = false;
 
@@ -416,7 +416,8 @@ namespace RomM.Settings
 
                 RomMProfileType = userinfo.Role;
                 RomMUser = userinfo.Username;
-                UpdateNotifcationBar("Authenticated!");
+                if(UpdateNotificationBar)
+                    UpdateNotifcationBar("Authenticated!");
             }
             catch (Exception ex)
             {
@@ -426,7 +427,10 @@ namespace RomM.Settings
                 RomMProfileType = "----";
                 ServerVersion = "---";
                 LogManager.GetLogger().Error($"Failed to read response! {ex}");
-                UpdateNotifcationBar($"Authentication failed: {ex.Message}", true);
+
+                if (UpdateNotificationBar)
+                    UpdateNotifcationBar($"Authentication failed: {ex.Message}", true);
+
                 PlayniteAPI.Notifications.Add(new NotificationMessage($"RomMPlugin.Authentication.Failed.{ex.Message}", $"RomM - Authentication failed: {ex.Message}", NotificationType.Error));
                 return false;
             }
@@ -458,7 +462,7 @@ namespace RomM.Settings
             }
             else
             {
-                HttpClientSingleton.Instance.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", RomMClientToken);
+                HttpClientSingleton.ConfigureAPIAuth(RomMClientToken);
             }
 
         }
@@ -513,7 +517,6 @@ namespace RomM.Settings
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.UriSource = new Uri(path);
             image.EndInit();
-            image.Freeze();
 
             return image;
 

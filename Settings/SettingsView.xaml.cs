@@ -25,7 +25,7 @@ namespace RomM.Settings
 
         private void Click_TestConnection(object sender, RoutedEventArgs e)
         {
-            SettingsViewModel.Instance.TestConnection();
+            SettingsViewModel.Instance.TestConnection(true);
             e.Handled = true;
         }
 
