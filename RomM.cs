@@ -341,7 +341,7 @@ namespace RomM
                     {
                         string json = File.ReadAllText($"{ROMDataPath}{args.Games.First().GameId.Split(':')[1]}.json");
                         var gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
-                        if(gameData.Siblings.Count > 0)
+                        if(gameData.ROMVersions.Count > 1)
                         {
                             gameMenuItems.Add(new GameMenuItem
                             {
@@ -405,38 +405,18 @@ namespace RomM
                     // Set ROM data to base ROM
                     romData = new GameInstallInfo
                     {
-                        Id = gameData.Id,
-                        FileName = gameData.FileName,
-                        HasMultipleFiles = gameData.HasMultipleFiles,
-                        DownloadURL = gameData.DownloadURL,
-                        IsSelected = gameData.IsSelected,
+                        Id = gameData.ROMVersions[0].Id,
+                        FileName = gameData.ROMVersions[0].FileName,
+                        HasMultipleFiles = gameData.ROMVersions[0].HasMultipleFiles,
+                        DownloadURL = gameData.ROMVersions[0].DownloadURL,
                         Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
                     };
 
                     // If Siblings are avaiable prompt user with version selection
-                    if (Settings.MergeRevisions && gameData.Siblings?.Count > 0)
+                    if (Settings.MergeRevisions && gameData.ROMVersions?.Count > 1)
                     {
-                        List<GameInstallInfo> gameVersions = new List<GameInstallInfo>();
 
-                        // Add roms to list to be selected
-                        gameVersions.Add(romData);
-
-                        foreach (var sibling in gameData.Siblings)
-                        {
-                            var siblingROMData = new GameInstallInfo
-                            {
-                                Id = sibling.Id,
-                                FileName = sibling.FileName,
-                                HasMultipleFiles = sibling.HasMultipleFiles,
-                                DownloadURL = sibling.DownloadURL,
-                                IsSelected = sibling.IsSelected,
-                                Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
-                            };
-
-                            gameVersions.Add(siblingROMData);
-                        }
-
-                        RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(gameVersions);
+                        RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(gameData.ROMVersions);
                         var window = Playnite.Dialogs.CreateWindow(new WindowCreationOptions
                         {
                             ShowMinimizeButton = false,
@@ -471,24 +451,15 @@ namespace RomM
                                 Playnite.Database.Games.Update(args.Game);
                             }
 
-                            // Write result back to json file
-                            gameData.IsSelected = VersionSelectorControl.RomVersions[0].IsSelected;
-                            VersionSelectorControl.RomVersions.RemoveAt(0);
 
-                            // There is probalby a LINQ you can do for this instead of clear and replace all siblings as
-                            // only the isSelected option needs altering
-                            gameData.Siblings.Clear();
-                            foreach (var versions in VersionSelectorControl.RomVersions)
-                            {
-                                gameData.Siblings.Add(new RomMSavedSibing
-                                {
-                                    Id = versions.Id,
-                                    FileName = versions.FileName,
-                                    HasMultipleFiles = versions.HasMultipleFiles,
-                                    DownloadURL = versions.DownloadURL,
-                                    IsSelected = versions.IsSelected,
-                                });
-                            }
+                            var selectedrevision = VersionSelectorControl.RomVersions.First(x => x.IsSelected);
+                            romData.Id = selectedrevision.Id;
+                            romData.FileName = selectedrevision.FileName;
+                            romData.HasMultipleFiles = selectedrevision.HasMultipleFiles;
+                            romData.DownloadURL = selectedrevision.DownloadURL;
+                            
+                            gameData.ROMVersions = VersionSelectorControl.RomVersions.ToList();
+
                             File.WriteAllText($"{ROMDataPath}{romMSHA1}.json", JsonConvert.SerializeObject(gameData));
                         }
                     }

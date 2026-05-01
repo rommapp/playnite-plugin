@@ -372,13 +372,17 @@ namespace RomM.Games
             string[] versionBreakdown = _plugin.Settings.ServerVersion.Split('.');
             float versionParsed = float.Parse(versionBreakdown[0]) + (float.Parse(versionBreakdown[1]) / 100);
 
-            RomMRomLocal toSave = new RomMRomLocal();
-
-            // Save base ROM data
-            toSave.Id = ROM.Id;
+            RomMRomLocal toSave = new RomMRomLocal();        
             toSave.Name = ROM.Name;
             toSave.SHA1 = ROM.SHA1;
-            toSave.HasMultipleFiles = ROM.HasMultipleFiles;
+            toSave.MappingID = _mapping.MappingId;
+            toSave.ROMVersions = new List<RomMRevision>();
+
+            RomMRevision baseROM = new RomMRevision();
+
+            // Save base ROM data
+            baseROM.Id = ROM.Id;       
+            baseROM.HasMultipleFiles = ROM.HasMultipleFiles;
             if(!ROM.HasMultipleFiles)
             {
                 var romfile = DetermineFile(ROM);
@@ -388,30 +392,29 @@ namespace RomM.Games
                     return;
                 }
 
-                toSave.FileName = romfile.FileName;
-                toSave.DownloadURL = versionParsed <= 4.7 ?
+                baseROM.FileName = romfile.FileName;
+                baseROM.DownloadURL = versionParsed <= 4.7 ?
                                            _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}") :
                                            _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
             }
             else
             {
-                toSave.FileName = ROM.FileName;
-                toSave.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{ROM.FileName}");
-            } 
-            toSave.IsSelected = false;
-            toSave.MappingID = _mapping.MappingId;
+                baseROM.FileName = ROM.FileName;
+                baseROM.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{ROM.FileName}");
+            }
+            baseROM.IsSelected = false;
+           toSave.ROMVersions.Add(baseROM);
 
             // Save sibling data
             if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)
             {
-                toSave.Siblings = new List<RomMSavedSibing>();
 
                 foreach (var sibling in ROM.Siblings)
                 {
                     var siblingROM = _ROMs.Find(x => x.Id == sibling.Id);
                     if(siblingROM != null)
                     {
-                        RomMSavedSibing saveSibling = new RomMSavedSibing();
+                        RomMRevision saveSibling = new RomMRevision();
 
                         saveSibling.Id = siblingROM.Id;
                         saveSibling.HasMultipleFiles = siblingROM.HasMultipleFiles;
@@ -425,7 +428,7 @@ namespace RomM.Games
                             }
 
                             saveSibling.FileName = romfile.FileName;
-                            toSave.DownloadURL = versionParsed <= 4.7 ?
+                            saveSibling.DownloadURL = versionParsed <= 4.7 ?
                                            _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/romsfiles/{romfile.Id}/content/{romfile.FileName}") :
                                            _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
                         }
@@ -437,7 +440,7 @@ namespace RomM.Games
                         saveSibling.IsSelected = false;
                         _ROMs.First(x => x.Id == sibling.Id).Processed = true;
 
-                        toSave.Siblings.Add(saveSibling);
+                        toSave.ROMVersions.Add(saveSibling);
                     }
                 }
             }
