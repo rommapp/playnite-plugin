@@ -45,6 +45,7 @@ namespace RomM.Games
                     fullpaths.Add(file.FullPath);
                 }
 
+                // Sort files by how many folders deep the file is and return the file that is at the highest point
                 fullpaths = fullpaths.OrderBy(x => x.Count(c => c == '/')).ToList();
                 return ROM.Files.Where(x => x.FullPath == fullpaths[0]).FirstOrDefault();
             }
@@ -67,7 +68,7 @@ namespace RomM.Games
                 // Some newer platforms don't get a hash value so we will compromise with this
                 if (string.IsNullOrEmpty(ROM.SHA1))
                 {
-                    var tohash = $"{ROM.Name}{ROM.FileSizeBytes}";
+                    var tohash = $"{ROM.Id}{ROM.FileNameNoExt}";
 
                     using (SHA1Managed sha1 = new SHA1Managed())
                     {
@@ -83,7 +84,7 @@ namespace RomM.Games
                     }
                 }
 
-                // Skip game import if the ROM is apart of the exclusion list
+                // Skip game import if the ROM is part of the exclusion list
                 if (_plugin.Playnite.Database.ImportExclusions[Playnite.ImportExclusionItem.GetId($"{ROM.Id}:{ROM.SHA1}", _plugin.Id)] != null)
                 {
                     _plugin.Logger.Warn($"[Importer] Excluding {ROM.Name} from import.");
@@ -195,11 +196,7 @@ namespace RomM.Games
             var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(ROM.Name));
             var pathToGame = Path.Combine(gameInstallDir, ROM.Name);
 
-            var gameNameWithTags =
-                        $"{ROM.Name}" +
-                        $"{(ROM.Regions.Count > 0 ? $" ({string.Join(", ", ROM.Regions)})" : "")}" +
-                        $"{(!string.IsNullOrEmpty(ROM.Revision) ? $" (Rev {ROM.Revision})" : "")}" +
-                        $"{(ROM.Tags.Count > 0 ? $" ({string.Join(", ", ROM.Tags)})" : "")}";
+            var gameNameWithTags = ROM.FileNameNoExt;
 
             var preferedRatingsBoard = _plugin.Playnite.ApplicationSettings.AgeRatingOrgPriority;
             var agerating = ROM.Metadatum.Age_Ratings.Count > 0 ? new HashSet<MetadataProperty>(ROM.Metadatum.Age_Ratings.Where(r => r.Split(':')[0] == preferedRatingsBoard.ToString()).Select(r => new MetadataNameProperty(r.ToString()))) : null;
@@ -240,7 +237,7 @@ namespace RomM.Games
 
                 Favorite = _favourites.Exists(f => f == ROM.Id),
                 LastActivity = ROM.RomUser.LastPlayed,
-                UserScore = ROM.RomUser.Rating * 10, //RomM-Rating is 1-10, Playnite 1-100, so it can unfortunately only by synced one direction without loosing decimals
+                UserScore = ROM.RomUser.Rating * 10, //RomM-Rating is 1-10, Playnite 1-100, so it can unfortunately only by synced one direction without losing decimals
                 CompletionStatus = completionStatusProperty,
                 Links = gameLinks,
                 Roms = new List<GameRom> { new GameRom(gameNameWithTags, pathToGame) },
