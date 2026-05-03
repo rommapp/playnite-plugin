@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using ProtoBuf;
-using Playnite.SDK;
+using RomM.Models.RomM.Rom;
 
 namespace RomM.Games
 {
@@ -68,7 +68,7 @@ namespace RomM.Games
             }
         }
 
-        public InstallController GetInstallController(Game game, RomM romm, bool HasSiblings, int SelectedSibling) => new RomMInstallController(game, romm, HasSiblings, SelectedSibling);
+        public InstallController GetInstallController(Game game, RomM romm, GameInstallInfo GameData) => new RomMInstallController(game, romm, GameData);
 
         public UninstallController GetUninstallController(Game game, RomM romm) => new RomMUninstallController(game, romm);
 

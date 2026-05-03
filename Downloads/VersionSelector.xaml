@@ -11,10 +11,10 @@
             <Separator Margin="0,5,0,0" />
             <ScrollViewer DockPanel.Dock="Top" Width="auto" Height="120" Margin="5,5,5,5" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="tStack">
-                    <ItemsControl ItemsSource="{Binding Siblings}">
+                    <ItemsControl ItemsSource="{Binding RomVersions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <RadioButton Margin="5,5,5,5" GroupName="Options" IsChecked="{Binding isSelected, Mode=TwoWay}" Content="{Binding FileName, Mode=OneWay}"/>
+                                <RadioButton Margin="5,5,5,5" GroupName="Options" IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding FileName, Mode=OneWay}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

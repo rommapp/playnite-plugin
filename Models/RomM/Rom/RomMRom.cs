@@ -37,6 +37,9 @@ namespace RomM.Models.RomM.Rom
 
     public class RomMFile
     {
+        [JsonProperty("id")]
+        public int? Id { get; set; }
+
         [JsonProperty("file_name")]
         public string FileName { get; set; }
 
@@ -47,7 +50,7 @@ namespace RomM.Models.RomM.Rom
         public string FullPath { get; set; }
     }
 
-    public class RomMSibling : ObservableObject
+    public class RomMSibling
     {
         [JsonProperty("id")]
         public int Id { get; set; }
@@ -60,12 +63,6 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("fs_name_no_ext")]
         public string FileNameNoExt { get; set; }
-
-        // Don't add JsonProperty data not from server
-        public string FileName { get; set; }
-        public string DownloadURL { get; set; }
-        public bool HasMultipleFiles { get; set; }
-        public bool isSelected { get; set; } = false;
     }
 
     public class RomMRom
@@ -81,6 +78,18 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("moby_id")]
         public object MobyId { get; set; }
+
+        [JsonProperty("ss_id")]
+        public int? SSId { get; set; }
+
+        [JsonProperty("ra_id")]
+        public int? RAId { get; set; }
+
+        [JsonProperty("hasheous_id")]
+        public int? HasheousId { get; set; }
+
+        [JsonProperty("hltb_id")]
+        public int? HLTBId { get; set; }
 
         [JsonProperty("platform_id")]
         public int PlatformId { get; set; }
@@ -184,6 +193,15 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("siblings")]
         public List<RomMSibling> Siblings { get; set; }
 
+        [JsonProperty("sha1_hash")]
+        public string SHA1 { get; set; }
+
+        [JsonProperty("has_manual")]
+        public bool HasManual {  get; set; }
+
+        [JsonProperty("path_manual")]
+        public string ManualPath { get; set; }
+
         [JsonProperty("full_path")]
         public string FullPath { get; set; }
 
@@ -198,5 +216,7 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("sort_comparator")]
         public string SortComparator { get; set; }
-    }
+
+        public bool Processed { get; set; } = false;
+}
 }

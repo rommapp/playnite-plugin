@@ -1,9 +1,14 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Playnite.SDK;
+using RomM.Models.RomM;
+using RomM.Models.RomM.Platform;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -16,6 +21,58 @@ namespace RomM.Settings
         public SettingsView()
         {
             InitializeComponent();
+        }
+
+        private void Click_TestConnection(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.TestConnection(true);
+            e.Handled = true;
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            try
+            {
+                if (e.Uri.Scheme == Uri.UriSchemeHttp || e.Uri.Scheme == Uri.UriSchemeHttps)
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = e.Uri.AbsoluteUri,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to open URL: {ex.Message}");
+            }
+            e.Handled = true;
+        }
+
+        private async void Click_PullPlatforms(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.Notify = false;
+
+            try
+            {
+                HttpResponseMessage response = await HttpClientSingleton.Instance.GetAsync($"{SettingsViewModel.Instance.RomMHost}/api/platforms");
+                response.EnsureSuccessStatusCode();
+
+                string body = await response.Content.ReadAsStringAsync();
+                SettingsViewModel.Instance.RomMPlatforms = JsonConvert.DeserializeObject<List<RomMPlatform>>(body);
+                SettingsViewModel.Instance.UpdateNotifcationBar("Platforms successfully retrieved!");
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger().Error($"RomM - failed to get platforms: {ex}");
+                SettingsViewModel.Instance.UpdateNotifcationBar($"Failed to get platforms: {ex.Message}!", true);
+            }
+        }
+
+        private void Click_AddMapping(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.Mappings.Add(new EmulatorMapping(SettingsViewModel.Instance.RomMPlatforms));
         }
 
         private void Click_Delete(object sender, RoutedEventArgs e)
@@ -44,80 +101,6 @@ namespace RomM.Settings
             mapping.DestinationPath = path;
         }
 
-        private async void Click_TestConnection(object sender, RoutedEventArgs e)
-        {
-            var settings = SettingsViewModel.Instance;
-            var dialogs = settings.PlayniteAPI.Dialogs;
-
-            var host = settings.RomMHost?.Trim().TrimEnd('/');
-            if (string.IsNullOrWhiteSpace(host))
-            {
-                dialogs.ShowMessage("RomM Host is empty.", "RomM");
-                return;
-            }
-
-            if (!settings.HasAnyAuth)
-            {
-                dialogs.ShowMessage("Provide either a valid API Token or username and password.", "RomM");
-                return;
-            }
-
-            var button = (Button)sender;
-            var originalContent = button.Content;
-
-            try
-            {
-                button.IsEnabled = false;
-                button.Content = "Testing...";
-
-                using (var req = new HttpRequestMessage(HttpMethod.Get, $"{host}/api/users/me"))
-                {
-                    req.Headers.Authorization = HttpClientSingleton.BuildAuthHeader(settings);
-                    using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
-                    using (var resp = await HttpClientSingleton.Instance.SendAsync(req, cts.Token))
-                    {
-                        if (resp.IsSuccessStatusCode)
-                        {
-                            dialogs.ShowMessage($"Connection successful ({(int)resp.StatusCode}).", "RomM");
-                        }
-                        else if (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden)
-                        {
-                            dialogs.ShowMessage($"Authentication rejected (HTTP {(int)resp.StatusCode}). Check your API token or username/password.", "RomM");
-                        }
-                        else
-                        {
-                            dialogs.ShowMessage($"Connection failed: HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}", "RomM");
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                dialogs.ShowMessage("Connection timed out after 10 seconds.", "RomM");
-            }
-            catch (HttpRequestException ex)
-            {
-                dialogs.ShowMessage($"Connection failed: {ex.Message}", "RomM");
-            }
-            catch (Exception ex)
-            {
-                dialogs.ShowMessage($"Unexpected error: {ex.Message}", "RomM");
-            }
-            finally
-            {
-                button.IsEnabled = true;
-                button.Content = originalContent;
-            }
-        }
-
-        private void Click_Browse7zDestination(object sender, RoutedEventArgs e)
-        {
-            string path;
-            if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
-
-            SettingsViewModel.Instance.PathTo7z = path;
-        }
-
         private static string GetSelectedFolderPath()
         {
             return SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFolder();
@@ -143,27 +126,15 @@ namespace RomM.Settings
 
         private void DataGrid_CurrentCellChanged(object sender, EventArgs e)
         {
-            
+
         }
 
-        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        private void Click_Browse7zDestination(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                if (e.Uri.Scheme == Uri.UriSchemeHttp || e.Uri.Scheme == Uri.UriSchemeHttps)
-                {
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = e.Uri.AbsoluteUri,
-                        UseShellExecute = true
-                    };
-                    Process.Start(psi);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to open URL: {ex.Message}");
-            }
+            string path;
+            if ((path = SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFile("7Zip Executable|7z.exe")) == null) return;
+
+            SettingsViewModel.Instance.PathTo7z = path;
             e.Handled = true;
         }
     }

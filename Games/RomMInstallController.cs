@@ -12,107 +12,57 @@ using Newtonsoft.Json;
 
 namespace RomM.Games
 {
+    enum InstallStatus
+    {
+        Cancelled = -1
+    }
+
     internal class RomMInstallController : InstallController
     {
         protected readonly IRomM _romM;
         public ILogger Logger => LogManager.GetLogger();
-        public bool HasSiblings = false;
-        public int SelectedSibling = -1;
+        public GameInstallInfo _gameData;
 
-        internal RomMInstallController(Game game, IRomM romM, bool hasSiblings, int selectedSibling) : base(game)
+        internal RomMInstallController(Game game, IRomM romM, GameInstallInfo GameData) : base(game)
         {
             Name = "Download";
             _romM = romM;
-            HasSiblings = hasSiblings;
-            SelectedSibling = selectedSibling;
+            _gameData = GameData;
         }
 
         public override void Install(InstallActionArgs args)
         {
-            var info = Game.GetRomMGameInfo();
-
-            if (SelectedSibling == -2)
+            if (_gameData.Id == (int)InstallStatus.Cancelled)
             {
                 CancelInstall();
                 return;
-            }
-                
-            // Replace info if a different version of the game is selected
-            if (HasSiblings && SelectedSibling != -1) 
-            {
-                List<RomMSibling> siblingInfos = new List<RomMSibling>();
+            }   
 
-                var version = Game.Version;
-                if (version == null || !version.StartsWith("RomM:"))
-                {
-                    _romM.Playnite.Notifications.Add(
-                        Game.GameId,
-                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{$"Couldn't find RomMId for {Game.Name}."}",
-                        NotificationType.Error);
-
-                    CancelInstall();
-                    return;
-                }
-
-                int romMId;
-                if (!int.TryParse(version.Split(':')[1], out romMId))
-                {
-                    _romM.Playnite.Notifications.Add(
-                        Game.GameId,
-                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{$"Malformed version string? {version} > {romMId}"}",
-                        NotificationType.Error);
-
-                    CancelInstall();
-                    return;
-                }
-
-                siblingInfos = JsonConvert.DeserializeObject<List<RomMSibling>>(File.ReadAllText($"{_romM.ROMsWithSiblingsPath}{romMId}.json"));
-                
-                var selectedSibling = siblingInfos.Find(x => x.Id == SelectedSibling);
-                if (selectedSibling != null)
-                {
-                    info.FileName = selectedSibling.FileName;
-                    info.DownloadUrl = selectedSibling.DownloadURL;
-                    // This has to be changed as systems can have single ROM and Multi ROM files. E.g. .chd vs .bin/.cue
-                    info.HasMultipleFiles = selectedSibling.HasMultipleFiles;
-                }
-                else
-                {
-                    _romM.Playnite.Notifications.Add(
-                        Game.GameId,
-                        $"Failed to find selected version of {Game.Name}.{Environment.NewLine}Selected sibling ID {SelectedSibling} was not found. Reimport libary!",
-                        NotificationType.Error);
-                    CancelInstall();
-                    return;
-                }
-
-            }
-
-            var dstPath = info.Mapping?.DestinationPathResolved
+            var dstPath = _gameData.Mapping?.DestinationPathResolved
                 ?? throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
 
             // Paths (same as before)
-            var installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(info.FileName));
+            var installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(_gameData.FileName));
 
             // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
             // Otherwise we download the single ROM file.
-            var downloadFilePath = info.HasMultipleFiles
-                ? Path.Combine(installDir, info.FileName + ".zip")
-                : Path.Combine(installDir, info.FileName);
+            var downloadFilePath = _gameData.HasMultipleFiles
+                ? Path.Combine(installDir, _gameData.FileName + ".zip")
+                : Path.Combine(installDir, _gameData.FileName);
 
             var req = new DownloadRequest
             {
                 GameId = Game.Id,
                 GameName = Game.Name,
 
-                DownloadUrl = info.DownloadUrl,
+                DownloadUrl = _gameData.DownloadURL,
                 InstallDir = installDir,
                 GamePath = downloadFilePath,
                 Use7z = _romM.Settings.Use7z,
                 PathTo7Z = _romM.Settings.PathTo7z,
 
-                HasMultipleFiles = info.HasMultipleFiles,
-                AutoExtract = info.Mapping != null && info.Mapping.AutoExtract,
+                HasMultipleFiles = _gameData.HasMultipleFiles,
+                AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
 
                 // Called by queue AFTER download/extract is done
                 BuildRoms = () =>
@@ -127,11 +77,11 @@ namespace RomM.Games
                     }
 
                     // Otherwise, we assume extracted files are in installDir
-                    var supported = GetEmulatorSupportedFileTypes(info);
+                    var supported = GetEmulatorSupportedFileTypes(_gameData);
                     var actualRomFiles = GetRomFiles(installDir, supported);
 
                     // Prefer .m3u if requested
-                    var useM3u = info.Mapping != null && info.Mapping.UseM3u;
+                    var useM3u = _gameData.Mapping != null && _gameData.Mapping.UseM3U && supported.Any(x => x.ToLower() == "m3u");
                     if (useM3u)
                     {
                         var m3uFile = actualRomFiles.FirstOrDefault(m =>
@@ -177,7 +127,7 @@ namespace RomM.Games
                 {
                     _romM.Playnite.Notifications.Add(
                         Game.GameId,
-                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex}",
+                        $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
                         NotificationType.Error);
 
                     Game.IsInstalling = false;
@@ -223,7 +173,7 @@ namespace RomM.Games
             }).ToArray();
         }
 
-        private static List<string> GetEmulatorSupportedFileTypes(RomMGameInfo info)
+        private static List<string> GetEmulatorSupportedFileTypes(GameInstallInfo info)
         {
             if (info.Mapping.EmulatorProfile is CustomEmulatorProfile)
             {

@@ -6,91 +6,260 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Xml.Serialization;
+using RomM.Models.RomM.Platform;
+using SharpCompress;
 
 namespace RomM.Settings
 {
     public class EmulatorMapping : ObservableObject
     {
-        public EmulatorMapping()
+        [JsonIgnore]
+        private Guid _mappingId;
+        [JsonIgnore]
+        private string _mappingName = "";
+        [JsonIgnore]
+        private bool _enabled = true;
+        [JsonIgnore]
+        private bool _autoExtract = false;
+        [JsonIgnore]
+        private bool _useM3U = false;
+        [JsonIgnore]
+        private Emulator _emulator;
+        [JsonIgnore]
+        private Guid _emulatorId;
+        [JsonIgnore]
+        private EmulatorProfile _emulatorProfile;
+        [JsonIgnore]
+        private IEnumerable<EmulatorProfile> _availableProfiles;
+        [JsonIgnore]
+        public string _emulatorProfileId;
+        [JsonIgnore]
+        private RomMPlatform _emulatedPlatform = new RomMPlatform();
+        [JsonIgnore]
+        private IEnumerable<RomMPlatform> _availablePlatforms;
+        [JsonIgnore]
+        public int _romMPlatformId = -1;
+        [JsonIgnore]
+        private string _destinationPath = "";
+
+        public EmulatorMapping(List<RomMPlatform> romMPlatforms)
         {
             MappingId = Guid.NewGuid();
+            AvailablePlatforms = romMPlatforms;
         }
 
-        public Guid MappingId { get; set; }
+        public Guid MappingId 
+        {
+            get => _mappingId; 
+            set
+            {
+                _mappingId = value;
+                OnPropertyChanged();    
+            }
+        }
 
         [DefaultValue(true)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
-        public bool Enabled { get; set; }
+        public bool Enabled 
+        {
+            get => _enabled;
+            set
+            {
+                _enabled = value;
+                OnPropertyChanged();
+            }
+        }
 
         [DefaultValue(false)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
-        public bool AutoExtract { get; set; }
+        public bool AutoExtract
+        {
+            get => _autoExtract;
+            set
+            {
+                _autoExtract = value;
+                OnPropertyChanged();
+            }
+        }
 
         [DefaultValue(false)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
-        public bool UseM3u { get; set; }
+        public bool UseM3U
+        {
+            get => _useM3U;
+            set
+            {
+                _useM3U = value;
+                OnPropertyChanged();
+            }
+        }
 
         [JsonIgnore]
         public Emulator Emulator
         {
-            get => AvailableEmulators.FirstOrDefault(e => e.Id == EmulatorId);
-            set { EmulatorId = value.Id; }
+            get => _emulator;
+            set 
+            {
+                if (value != null)
+                {
+                    _emulator = value;
+                    _emulatorId = value.Id;
+                    AvailableProfiles = Emulator?.SelectableProfiles;
+                    RomMPlatform = new RomMPlatform();
+                    MappingName = value.Name;
+                    OnPropertyChanged();
+                } 
+            }
         }
-        public Guid EmulatorId { get; set; }
+        public Guid EmulatorId
+        {
+            get => _emulatorId;
+            set
+            {
+                _emulatorId = value;
+                Emulator = SettingsViewModel.Instance.PlayniteAPI.Database.Emulators.FirstOrDefault(x => x.Id == _emulatorId);
+                OnPropertyChanged();
+            }
+        }
 
         [JsonIgnore]
         public EmulatorProfile EmulatorProfile
         {
-            get => Emulator?.SelectableProfiles.FirstOrDefault(p => p.Id == EmulatorProfileId);
-            set { EmulatorProfileId = value.Id; }
-        }
-
-        public string EmulatorProfileId { get; set; }
-
-        [JsonIgnore]
-        public EmulatedPlatform Platform
-        {
-            get => AvailablePlatforms.FirstOrDefault(p => p.Id == PlatformId);
-            set { PlatformId = value.Id; }
-        }
-        public string PlatformId { get; set; }
-        public string DestinationPath { get; set; }
-
-        public static IEnumerable<Emulator> AvailableEmulators => SettingsViewModel.Instance.PlayniteAPI.Database.Emulators?.OrderBy(x => x.Name) ?? Enumerable.Empty<Emulator>();
-
-        [JsonIgnore]
-        public IEnumerable<EmulatorProfile> AvailableProfiles => Emulator?.SelectableProfiles;
-
-        [JsonIgnore]
-        public IEnumerable<EmulatedPlatform> AvailablePlatforms
-        {
-            get
+            get => _emulatorProfile;
+            set 
             {
-                var playnite = SettingsViewModel.Instance.PlayniteAPI;
-                HashSet<string> validPlatforms;
+                if (value != null)
+                {
+                    _emulatorProfile = value;
+                    _emulatorProfileId = value.Id;
 
-                if (EmulatorProfile is CustomEmulatorProfile)
-                {
-                    var customProfile = EmulatorProfile as CustomEmulatorProfile;
-                    validPlatforms = new HashSet<string>(playnite.Database.Platforms.Where(p => customProfile.Platforms.Contains(p.Id)).Select(p => p.SpecificationId));
-                }
-                else if (EmulatorProfile is BuiltInEmulatorProfile)
-                {
-                    var builtInProfile = (EmulatorProfile as BuiltInEmulatorProfile);
-                    validPlatforms = new HashSet<string>(
-                        playnite.Emulation.Emulators
-                        .FirstOrDefault(e => e.Id == Emulator.BuiltInConfigId)?
-                        .Profiles
-                        .FirstOrDefault(p => p.Name == builtInProfile.Name)?
-                        .Platforms
-                        );
-                }
-                else
-                {
-                    validPlatforms = new HashSet<string>();
-                }
+                    if (Emulator != null)
+                    {
+                        var name = Emulator.Name;
+                        if (EmulatorProfile != null  && EmulatorProfile.Name != "")
+                            name += " - " + EmulatorProfile.Name;
+                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.Name))
+                            name += " - " + RomMPlatform.Name;
 
-                return playnite.Emulation.Platforms?.Where(p => validPlatforms.Contains(p.Id)) ?? Enumerable.Empty<EmulatedPlatform>();
+                        MappingName = name;
+                    }
+                }
+                OnPropertyChanged(); 
+            }
+        }
+        public string EmulatorProfileId
+        {
+            get => _emulatorProfileId;
+            set
+            {
+                _emulatorProfileId = value;
+                EmulatorProfile = Emulator?.SelectableProfiles.FirstOrDefault(x => x.Id == _emulatorProfileId);
+                OnPropertyChanged();
+            }
+        }
+
+        // (Deprecated) DON'T USE
+        [JsonIgnore]   
+        public Platform Platform
+        {
+            get => null;
+            set 
+            {
+            }
+        }
+        // (Deprecated) DON'T USE
+        [JsonIgnore]
+        public string PlatformId
+        {
+            get => "";
+            set
+            {
+            }
+        }
+
+        [JsonIgnore]
+        public RomMPlatform RomMPlatform
+        {
+            get => _emulatedPlatform;
+            set
+            {
+                _emulatedPlatform = value;
+                _romMPlatformId = -1;
+                if(value != null)
+                {
+                    _romMPlatformId = value.Id;
+
+                    if(Emulator != null)
+                    {
+                        var name = Emulator.Name;
+                        if (EmulatorProfile != null && EmulatorProfile.Name != "")
+                            name += " - " + EmulatorProfile.Name;
+                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.Name))
+                            name += " - " + RomMPlatform.Name;
+
+                        MappingName = name;
+                    }
+
+                }
+                OnPropertyChanged();
+            }
+        }
+        public int RomMPlatformId
+        {
+            get => _romMPlatformId;
+            set
+            {
+                _romMPlatformId = value;
+                OnPropertyChanged();
+            }
+        }
+
+        [JsonIgnore]
+        public string MappingName
+        {
+            get => _mappingName;
+            set
+            {
+                _mappingName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string DestinationPath
+        {
+            get => _destinationPath;
+            set
+            {
+                _destinationPath = value;
+                OnPropertyChanged();
+    }
+}
+
+[JsonIgnore]
+        public static IEnumerable<Emulator> AvailableEmulators => SettingsViewModel.Instance.PlayniteAPI.Database.Emulators?.OrderBy(x => x.Name) ?? Enumerable.Empty<Emulator>();
+        [JsonIgnore]
+        public IEnumerable<EmulatorProfile> AvailableProfiles
+        {
+            get => _availableProfiles;
+            set
+            {
+                _availableProfiles = value;
+                OnPropertyChanged();
+            }
+        }    
+        [JsonIgnore]
+        public IEnumerable<RomMPlatform> AvailablePlatforms
+        {
+            get => _availablePlatforms;
+            set
+            {
+                _availablePlatforms = value;
+                OnPropertyChanged();
+
+                if (_availablePlatforms != null && RomMPlatformId != -1)
+                {
+                    RomMPlatform = AvailablePlatforms.FirstOrDefault (x => x.Id == RomMPlatformId);
+                }
             }
         }
 
@@ -128,11 +297,11 @@ namespace RomM.Settings
 
         public IEnumerable<string> GetDescriptionLines()
         {
-            yield return $"{nameof(EmulatorId)}: {EmulatorId}";
+            yield return $"{nameof(_emulatorId)}: {_emulatorId}";
             yield return $"{nameof(Emulator)}*: {Emulator?.Name ?? "<Unknown>"}";
             yield return $"{nameof(EmulatorProfileId)}: {EmulatorProfileId ?? "<Unknown>"}";
             yield return $"{nameof(EmulatorProfile)}*: {EmulatorProfile?.Name ?? "<Unknown>"}";
-            yield return $"{nameof(PlatformId)}: {PlatformId ?? "<Unknown>"}";
+            yield return $"{nameof(PlatformId)}: {PlatformId}";
             yield return $"{nameof(Platform)}*: {Platform?.Name ?? "<Unknown>"}";
             yield return $"{nameof(DestinationPath)}: {DestinationPath ?? "<Unknown>"}";
             yield return $"{nameof(DestinationPathResolved)}*: {DestinationPathResolved ?? "<Unknown>"}";
