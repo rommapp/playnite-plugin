@@ -12,6 +12,9 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("user_id")]
         public int UserId { get; set; }
 
+        [JsonProperty("is_main_sibling")]
+        public bool IsMainSibling { get; set; }
+
         [JsonProperty("last_played")]
         public DateTime? LastPlayed { get; set; }
 

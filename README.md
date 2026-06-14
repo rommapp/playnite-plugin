@@ -33,6 +33,8 @@ To install and configure the RomM Playnite plugin, check out the [Installation G
 
 To contribute to RomM Playnite plugin, please check [Contribution Guide](./CONTRIBUTING.md)
 
+For setting up a local development environment (building, deploying, and debugging the plugin), see the [Development Guide](./DEVELOPMENT.md).
+
 # Community
 
 Join us on Discord, where you can ask questions, submit ideas, get help, showcase your collection, and discuss RomM with other users.

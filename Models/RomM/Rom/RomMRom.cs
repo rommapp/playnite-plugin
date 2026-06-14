@@ -10,22 +10,22 @@ namespace RomM.Models.RomM.Rom
         public int Id { get; set; }
 
         [JsonProperty("genres")]
-        public List<string> Genres { get; set; }
+        public List<string> Genres { get; set; } = new List<string>();
 
         [JsonProperty("franchises")]
-        public List<string> Franchises { get; set; }
+        public List<string> Franchises { get; set; } = new List<string>();
 
         [JsonProperty("collections")]
-        public List<string> Collections { get; set; }
+        public List<string> Collections { get; set; } = new List<string>();
 
         [JsonProperty("companies")]
-        public List<string> Companies { get; set; }
+        public List<string> Companies { get; set; } = new List<string>();
 
         [JsonProperty("game_modes")]
-        public List<string> Gamemodes { get; set; }
+        public List<string> Gamemodes { get; set; } = new List<string>();
 
         [JsonProperty("age_ratings")]
-        public List<string> Age_Ratings { get; set; }
+        public List<string> Age_Ratings { get; set; } = new List<string>();
 
         [JsonProperty("first_release_date")]
         public long? Release_Date { get; set; }
@@ -37,6 +37,9 @@ namespace RomM.Models.RomM.Rom
 
     public class RomMFile
     {
+        [JsonProperty("id")]
+        public int? Id { get; set; }
+
         [JsonProperty("file_name")]
         public string FileName { get; set; }
 
@@ -47,7 +50,7 @@ namespace RomM.Models.RomM.Rom
         public string FullPath { get; set; }
     }
 
-    public class RomMSibling : ObservableObject
+    public class RomMSibling
     {
         [JsonProperty("id")]
         public int Id { get; set; }
@@ -60,12 +63,6 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("fs_name_no_ext")]
         public string FileNameNoExt { get; set; }
-
-        // Don't add JsonProperty data not from server
-        public string FileName { get; set; }
-        public string DownloadURL { get; set; }
-        public bool HasMultipleFiles { get; set; }
-        public bool isSelected { get; set; } = false;
     }
 
     public class RomMRom
@@ -81,6 +78,18 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("moby_id")]
         public object MobyId { get; set; }
+
+        [JsonProperty("ss_id")]
+        public int? SSId { get; set; }
+
+        [JsonProperty("ra_id")]
+        public int? RAId { get; set; }
+
+        [JsonProperty("hasheous_id")]
+        public int? HasheousId { get; set; }
+
+        [JsonProperty("hltb_id")]
+        public int? HLTBId { get; set; }
 
         [JsonProperty("platform_id")]
         public int PlatformId { get; set; }
@@ -145,6 +154,9 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("igdb_metadata")]
         public RomMIgdbMetadata IgdbMetadata { get; set; }
 
+        [JsonProperty("ss_metadata")]
+        public RomMSSMetadata SSMetadata { get; set; }
+
         [JsonProperty("path_cover_small")]
         public string PathCoverS { get; set; }
 
@@ -181,8 +193,17 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("files")]
         public List<RomMFile> Files { get; set; }
 
-        [JsonProperty("siblings")]
+        [JsonProperty("sibling_roms")]
         public List<RomMSibling> Siblings { get; set; }
+
+        [JsonProperty("sha1_hash")]
+        public string SHA1 { get; set; }
+
+        [JsonProperty("has_manual")]
+        public bool HasManual {  get; set; }
+
+        [JsonProperty("path_manual")]
+        public string ManualPath { get; set; }
 
         [JsonProperty("full_path")]
         public string FullPath { get; set; }
@@ -198,5 +219,21 @@ namespace RomM.Models.RomM.Rom
 
         [JsonProperty("sort_comparator")]
         public string SortComparator { get; set; }
-    }
+
+        public bool Processed { get; set; } = false;
+
+        /// <summary>
+        /// RomM 4.9+ can omit collection/object fields entirely. Normalising them once after
+        /// deserialization means consumers (importer, metadata downloader) never have to null-check.
+        /// </summary>
+        public void Normalize()
+        {
+            Metadatum = Metadatum ?? new metadatum();
+            RomUser = RomUser ?? new RomMRomUser();
+            Regions = Regions ?? new List<string>();
+            Tags = Tags ?? new List<string>();
+            Files = Files ?? new List<RomMFile>();
+            Siblings = Siblings ?? new List<RomMSibling>();
+        }
+}
 }

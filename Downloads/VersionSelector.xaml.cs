@@ -10,13 +10,13 @@ namespace RomM.VersionSelector
     public partial class RomMVersionSelector : PluginUserControl
     {
 
-        public ObservableCollection<RomMSibling> Siblings { get; set; }
+        public ObservableCollection<RomMRevision> RomVersions { get; set; }
         public bool Cancelled { get; set; } = true;
 
-        public RomMVersionSelector(List<RomMSibling> siblings)
+        public RomMVersionSelector(List<RomMRevision> romVersions)
         {
 
-            Siblings = new ObservableCollection<RomMSibling>(siblings);
+            RomVersions = new ObservableCollection<RomMRevision>(romVersions);
 
             InitializeComponent();  
         }
