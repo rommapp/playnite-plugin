@@ -31,7 +31,8 @@ public class RomMPlatform : IEquatable<RomMPlatform>
         }
         public override int GetHashCode()
         {
-            return this.Id.GetHashCode();
+            // Must agree with Equals (which compares Name) to honour the equality/hashcode contract.
+            return this.Name?.GetHashCode() ?? 0;
         }
 
         [JsonProperty("id")]

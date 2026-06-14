@@ -51,7 +51,7 @@ namespace RomM.Games
                 }
 
                 // Sort files by how many folders deep the file is and return the file that is at the highest point
-                fullpaths = fullpaths.OrderBy(x => x.Count(c => c == '/')).ToList();
+                fullpaths = fullpaths.OrderBy(x => (x ?? string.Empty).Count(c => c == '/')).ToList();
                 return ROM.Files.Where(x => x.FullPath == fullpaths[0]).FirstOrDefault();
             }
 
@@ -77,7 +77,11 @@ namespace RomM.Games
                     return null;
 
                 revision.FileName = romfile.FileName;
-                revision.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
+                // The 4.9 single-file endpoint needs the file id; fall back to the rom-level endpoint
+                // when the payload doesn't include one so we never emit "api/roms//files/content/...".
+                revision.DownloadURL = romfile.Id.HasValue
+                    ? _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}")
+                    : _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{rom.Id}/content/{romfile.FileName}");
             }
             else
             {
@@ -232,8 +236,13 @@ namespace RomM.Games
             var rootInstallDir = _plugin.Playnite.Paths.IsPortable
                         ? _mapping.DestinationPathResolved.Replace(_plugin.Playnite.Paths.ApplicationPath, ExpandableVariables.PlayniteDirectory)
                         : _mapping.DestinationPathResolved;
-            var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(ROM.Name));
-            var pathToGame = Path.Combine(gameInstallDir, ROM.Name);
+            // Paths must be derived from the actual ROM file (what RomMInstallController downloads),
+            // not the display Name. Using Name drops the extension and can include characters that
+            // don't match the installed file, breaking IsInstalled detection and the play path.
+            var baseRevision = BuildRevision(ROM);
+            var fileName = !string.IsNullOrEmpty(baseRevision?.FileName) ? baseRevision.FileName : ROM.Name;
+            var gameInstallDir = Path.Combine(rootInstallDir, Path.GetFileNameWithoutExtension(fileName));
+            var pathToGame = Path.Combine(gameInstallDir, fileName);
 
             var gameNameWithTags = ROM.FileNameNoExt;
 
@@ -490,7 +499,12 @@ namespace RomM.Games
             }
             else
             {
-                completionStatus = RomMRomUser.CompletionStatusMap[ROM.RomUser.Status ?? "not_played"];
+                // RomM may report a status value we don't map; fall back instead of throwing KeyNotFoundException.
+                var romMStatus = ROM.RomUser.Status ?? "not_played";
+                if (!RomMRomUser.CompletionStatusMap.TryGetValue(romMStatus, out completionStatus))
+                {
+                    completionStatus = RomMRomUser.CompletionStatusMap["not_played"];
+                }
             }
 
             _completionStatusMap.TryGetValue(completionStatus, out var statusId);
