@@ -65,15 +65,15 @@ namespace RomM.Games
             // we use the consistently-sized miximage. No fallback: leave the icon unset when there's
             // no miximage so another metadata plugin can fill it.
             var ss = rom.SSMetadata;
-            return ss != null ? ResolveImage(romMHost, ss.MiximagePath, ss.MiximageUrl) : null;
-        }
+            if (ss == null)
+                return null;
 
-        private static MetadataFile ResolveImage(string romMHost, string path, string url)
-        {
-            if (!string.IsNullOrEmpty(path))
-                return new MetadataFile($"{romMHost}{path}");
-            if (!string.IsNullOrEmpty(url))
-                return new MetadataFile(url);
+            // *_path is relative to RomM's resource mount (same as manuals), e.g. "roms/2/32/miximage/...";
+            // prefer the locally-cached file, falling back to the external Screenscraper url.
+            if (!string.IsNullOrEmpty(ss.MiximagePath))
+                return new MetadataFile($"{romMHost}/assets/romm/resources/{ss.MiximagePath}");
+            if (!string.IsNullOrEmpty(ss.MiximageUrl))
+                return new MetadataFile(ss.MiximageUrl);
             return null;
         }
     }
