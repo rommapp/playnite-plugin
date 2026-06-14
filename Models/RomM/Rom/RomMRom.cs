@@ -154,6 +154,9 @@ namespace RomM.Models.RomM.Rom
         [JsonProperty("igdb_metadata")]
         public RomMIgdbMetadata IgdbMetadata { get; set; }
 
+        [JsonProperty("ss_metadata")]
+        public RomMSSMetadata SSMetadata { get; set; }
+
         [JsonProperty("path_cover_small")]
         public string PathCoverS { get; set; }
 

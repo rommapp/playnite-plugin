@@ -46,6 +46,8 @@ namespace RomM.Games
                     : new ReleaseDate(),
                 CommunityScore = (int?)rom.Metadatum.Average_Rating,
                 CoverImage = !string.IsNullOrEmpty(rom.PathCoverL) ? new MetadataFile($"{romMHost}{rom.PathCoverL}") : null,
+                // Game icon: Screenscraper wheel (logo) when present, otherwise the miximage.
+                Icon = ScreenscraperIcon(romMHost, rom.SSMetadata),
                 LastActivity = rom.RomUser.LastPlayed,
                 // RomM rating is 1-10, Playnite 1-100, so it can only be synced one direction without losing decimals.
                 UserScore = rom.RomUser.Rating * 10,
@@ -55,5 +57,24 @@ namespace RomM.Games
 
         private static HashSet<MetadataProperty> ToNameSet(IEnumerable<string> values)
             => new HashSet<MetadataProperty>(values.Where(v => !string.IsNullOrEmpty(v)).Select(v => new MetadataNameProperty(v)));
+
+        private static MetadataFile ScreenscraperIcon(string romMHost, RomMSSMetadata ss)
+        {
+            if (ss == null)
+                return null;
+
+            // Prefer the "wheel" (logo); fall back to the miximage. RomM-hosted path first, then external url.
+            return ResolveImage(romMHost, ss.LogoPath, ss.LogoUrl)
+                ?? ResolveImage(romMHost, ss.MiximagePath, ss.MiximageUrl);
+        }
+
+        private static MetadataFile ResolveImage(string romMHost, string path, string url)
+        {
+            if (!string.IsNullOrEmpty(path))
+                return new MetadataFile($"{romMHost}{path}");
+            if (!string.IsNullOrEmpty(url))
+                return new MetadataFile(url);
+            return null;
+        }
     }
 }
