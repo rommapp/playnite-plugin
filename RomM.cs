@@ -10,6 +10,7 @@ using RomM.Models.RomM.Collection;
 using RomM.Models.RomM.Rom;
 using RomM.Settings;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -73,7 +74,12 @@ namespace RomM
         public DownloadQueueController DownloadQueueController { get; private set; }
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
         private readonly DownloadQueueViewModel downloadsVm;
-        
+
+        // Game ids whose next ItemUpdated was caused by the importer itself, so OnItemUpdated must
+        // not echo the change back to the RomM server.
+        private readonly ConcurrentDictionary<Guid, byte> ignoredGameIds = new ConcurrentDictionary<Guid, byte>();
+        public void SuppressSync(Guid gameId) => ignoredGameIds[gameId] = 0;
+
         // Implementing Client adds ability to open it via special menu in playnite
         public override LibraryClient Client { get; } = new RomMClient();
 
@@ -305,7 +311,8 @@ namespace RomM
                 return new List<Game>();
             }
 
-            if(!Settings.TestConnection())
+            // Import only needs connectivity + server version, not the profile/avatar.
+            if(!Settings.TestConnection(false, false))
             {
                 return new List<Game>();
             }
@@ -588,6 +595,12 @@ namespace RomM
                 
                     if (Settings.KeepRomMSynced == true)
                     {
+                        // The importer wrote the server's own values into this game; don't push them back.
+                        if (ignoredGameIds.TryRemove(newGame.Id, out byte _))
+                        {
+                            continue;
+                        }
+
                         if(!RomMGameId.TryParse(newGame.GameId, out int romMId, out string _))
                         {
                             Logger.Error($"{newGame.Name} GameID is malformed!");

@@ -335,7 +335,7 @@ namespace RomM.Settings
             }
         }
 
-        public bool TestConnection(bool UpdateNotificationBar = false)
+        public bool TestConnection(bool UpdateNotificationBar = false, bool fetchProfile = true)
         {
             Notify = false;
 
@@ -388,36 +388,41 @@ namespace RomM.Settings
                     ServerVersion = info.Version;
                 }
 
-                // Get user info
-                response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/users/me", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
-                response.EnsureSuccessStatusCode();
-
-                body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
-                RomMUser userinfo;
-
-                using (StreamReader reader = new StreamReader(body))
+                // Profile (name/role/avatar) is only needed for the settings UI, not for import.
+                if (fetchProfile)
                 {
-                    var jsonResponse = JObject.Parse(reader.ReadToEnd());
-                    userinfo = jsonResponse.ToObject<RomMUser>();
-                }
-
-                if (!string.IsNullOrEmpty(userinfo.IconPath))
-                {
-                    response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/raw/assets/{userinfo.IconPath}", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
+                    // Get user info
+                    response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/users/me", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
                     response.EnsureSuccessStatusCode();
-                    var imagebytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                    var extensionDataDir = $"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}";
-                    Directory.CreateDirectory(extensionDataDir);
-                    File.WriteAllBytes($"{extensionDataDir}\\avatar.png", imagebytes);
-                    ProfilePath = $"{extensionDataDir}\\avatar.png";
-                }
-                else
-                {
-                    ProfilePath = _defaultprofilepath;
+
+                    body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                    RomMUser userinfo;
+
+                    using (StreamReader reader = new StreamReader(body))
+                    {
+                        var jsonResponse = JObject.Parse(reader.ReadToEnd());
+                        userinfo = jsonResponse.ToObject<RomMUser>();
+                    }
+
+                    if (!string.IsNullOrEmpty(userinfo.IconPath))
+                    {
+                        response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/raw/assets/{userinfo.IconPath}", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
+                        response.EnsureSuccessStatusCode();
+                        var imagebytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                        var extensionDataDir = $"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}";
+                        Directory.CreateDirectory(extensionDataDir);
+                        File.WriteAllBytes($"{extensionDataDir}\\avatar.png", imagebytes);
+                        ProfilePath = $"{extensionDataDir}\\avatar.png";
+                    }
+                    else
+                    {
+                        ProfilePath = _defaultprofilepath;
+                    }
+
+                    RomMProfileType = userinfo.Role;
+                    RomMUser = userinfo.Username;
                 }
 
-                RomMProfileType = userinfo.Role;
-                RomMUser = userinfo.Username;
                 if(UpdateNotificationBar)
                     UpdateNotifcationBar("Authenticated!");
             }
