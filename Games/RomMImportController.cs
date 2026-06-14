@@ -30,17 +30,21 @@ namespace RomM.Games
 
         public List<Game> Import(LibraryImportGamesArgs args)
         {
-            // Server version can contain pre-release suffixes (e.g. "4.9.0-beta"), so parse defensively.
+            // Only block servers we can positively identify as older than 4.9. Dev builds report a
+            // non-numeric version (e.g. "development"), which we assume is recent enough to import.
+            // Pre-release suffixes (e.g. "4.9.0-beta") are stripped before parsing.
             string rawVersion = (_plugin.Settings.ServerVersion ?? string.Empty).Split('-', '+')[0];
-            if (!Version.TryParse(rawVersion, out Version versionParsed))
+            if (Version.TryParse(rawVersion, out Version versionParsed))
             {
-                _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Could not determine RomM server version (\"{_plugin.Settings.ServerVersion}\"). Authenticate in settings first.", NotificationType.Error);
-                return new List<Game>();
+                if (versionParsed.CompareTo(new Version(4, 9)) < 0)
+                {
+                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), "RomM Server 4.9 or later required to import ROMs!", NotificationType.Error);
+                    return new List<Game>();
+                }
             }
-            if (versionParsed.CompareTo(new Version(4, 9)) < 0)
+            else
             {
-                _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), "RomM Server 4.9 or later required to import ROMs!", NotificationType.Error);
-                return new List<Game>();
+                Logger.Warn($"[Import Controller] Could not parse RomM server version \"{_plugin.Settings.ServerVersion}\"; assuming it's compatible (>= 4.9).");
             }
 
             IList<RomMPlatform> apiPlatforms = FetchPlatforms();
