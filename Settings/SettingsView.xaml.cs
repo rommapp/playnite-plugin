@@ -16,8 +16,6 @@ namespace RomM.Settings
 {
     public partial class SettingsView : UserControl
     {
-        private bool InManualCellCommit = false;
-
         public SettingsView()
         {
             InitializeComponent();
@@ -104,29 +102,6 @@ namespace RomM.Settings
         private static string GetSelectedFolderPath()
         {
             return SettingsViewModel.Instance.PlayniteAPI.Dialogs.SelectFolder();
-        }
-
-        private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
-        {
-            if (!InManualCellCommit && sender is DataGrid grid)
-            {
-                InManualCellCommit = true;
-
-                // HACK!!!!
-                // Alternate approach 1: try to find new value here and store that somewhere as the currently selected emu
-                // Alternate approach 2: the "right" way(?) https://stackoverflow.com/a/34332709
-                if (e.Column.Header?.ToString() == "Emulator" || e.Column.Header?.ToString() == "Profile")
-                {
-                    grid.CommitEdit(DataGridEditingUnit.Row, true);
-                }
-
-                InManualCellCommit = false;
-            }
-        }
-
-        private void DataGrid_CurrentCellChanged(object sender, EventArgs e)
-        {
-
         }
 
         private void Click_Browse7zDestination(object sender, RoutedEventArgs e)
