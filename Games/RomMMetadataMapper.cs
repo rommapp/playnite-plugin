@@ -46,7 +46,8 @@ namespace RomM.Games
                     : new ReleaseDate(),
                 CommunityScore = (int?)rom.Metadatum.Average_Rating,
                 CoverImage = !string.IsNullOrEmpty(rom.PathCoverL) ? new MetadataFile($"{romMHost}{rom.PathCoverL}") : null,
-                // Game icon: Screenscraper miximage (consistent dimensions) -> cover image.
+                // Game icon: Screenscraper miximage only; left blank when absent so another metadata
+                // source can supply one.
                 Icon = GameIcon(romMHost, rom),
                 LastActivity = rom.RomUser.LastPlayed,
                 // RomM rating is 1-10, Playnite 1-100, so it can only be synced one direction without losing decimals.
@@ -60,11 +61,11 @@ namespace RomM.Games
 
         private static MetadataFile GameIcon(string romMHost, RomMRom rom)
         {
-            // Wheel/logo art has wildly varying aspect ratios, which makes list icons look ragged.
-            // The miximage has consistent dimensions; fall back to the cover when there's no miximage.
+            // Wheel/logo art has wildly varying aspect ratios, which makes list icons look ragged, so
+            // we use the consistently-sized miximage. No fallback: leave the icon unset when there's
+            // no miximage so another metadata plugin can fill it.
             var ss = rom.SSMetadata;
-            return (ss != null ? ResolveImage(romMHost, ss.MiximagePath, ss.MiximageUrl) : null)
-                ?? ResolveImage(romMHost, rom.PathCoverL, rom.UrlCover);
+            return ss != null ? ResolveImage(romMHost, ss.MiximagePath, ss.MiximageUrl) : null;
         }
 
         private static MetadataFile ResolveImage(string romMHost, string path, string url)
