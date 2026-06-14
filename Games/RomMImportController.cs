@@ -10,7 +10,6 @@ using RomM.Settings;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -135,16 +134,9 @@ namespace RomM.Games
                     url += "?";
                 }
 
-                if (excludeGenres.Count > 1)
+                foreach (var genre in excludeGenres)
                 {
-                    foreach (var genre in excludeGenres)
-                    {
-                        url += $"genres={HttpUtility.UrlEncode(genre)}&";
-                    }
-                }
-                else
-                {
-                    url += $"genres={HttpUtility.UrlEncode(excludeGenresString)}";
+                    url += $"genres={HttpUtility.UrlEncode(genre)}&";
                 }
             }
             return url.TrimEnd('&');

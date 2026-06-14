@@ -17,8 +17,7 @@ namespace RomM.Games
 
         public override GameMetadata GetMetadata(Game game)
         {
-            int romMId;
-            if (!int.TryParse(game.GameId.Split(':')[0], out romMId))
+            if (!RomMGameId.TryParse(game.GameId, out int romMId, out _))
             {
                 _romM.Logger.Error($"[Metadata] {game.Name} GameID is malformed!");
                 return null;
@@ -32,9 +31,7 @@ namespace RomM.Games
             }
 
             // RomM 4.9+ can omit these fields; normalise so the metadata mapping never null-derefs.
-            romMGame.Metadatum = romMGame.Metadatum ?? new metadatum();
-            romMGame.RomUser = romMGame.RomUser ?? new RomMRomUser();
-            romMGame.Regions = romMGame.Regions ?? new List<string>();
+            romMGame.Normalize();
 
             var preferedRatingsBoard = _romM.Playnite.ApplicationSettings.AgeRatingOrgPriority;
             var agerating = romMGame.Metadatum.Age_Ratings.Count > 0 ? new HashSet<MetadataProperty>(romMGame.Metadatum.Age_Ratings.Where(r => r.Split(':')[0] == preferedRatingsBoard.ToString()).Select(r => new MetadataNameProperty(r.ToString()))) : null;

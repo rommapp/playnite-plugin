@@ -218,5 +218,19 @@ namespace RomM.Models.RomM.Rom
         public string SortComparator { get; set; }
 
         public bool Processed { get; set; } = false;
+
+        /// <summary>
+        /// RomM 4.9+ can omit collection/object fields entirely. Normalising them once after
+        /// deserialization means consumers (importer, metadata downloader) never have to null-check.
+        /// </summary>
+        public void Normalize()
+        {
+            Metadatum = Metadatum ?? new metadatum();
+            RomUser = RomUser ?? new RomMRomUser();
+            Regions = Regions ?? new List<string>();
+            Tags = Tags ?? new List<string>();
+            Files = Files ?? new List<RomMFile>();
+            Siblings = Siblings ?? new List<RomMSibling>();
+        }
 }
 }

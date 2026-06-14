@@ -242,11 +242,12 @@ namespace RomM
                     {
                         if (item.PluginId == PluginId)
                         {
-                            if (item.GameId.Contains(':'))
+                            if (RomMGameId.TryParse(item.GameId, out _, out var sha1))
                             {
-                                if (File.Exists($"{ROMDataPath}{item.GameId.Split(':')[1]}.json"))
+                                var romDataFile = $"{ROMDataPath}{sha1}.json";
+                                if (File.Exists(romDataFile))
                                 {
-                                    File.Delete($"{ROMDataPath}{item.GameId.Split(':')[1]}.json");
+                                    File.Delete(romDataFile);
                                 }
                             }
                             else
@@ -333,9 +334,9 @@ namespace RomM
             List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
 
             var game = args.Games.First();
-            if (game.PluginId == PluginId && game.GameId != null && game.GameId.Contains(':'))
+            if (game.PluginId == PluginId && RomMGameId.TryParse(game.GameId, out _, out var sha1))
             {
-                string romDataFile = $"{ROMDataPath}{game.GameId.Split(':')[1]}.json";
+                string romDataFile = $"{ROMDataPath}{sha1}.json";
                 if (Settings.MergeRevisions && File.Exists(romDataFile) && game.IsInstalled)
                 {
                     try
@@ -382,9 +383,7 @@ namespace RomM
                 else
                 {
                     // Pull game file from RomM data directory
-                    int romMId;
-                    string romMSHA1 = gameID.Split(':')[1];
-                    if (!int.TryParse(gameID.Split(':')[0], out romMId) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
+                    if (!RomMGameId.TryParse(gameID, out _, out string romMSHA1) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
                     {
                         Logger.Error($"{args.Game.Name} GameID is malformed!");
                         romData.Id = (int)InstallStatus.Cancelled;
@@ -589,8 +588,7 @@ namespace RomM
                 
                     if (Settings.KeepRomMSynced == true)
                     {
-                        int romMId;
-                        if(newGame.GameId == null || !int.TryParse(newGame.GameId.Split(':')[0], out romMId))
+                        if(!RomMGameId.TryParse(newGame.GameId, out int romMId, out _))
                         {
                             Logger.Error($"{newGame.Name} GameID is malformed!");
                             continue;

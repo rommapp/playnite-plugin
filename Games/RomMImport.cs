@@ -19,6 +19,7 @@ namespace RomM.Games
         LibraryImportGamesArgs _args;
         EmulatorMapping _mapping;
         List<RomMRom> _ROMs;
+        Dictionary<int, RomMRom> _romById;
         Dictionary<string, Guid> _completionStatusMap;
         List<int> _favourites;
 
@@ -28,6 +29,10 @@ namespace RomM.Games
             _args = args;
             _mapping = mapping;
             _ROMs = roms;
+            // Index by id once so sibling lookups are O(1) instead of List.Find per sibling per ROM.
+            _romById = new Dictionary<int, RomMRom>();
+            foreach (var rom in roms)
+                _romById[rom.Id] = rom;
             _completionStatusMap = plugin.Playnite.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
             _favourites = favourites;
         }
@@ -53,6 +58,36 @@ namespace RomM.Games
             return ROM.Files.FirstOrDefault();
         }
 
+        // Builds the install descriptor for a single ROM (base or sibling). Returns null when a
+        // single-file ROM has no resolvable file. Single files use the 4.9 /files/content endpoint,
+        // multi-file ROMs download the whole rom as an archive.
+        private RomMRevision BuildRevision(RomMRom rom)
+        {
+            var revision = new RomMRevision
+            {
+                Id = rom.Id,
+                HasMultipleFiles = rom.HasMultipleFiles,
+                IsSelected = false
+            };
+
+            if (!rom.HasMultipleFiles)
+            {
+                var romfile = DetermineFile(rom);
+                if (romfile == null)
+                    return null;
+
+                revision.FileName = romfile.FileName;
+                revision.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
+            }
+            else
+            {
+                revision.FileName = rom.FileName;
+                revision.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{rom.Id}/content/{rom.FileName}");
+            }
+
+            return revision;
+        }
+
         // Main library import functions
         public List<Game> ProcessData()
         {
@@ -65,14 +100,9 @@ namespace RomM.Games
                 if (_args.CancelToken.IsCancellationRequested)
                     break;
 
-                // RomM 4.9+ can omit these fields entirely; normalise them so the rest of the
-                // importer never has to null-check (mirrors the hardening done in #107).
-                ROM.Metadatum = ROM.Metadatum ?? new metadatum();
-                ROM.RomUser = ROM.RomUser ?? new RomMRomUser();
-                ROM.Regions = ROM.Regions ?? new List<string>();
-                ROM.Tags = ROM.Tags ?? new List<string>();
-                ROM.Files = ROM.Files ?? new List<RomMFile>();
-                ROM.Siblings = ROM.Siblings ?? new List<RomMSibling>();
+                // RomM 4.9+ can omit these fields entirely; normalise so the rest of the importer
+                // never has to null-check (mirrors the hardening done in #107).
+                ROM.Normalize();
 
                 // Some newer platforms don't get a hash value so we will compromise with this
                 if (string.IsNullOrEmpty(ROM.SHA1))
@@ -353,9 +383,8 @@ namespace RomM.Games
             // still carry an id without a ':' separator, so match defensively instead of indexing blindly.
             var oldgame = _plugin.Playnite.Database.Games.FirstOrDefault(g =>
                 g.PluginId == _plugin.Id &&
-                g.GameId != null &&
-                g.GameId.Contains(':') &&
-                g.GameId.Split(':')[1] == ROM.SHA1);
+                RomMGameId.TryParse(g.GameId, out _, out var sha1) &&
+                sha1 == ROM.SHA1);
             if (oldgame != null)
             {
                 oldgame.GameId = $"{ROM.Id}:{ROM.SHA1}";
@@ -377,10 +406,8 @@ namespace RomM.Games
             //Find if there is a main sibling
             foreach (var sibling in ROM.Siblings)
             {
-                var siblingROM = _ROMs.Find(x => x.Id == sibling.Id);
-
                 // The sibling may live on a different page and not be present in this batch.
-                if (siblingROM?.RomUser != null && siblingROM.RomUser.IsMainSibling)
+                if (_romById.TryGetValue(sibling.Id, out var siblingROM) && siblingROM.RomUser != null && siblingROM.RomUser.IsMainSibling)
                 {
                     return MainSibling.Other;
                 }
@@ -397,66 +424,32 @@ namespace RomM.Games
             toSave.MappingID = _mapping.MappingId;
             toSave.ROMVersions = new List<RomMRevision>();
 
-            RomMRevision baseROM = new RomMRevision();
-
             // Save base ROM data
-            baseROM.Id = ROM.Id;       
-            baseROM.HasMultipleFiles = ROM.HasMultipleFiles;
-            if(!ROM.HasMultipleFiles)
+            var baseROM = BuildRevision(ROM);
+            if (baseROM == null)
             {
-                var romfile = DetermineFile(ROM);
-                if (romfile == null)
-                {
-                    _plugin.Logger.Error("[Importer] Unable to save ROM data as there is no rom file!");
-                    return;
-                }
-
-                baseROM.FileName = romfile.FileName;
-                baseROM.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
+                _plugin.Logger.Error("[Importer] Unable to save ROM data as there is no rom file!");
+                return;
             }
-            else
-            {
-                baseROM.FileName = ROM.FileName;
-                baseROM.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{ROM.Id}/content/{ROM.FileName}");
-            }
-            baseROM.IsSelected = false;
-           toSave.ROMVersions.Add(baseROM);
+            toSave.ROMVersions.Add(baseROM);
 
             // Save sibling data
             if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)
             {
-
                 foreach (var sibling in ROM.Siblings)
                 {
-                    var siblingROM = _ROMs.Find(x => x.Id == sibling.Id);
-                    if(siblingROM != null)
+                    if (!_romById.TryGetValue(sibling.Id, out var siblingROM))
+                        continue;
+
+                    var saveSibling = BuildRevision(siblingROM);
+                    if (saveSibling == null)
                     {
-                        RomMRevision saveSibling = new RomMRevision();
-
-                        saveSibling.Id = siblingROM.Id;
-                        saveSibling.HasMultipleFiles = siblingROM.HasMultipleFiles;
-                        if (!siblingROM.HasMultipleFiles)
-                        {
-                            var romfile = DetermineFile(siblingROM);
-                            if (romfile == null)
-                            {
-                                _plugin.Logger.Error("[Importer] Unable to save sibling ROM data as there is no rom file!");
-                                continue;
-                            }
-
-                            saveSibling.FileName = romfile.FileName;
-                            saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}");
-                        }
-                        else
-                        {
-                            saveSibling.FileName = siblingROM.FileName;
-                            saveSibling.DownloadURL = _plugin.CombineUrl(_plugin.Settings.RomMHost, $"api/roms/{siblingROM.Id}/content/{siblingROM.FileName}");
-                        }          
-                        saveSibling.IsSelected = false;
-                        _ROMs.First(x => x.Id == sibling.Id).Processed = true;
-
-                        toSave.ROMVersions.Add(saveSibling);
+                        _plugin.Logger.Error("[Importer] Unable to save sibling ROM data as there is no rom file!");
+                        continue;
                     }
+
+                    siblingROM.Processed = true;
+                    toSave.ROMVersions.Add(saveSibling);
                 }
             }
 
