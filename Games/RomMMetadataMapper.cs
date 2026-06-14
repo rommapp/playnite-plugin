@@ -46,8 +46,9 @@ namespace RomM.Games
                     : new ReleaseDate(),
                 CommunityScore = (int?)rom.Metadatum.Average_Rating,
                 CoverImage = !string.IsNullOrEmpty(rom.PathCoverL) ? new MetadataFile($"{romMHost}{rom.PathCoverL}") : null,
-                // Game icon: Screenscraper wheel (logo) when present, otherwise the miximage.
-                Icon = ScreenscraperIcon(romMHost, rom.SSMetadata),
+                // Game icon: Screenscraper wheel (logo) -> miximage -> cover image.
+                Icon = ScreenscraperIcon(romMHost, rom.SSMetadata)
+                    ?? ResolveImage(romMHost, rom.PathCoverL, rom.UrlCover),
                 LastActivity = rom.RomUser.LastPlayed,
                 // RomM rating is 1-10, Playnite 1-100, so it can only be synced one direction without losing decimals.
                 UserScore = rom.RomUser.Rating * 10,
