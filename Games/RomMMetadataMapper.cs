@@ -46,9 +46,8 @@ namespace RomM.Games
                     : new ReleaseDate(),
                 CommunityScore = (int?)rom.Metadatum.Average_Rating,
                 CoverImage = !string.IsNullOrEmpty(rom.PathCoverL) ? new MetadataFile($"{romMHost}{rom.PathCoverL}") : null,
-                // Game icon: Screenscraper wheel (logo) -> miximage -> cover image.
-                Icon = ScreenscraperIcon(romMHost, rom.SSMetadata)
-                    ?? ResolveImage(romMHost, rom.PathCoverL, rom.UrlCover),
+                // Game icon: Screenscraper miximage (consistent dimensions) -> cover image.
+                Icon = GameIcon(romMHost, rom),
                 LastActivity = rom.RomUser.LastPlayed,
                 // RomM rating is 1-10, Playnite 1-100, so it can only be synced one direction without losing decimals.
                 UserScore = rom.RomUser.Rating * 10,
@@ -59,14 +58,13 @@ namespace RomM.Games
         private static HashSet<MetadataProperty> ToNameSet(IEnumerable<string> values)
             => new HashSet<MetadataProperty>(values.Where(v => !string.IsNullOrEmpty(v)).Select(v => new MetadataNameProperty(v)));
 
-        private static MetadataFile ScreenscraperIcon(string romMHost, RomMSSMetadata ss)
+        private static MetadataFile GameIcon(string romMHost, RomMRom rom)
         {
-            if (ss == null)
-                return null;
-
-            // Prefer the "wheel" (logo); fall back to the miximage. RomM-hosted path first, then external url.
-            return ResolveImage(romMHost, ss.LogoPath, ss.LogoUrl)
-                ?? ResolveImage(romMHost, ss.MiximagePath, ss.MiximageUrl);
+            // Wheel/logo art has wildly varying aspect ratios, which makes list icons look ragged.
+            // The miximage has consistent dimensions; fall back to the cover when there's no miximage.
+            var ss = rom.SSMetadata;
+            return (ss != null ? ResolveImage(romMHost, ss.MiximagePath, ss.MiximageUrl) : null)
+                ?? ResolveImage(romMHost, rom.PathCoverL, rom.UrlCover);
         }
 
         private static MetadataFile ResolveImage(string romMHost, string path, string url)
