@@ -242,7 +242,7 @@ namespace RomM
                     {
                         if (item.PluginId == PluginId)
                         {
-                            if (RomMGameId.TryParse(item.GameId, out _, out var sha1))
+                            if (RomMGameId.TryParse(item.GameId, out int _, out var sha1))
                             {
                                 var romDataFile = $"{ROMDataPath}{sha1}.json";
                                 if (File.Exists(romDataFile))
@@ -334,7 +334,7 @@ namespace RomM
             List<GameMenuItem> gameMenuItems = new List<GameMenuItem>();
 
             var game = args.Games.First();
-            if (game.PluginId == PluginId && RomMGameId.TryParse(game.GameId, out _, out var sha1))
+            if (game.PluginId == PluginId && RomMGameId.TryParse(game.GameId, out int _, out var sha1))
             {
                 string romDataFile = $"{ROMDataPath}{sha1}.json";
                 if (Settings.MergeRevisions && File.Exists(romDataFile) && game.IsInstalled)
@@ -383,7 +383,7 @@ namespace RomM
                 else
                 {
                     // Pull game file from RomM data directory
-                    if (!RomMGameId.TryParse(gameID, out _, out string romMSHA1) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
+                    if (!RomMGameId.TryParse(gameID, out int _, out string romMSHA1) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
                     {
                         Logger.Error($"{args.Game.Name} GameID is malformed!");
                         romData.Id = (int)InstallStatus.Cancelled;
@@ -588,7 +588,7 @@ namespace RomM
                 
                     if (Settings.KeepRomMSynced == true)
                     {
-                        if(!RomMGameId.TryParse(newGame.GameId, out int romMId, out _))
+                        if(!RomMGameId.TryParse(newGame.GameId, out int romMId, out string _))
                         {
                             Logger.Error($"{newGame.Name} GameID is malformed!");
                             continue;

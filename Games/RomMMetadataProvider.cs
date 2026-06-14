@@ -17,7 +17,7 @@ namespace RomM.Games
 
         public override GameMetadata GetMetadata(Game game)
         {
-            if (!RomMGameId.TryParse(game.GameId, out int romMId, out _))
+            if (!RomMGameId.TryParse(game.GameId, out int romMId, out string _))
             {
                 _romM.Logger.Error($"[Metadata] {game.Name} GameID is malformed!");
                 return null;

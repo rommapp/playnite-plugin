@@ -383,7 +383,7 @@ namespace RomM.Games
             // still carry an id without a ':' separator, so match defensively instead of indexing blindly.
             var oldgame = _plugin.Playnite.Database.Games.FirstOrDefault(g =>
                 g.PluginId == _plugin.Id &&
-                RomMGameId.TryParse(g.GameId, out _, out var sha1) &&
+                RomMGameId.TryParse(g.GameId, out int _, out var sha1) &&
                 sha1 == ROM.SHA1);
             if (oldgame != null)
             {
