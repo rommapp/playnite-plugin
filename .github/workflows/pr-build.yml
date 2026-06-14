@@ -1,0 +1,39 @@
+name: PR Build Check
+
+# Validates that pull requests compile. Mirrors the build steps of the
+# release workflow (build.yml) but stops at the MSBuild compile and skips
+# the Playnite packing/upload, so a PR is gated on "does it build?".
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-build-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore dependencies
+        run: |
+          dotnet restore
+          dotnet add package Microsoft.Net.Sdk.Compilers.Toolset --version 9.0.300
+
+      - name: Build with MSBuild
+        run: |
+          msbuild RomM.csproj /p:Configuration=Release /p:Platform="AnyCPU" /p:RestorePackages=false
