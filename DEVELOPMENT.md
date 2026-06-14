@@ -92,3 +92,22 @@ Easiest route is **CrystalFetch** (free, open source, on the Mac App Store):
 Same UTM steps, but use a **Windows 11 x64** ISO
 (<https://www.microsoft.com/software-download/windows11>) instead of the Arm64 one — it
 runs x64 natively, with no emulation layer.
+
+### Troubleshooting
+
+**Boots to a "UEFI Interactive Shell v2.2" prompt instead of the installer.** The
+**"Press any key to boot from CD or DVD…"** prompt only shows for a couple of seconds; if
+it times out the VM drops to the UEFI shell. To recover:
+
+1. Type `exit` and press **Enter** to reach the UEFI firmware menu (TianoCore).
+2. Choose **Boot Manager**.
+3. Select the **DVD/CD** entry (your Windows ISO, e.g. "UEFI … DVD/CDROM").
+4. When **"Press any key to boot from CD or DVD…"** appears, immediately spam **Spacebar/Enter**.
+   If you miss it, it returns to the shell — repeat from step 1.
+
+Tip: right after you hit **▶︎ Play**, click into the VM window and tap Spacebar repeatedly to
+catch the prompt. If `exit` shows no DVD/CD option, the ISO isn't attached — stop the VM and
+confirm **Settings → Drives** has a CD/DVD drive pointing at the ISO.
+
+Once Windows is installed and boots from the virtual disk, **eject the ISO** (Settings →
+Drives → clear it) so it stops offering "press any key to boot from CD" on every restart.
