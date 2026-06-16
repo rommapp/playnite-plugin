@@ -51,6 +51,8 @@
     <Compile Include="..\Games\RomMCompletionStatus.cs" Link="Linked\Games\RomMCompletionStatus.cs" />
     <Compile Include="..\Games\RomMHash.cs" Link="Linked\Games\RomMHash.cs" />
     <Compile Include="..\Games\RomMSiblings.cs" Link="Linked\Games\RomMSiblings.cs" />
+    <Compile Include="..\Saves\RetroArchConfig.cs" Link="Linked\Saves\RetroArchConfig.cs" />
+    <Compile Include="..\Saves\SaveFileHash.cs" Link="Linked\Saves\SaveFileHash.cs" />
   </ItemGroup>
 
 </Project>

@@ -273,6 +273,14 @@
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding KeepRomMSynced, Mode=TwoWay}">
                         <TextBlock Text="Keep completion status and favorites in sync with RomM" TextWrapping="Wrap" />
                     </CheckBox>
+
+                    <!-- Save sync -->
+                    <Label Content="Save sync" Style="{StaticResource SectionHeader}" />
+                    <Separator Margin="0,4,0,10" />
+
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding EnableSaveSync, Mode=TwoWay}">
+                        <TextBlock Text="Sync RetroArch saves with RomM (downloads the newest save before launch, uploads after play)" TextWrapping="Wrap" />
+                    </CheckBox>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

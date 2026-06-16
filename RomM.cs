@@ -5,6 +5,7 @@ using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using RomM.Games;
 using RomM.Downloads;
+using RomM.Saves;
 using RomM.VersionSelector;
 using RomM.Models.RomM.Collection;
 using RomM.Models.RomM.Rom;
@@ -75,6 +76,8 @@ namespace RomM
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
         private readonly DownloadQueueViewModel downloadsVm;
 
+        internal SaveSyncService SaveSync { get; private set; }
+
         // Game ids whose next ItemUpdated was caused by the importer itself, so OnItemUpdated must
         // not echo the change back to the RomM server.
         private readonly ConcurrentDictionary<Guid, byte> ignoredGameIds = new ConcurrentDictionary<Guid, byte>();
@@ -92,6 +95,9 @@ namespace RomM
                 HasCustomizedGameImport = true,
             };
             ROMDataPath = $"{Playnite.Paths.ExtensionsDataPath}\\{Id}\\Games\\";
+
+            // Save sync (RetroArch <-> RomM). Reads Settings lazily, so constructing here is safe.
+            SaveSync = new SaveSyncService(this);
 
             // Initialise the download queue
             downloadsVm = new DownloadQueueViewModel();
@@ -340,6 +346,15 @@ namespace RomM
             var game = args.Games.First();
             if (game.PluginId == PluginId && RomMGameId.TryParse(game.GameId, out int _, out var sha1))
             {
+                if (Settings.EnableSaveSync)
+                {
+                    gameMenuItems.Add(new GameMenuItem
+                    {
+                        Description = "Sync saves with RomM",
+                        Action = (_) => SyncSavesWithNotification(args.Games.Where(g => g.PluginId == PluginId).ToList())
+                    });
+                }
+
                 string romDataFile = $"{ROMDataPath}{sha1}.json";
                 if (Settings.MergeRevisions && File.Exists(romDataFile) && game.IsInstalled)
                 {
@@ -498,6 +513,32 @@ namespace RomM
             if (args.Game.PluginId == PluginId && Settings.NotifyOnInstallComplete)
             {
                 Playnite.Notifications.Add(args.Game.GameId, $"Download of \"{args.Game.Name}\" is complete", NotificationType.Info);
+            }
+        }
+
+        // Pull the newest save down before the emulator launches so the player continues from the
+        // latest device. Playnite blocks the launch until this returns, so any failure is swallowed
+        // (logged inside Sync) rather than preventing the game from starting.
+        public override void OnGameStarting(OnGameStartingEventArgs args)
+        {
+            base.OnGameStarting(args);
+
+            if (Settings.EnableSaveSync && args.Game.PluginId == PluginId)
+            {
+                SaveSync.Sync(args.Game);
+            }
+        }
+
+        // Push the save the player just produced back to RomM. Runs in the background so it never
+        // delays returning to the library.
+        public override void OnGameStopped(OnGameStoppedEventArgs args)
+        {
+            base.OnGameStopped(args);
+
+            if (Settings.EnableSaveSync && args.Game.PluginId == PluginId)
+            {
+                var game = args.Game;
+                Task.Run(() => SaveSync.Sync(game));
             }
         }
 
@@ -660,6 +701,57 @@ namespace RomM
                         }
                     }
                 }
+            });
+        }
+    #endregion
+
+    #region RomM Save Syncing
+        // Manual "Sync saves with RomM" menu action: sync each selected game on a background thread
+        // and surface a single summary notification so the user gets feedback.
+        private void SyncSavesWithNotification(IList<Game> games)
+        {
+            if (games == null || games.Count == 0)
+            {
+                return;
+            }
+
+            Task.Run(() =>
+            {
+                int uploaded = 0, downloaded = 0, conflicts = 0, failed = 0, applicable = 0;
+                string lastMessage = null;
+
+                foreach (var game in games)
+                {
+                    var outcome = SaveSync.Sync(game);
+                    if (outcome.Applicable)
+                    {
+                        applicable++;
+                        uploaded += outcome.Uploaded;
+                        downloaded += outcome.Downloaded;
+                        conflicts += outcome.Conflicts;
+                        failed += outcome.Failed;
+                    }
+
+                    if (!string.IsNullOrEmpty(outcome.Message))
+                    {
+                        lastMessage = outcome.Message;
+                    }
+                }
+
+                if (applicable == 0)
+                {
+                    Playnite.Notifications.Add("RomMPlugin.SaveSync",
+                        lastMessage ?? "Save sync currently only supports RetroArch games.",
+                        NotificationType.Info);
+                    return;
+                }
+
+                var summary = $"Save sync complete: {downloaded} downloaded, {uploaded} uploaded" +
+                              (conflicts > 0 ? $", {conflicts} conflict(s) resolved" : "") +
+                              (failed > 0 ? $", {failed} failed" : "") + ".";
+
+                Playnite.Notifications.Add("RomMPlugin.SaveSync", summary,
+                    failed > 0 ? NotificationType.Error : NotificationType.Info);
             });
         }
     #endregion

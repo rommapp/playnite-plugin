@@ -230,6 +230,11 @@ namespace RomM.Settings
         public bool ScanGamesInFullScreen { get; set; } = false;
         public bool NotifyOnInstallComplete { get; set; } = false;
         public bool KeepRomMSynced { get; set; } = false;
+
+        // Save sync (RetroArch saves <-> RomM server). DeviceId is assigned by the server on first
+        // registration and persisted so this machine keeps the same RomM device across sessions.
+        public bool EnableSaveSync { get; set; } = false;
+        public string SaveSyncDeviceId { get; set; } = "";
         public bool Use7z { get; set; } = false;
         public string PathTo7z
         {
@@ -314,7 +319,9 @@ namespace RomM.Settings
                 PathTo7z = savedSettings.PathTo7z;
                 MergeRevisions = savedSettings.MergeRevisions;
                 KeepDeletedGames = savedSettings.KeepDeletedGames;
-                ExcludeGenres = savedSettings.ExcludeGenres;     
+                ExcludeGenres = savedSettings.ExcludeGenres;
+                EnableSaveSync = savedSettings.EnableSaveSync;
+                SaveSyncDeviceId = savedSettings.SaveSyncDeviceId;
             }
             
             if (Mappings == null)
@@ -503,6 +510,10 @@ namespace RomM.Settings
             }
 
         }
+
+        // Persists the current settings to disk. Used by background features (e.g. save sync device
+        // registration) that need to store a value without going through the settings dialog edit cycle.
+        internal void Persist() => SavePluginSettings(this);
 
         private void SavePluginSettings<SettingsViewModel>(SettingsViewModel settings)
         {
