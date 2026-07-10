@@ -34,6 +34,7 @@ namespace RomM.Settings
         [JsonIgnore] private string _romMHost = "";
         [JsonIgnore] private string _romMServerVersion = "---";
         [JsonIgnore] private string _romMClientToken = "";
+        [JsonIgnore] private string _romMDeviceID = "";
         [JsonIgnore] private bool _useBasicAuth = true;
         [JsonIgnore] private string _romMUsername = "";
         [JsonIgnore] private string _romMPassword = "";
@@ -107,7 +108,7 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
-        public void UpdateNotifcationBar(string Message, bool IsError = false)
+        public void UpdateNotificationBar(string Message, bool IsError = false)
         {
             if (IsError)
             {
@@ -155,6 +156,16 @@ namespace RomM.Settings
             }
         }
         public static readonly Regex ApiTokenPattern = new Regex(@"^rmm_[0-9a-f]{64}$", RegexOptions.Compiled);
+
+        public string RomMDeviceID
+        {
+            get => _romMDeviceID;
+            set
+            {
+                _romMDeviceID = value;
+                OnPropertyChanged();
+            }
+        }
 
         public bool UseBasicAuth
         {
@@ -208,6 +219,7 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
+        [JsonIgnore]
         public string ProfilePath 
         { 
             get => _profilepath; 
@@ -304,7 +316,6 @@ namespace RomM.Settings
 
                 RomMUser = savedSettings.RomMUser;
                 RomMProfileType = savedSettings.RomMProfileType;
-                ProfilePath = savedSettings.ProfilePath;
                 ServerVersion = savedSettings.ServerVersion;
 
                 // ----- These need to stay in this order -----
@@ -336,10 +347,20 @@ namespace RomM.Settings
                 forceSave = true;
             }
 
+            ProfilePath = ResolveProfilePath();
+
             if (forceSave)
             {
                 SavePluginSettings(this);
             }
+        }
+
+        // Returns the avatar path if the file exists in the current extension data directory,
+        // otherwise falls back to the bundled default profile image.
+        private string ResolveProfilePath()
+        {
+            var avatarPath = Path.Combine(PlayniteAPI.Paths.ExtensionsDataPath, RomM.Id.ToString(), "avatar.png");
+            return File.Exists(avatarPath) ? avatarPath : _defaultprofilepath;
         }
 
         public bool TestConnection(bool UpdateNotificationBar = false, bool fetchProfile = true)
@@ -436,7 +457,7 @@ namespace RomM.Settings
                 }
 
                 if(UpdateNotificationBar)
-                    UpdateNotifcationBar("Authenticated!");
+                    this.UpdateNotificationBar("Authenticated!");
             }
             catch (Exception ex)
             {
@@ -448,7 +469,7 @@ namespace RomM.Settings
                 LogManager.GetLogger().Error($"Failed to read response! {ex}");
 
                 if (UpdateNotificationBar)
-                    UpdateNotifcationBar($"Authentication failed: {ex.Message}", true);
+                    this.UpdateNotificationBar($"Authentication failed: {ex.Message}", true);
 
                 PlayniteAPI.Notifications.Add(new NotificationMessage($"RomMPlugin.Authentication.Failed.{ex.Message}", $"RomM - Authentication failed: {ex.Message}", NotificationType.Error));
                 return false;
@@ -537,12 +558,12 @@ namespace RomM.Settings
                 if (string.IsNullOrEmpty(m.DestinationPathResolved))
                 {
                     mappingErrors.Add($"{m.MappingId}: No destination path specified.");
-                    UpdateNotifcationBar($"{m.MappingId}: No destination path specified.", true);
+                    UpdateNotificationBar($"{m.MappingId}: No destination path specified.", true);
                 }
                 else if (!Directory.Exists(m.DestinationPathResolved))
                 {
                     mappingErrors.Add($"{m.MappingId}: Destination path doesn't exist ({m.DestinationPathResolved}).");
-                    UpdateNotifcationBar($"{m.MappingId}: Destination path doesn't exist ({m.DestinationPathResolved}).", true);
+                    UpdateNotificationBar($"{m.MappingId}: Destination path doesn't exist ({m.DestinationPathResolved}).", true);
                 }
             });
 
@@ -558,16 +579,21 @@ namespace RomM.Settings
         public object Convert(object value, Type targetType,
             object parameter, System.Globalization.CultureInfo culture)
         {
-
             var path = (string)value;
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.UriSource = new Uri(path);
-            image.EndInit();
-
-            return image;
-
+            try
+            {
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad;
+                image.UriSource = new Uri(path);
+                image.EndInit();
+                return image;
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger().Warn($"[Settings] Failed to load profile image from '{path}': {ex.Message}");
+                return null;
+            }
         }
 
         public object ConvertBack(object value, Type targetType,

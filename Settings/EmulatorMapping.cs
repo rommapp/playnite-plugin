@@ -138,8 +138,8 @@ namespace RomM.Settings
                         var name = Emulator.Name;
                         if (EmulatorProfile != null  && EmulatorProfile.Name != "")
                             name += " - " + EmulatorProfile.Name;
-                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.Name))
-                            name += " - " + RomMPlatform.Name;
+                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.PlayniteName))
+                            name += " - " + RomMPlatform.PlayniteName;
 
                         MappingName = name;
                     }
@@ -194,8 +194,8 @@ namespace RomM.Settings
                         var name = Emulator.Name;
                         if (EmulatorProfile != null && EmulatorProfile.Name != "")
                             name += " - " + EmulatorProfile.Name;
-                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.Name))
-                            name += " - " + RomMPlatform.Name;
+                        if (RomMPlatform != null && !string.IsNullOrEmpty(RomMPlatform.PlayniteName))
+                            name += " - " + RomMPlatform.PlayniteName;
 
                         MappingName = name;
                     }

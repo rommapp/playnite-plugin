@@ -72,7 +72,7 @@ namespace RomM.Games
         {
             var games = new List<Game>();
             var importedGameIds = new HashSet<string>();
-            _plugin.PlayniteApi.Database.Platforms.Add(_mapping.RomMPlatform.Name);
+            _plugin.PlayniteApi.Database.Platforms.Add(_mapping.RomMPlatform.PlayniteName);
 
             // Batch the add/update/remove writes so Playnite raises a single update pass instead of
             // per-item churn for the whole platform.
@@ -169,7 +169,7 @@ namespace RomM.Games
                     }
                 }
 
-                _plugin.Logger.Info($"[Importer] Finished adding new games for {_mapping.RomMPlatform.Name}");
+                _plugin.Logger.Info($"[Importer] Finished adding new games for {_mapping.RomMPlatform.PlayniteName}");
 
                 if (!_plugin.Settings.KeepDeletedGames)
                 {
@@ -201,7 +201,7 @@ namespace RomM.Games
 
             metadata.Source = _plugin.Source;
             metadata.GameId = $"{ROM.Id}:{ROM.SHA1}";
-            metadata.Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(_mapping.RomMPlatform.Name ?? "") };
+            metadata.Platforms = new HashSet<MetadataProperty> { new MetadataNameProperty(_mapping.RomMPlatform.PlayniteName ?? "") };
             metadata.Favorite = _favourites.Exists(f => f == ROM.Id);
             metadata.CompletionStatus = completionStatusProperty;
             metadata.Roms = new List<GameRom> { new GameRom(ROM.FileNameNoExt, pathToGame) };
@@ -257,10 +257,10 @@ namespace RomM.Games
             // Snapshot before mutating; removing while enumerating the live query is unsafe.
             var gamesInDatabase = _plugin.Playnite.Database.Games.Where(g =>
                         g.Source != null && g.Source.Name == _plugin.Source.ToString() &&
-                        g.Platforms != null && g.Platforms.Any(p => p.Name == _mapping.RomMPlatform.Name)
+                        g.Platforms != null && g.Platforms.Any(p => p.Name == _mapping.RomMPlatform.PlayniteName)
                     ).ToList();
 
-            _plugin.Logger.Info($"[Importer] Starting to remove not found games for {_mapping.RomMPlatform.Name}.");
+            _plugin.Logger.Info($"[Importer] Starting to remove not found games for {_mapping.RomMPlatform.PlayniteName}.");
 
             foreach (var game in gamesInDatabase)
             {
@@ -273,10 +273,10 @@ namespace RomM.Games
                 }
 
                 _plugin.Playnite.Database.Games.Remove(game.Id);
-                _plugin.Logger.Info($"[Importer] Removing {game.Name} - {game.Id} for {_mapping.RomMPlatform.Name}");
+                _plugin.Logger.Info($"[Importer] Removing {game.Name} - {game.Id} for {_mapping.RomMPlatform.PlayniteName}");
             }
 
-            _plugin.Logger.Info($"[Importer] Finished removing not found games for {_mapping.RomMPlatform.Name}");
+            _plugin.Logger.Info($"[Importer] Finished removing not found games for {_mapping.RomMPlatform.PlayniteName}");
         }
 
         private bool UpdatedOldGameID(RomMRom ROM)
@@ -312,7 +312,7 @@ namespace RomM.Games
             {
                 var newId = $"{ROM.Id}:{ROM.SHA1}";
                 oldgame.GameId = newId;
-                oldgame.PlatformIds = new List<Guid> { _plugin.Playnite.Database.Platforms.First(x => x.Name == _mapping.RomMPlatform.Name).Id };
+                oldgame.PlatformIds = new List<Guid> { _plugin.Playnite.Database.Platforms.First(x => x.Name == _mapping.RomMPlatform.PlayniteName).Id };
                 _plugin.Playnite.Database.Games.Update(oldgame);
 
                 // Keep indexes consistent so the already-imported check finds the just-migrated game.

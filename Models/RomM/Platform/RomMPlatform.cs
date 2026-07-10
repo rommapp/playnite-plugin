@@ -47,6 +47,12 @@ public class RomMPlatform : IEquatable<RomMPlatform>
         [JsonProperty("name")]
         public string Name { get; set; }
 
+        [JsonProperty("display_name")]
+        public string DisplayName { get; set; }
+
+        [JsonIgnore]
+        public string PlayniteName => string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName;
+
         [JsonProperty("rom_count")]
         public int RomCount { get; set; }
 

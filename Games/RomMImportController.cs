@@ -58,17 +58,36 @@ namespace RomM.Games
                 if (args.CancelToken.IsCancellationRequested)
                     break;
 
-                // Check mapping has an Emulator, Profile & Platform assigned to it
-                if (mapping.Emulator == null || mapping.EmulatorProfile == null || mapping.RomMPlatform == null || mapping.RomMPlatform.Id == -1)
+                // A mapping with no emulator/profile is genuinely unconfigured — skip quietly.
+                if (mapping.Emulator == null || mapping.EmulatorProfile == null)
                 {
                     Logger.Warn($"[Import Controller] Emulator {mapping.MappingId} is misconfigured, skipping.");
+                    continue;
+                }
+
+                // No RomM platform selected. This is the common state right after upgrading from a
+                // pre-0.6 version, where the old platform mapping is dropped and no RomM platform id
+                // is carried over. Give the user an actionable message instead of a cryptic
+                // "-1 not found". The <= 0 check covers both the unset RomMPlatformId (-1) and the
+                // empty default RomMPlatform (Id 0).
+                if (mapping.RomMPlatformId <= 0 || mapping.RomMPlatform == null || mapping.RomMPlatform.Id <= 0)
+                {
+                    var name = !string.IsNullOrWhiteSpace(mapping.MappingName)
+                        ? mapping.MappingName
+                        : (mapping.Emulator?.Name ?? "a mapping");
+                    // Stable per-mapping id so repeated imports dedupe instead of stacking.
+                    _plugin.Playnite.Notifications.Add(
+                        $"{_plugin.Id}-platform-unset-{mapping.MappingId}",
+                        $"The RomM platform for \"{name}\" is not set. This can happen after upgrading the plugin. " +
+                        "Open RomM settings, select the emulator mapping, choose its RomM platform, then run Update Game Library again.",
+                        NotificationType.Error);
                     continue;
                 }
 
                 RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.Id == mapping.RomMPlatformId);
                 if (apiPlatform == null)
                 {
-                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.RomMPlatform.Name} with ID {mapping.RomMPlatformId} not found in RomM, skipping.", NotificationType.Error);
+                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.RomMPlatform.PlayniteName} with ID {mapping.RomMPlatformId} not found in RomM, skipping.", NotificationType.Error);
                     continue;
                 }
 

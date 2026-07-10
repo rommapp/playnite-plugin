@@ -109,29 +109,26 @@
                     <!-- Credentials -->
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="130" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="170"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Content="RomM host" Style="{StaticResource FieldLabel}" />
                         <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource FieldBox}" Text="{Binding RomMHost, Mode=TwoWay}" />
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Client token (4.8+)" Style="{StaticResource FieldLabel}" />
-                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
-                            <TextBox Style="{StaticResource FieldBox}" Text="{Binding RomMClientToken, Mode=TwoWay}" />
-                            <TextBlock VerticalAlignment="Center" Margin="8,0,0,6">
-                                <Hyperlink NavigateUri="{Binding ClientTokenURL}" RequestNavigate="Hyperlink_RequestNavigate">Get token</Hyperlink>
-                            </TextBlock>
-                        </StackPanel>
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
+                            <Hyperlink NavigateUri="{Binding ClientTokenURL}" RequestNavigate="Hyperlink_RequestNavigate">Client Token</Hyperlink>
+                        </TextBlock>
+                        <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource FieldBox}" Text="{Binding RomMClientToken, Mode=TwoWay}" />
 
-                        <CheckBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" VerticalAlignment="Center" Content="Use basic auth (username / password)" IsChecked="{Binding UseBasicAuth, Mode=TwoWay}" />
+                        <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,6" VerticalAlignment="Center" Content="Use basic auth (username / password)" IsChecked="{Binding UseBasicAuth, Mode=TwoWay}" />
 
                         <Label Grid.Row="3" Grid.Column="0" Content="Username" Style="{StaticResource FieldLabel}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}" />
                         <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource FieldBox}" Text="{Binding RomMUsername, Mode=TwoWay}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}" />
@@ -140,6 +137,25 @@
                         <TextBox Grid.Row="4" Grid.Column="1" Style="{StaticResource FieldBox}" Text="{Binding RomMPassword, Mode=TwoWay}" Visibility="{Binding UseBasicAuth, Converter={StaticResource BoolToVisConverter}}" />
                     </Grid>
 
+                    <!-- QR code login (button and code stacked below the credentials, in the layout flow so it never overlaps other sections) -->
+                    <StackPanel Margin="0,8,0,0" HorizontalAlignment="Left">
+                        <Button Name="QRAuth" Click="Click_LoginViaQR" Padding="12,4" HorizontalAlignment="Left">
+                            <TextBlock Name="QRAuthText" Text="Login via QR Code" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
+
+                        <Grid Name="QRPanel" Width="200" Height="200" Margin="0,10,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
+                            <Border Name="LoginQRBorder" BorderThickness="1" CornerRadius="8" ClipToBounds="True" BorderBrush="#41373737" Background="#41373737"/>
+                            <Border Name="LoginQR" BorderThickness="1" CornerRadius="8" ClipToBounds="True"/>
+                        </Grid>
+
+                        <StackPanel Name="QRDetails" Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
+                            <Button Click="Click_OpenInBrowser" Padding="12,4" VerticalAlignment="Center">
+                                <TextBlock Text="Open in Browser" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Button>
+                            <TextBlock Name="LoginQRTimer" Margin="10,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+
                     <!-- Emulator path mappings -->
                     <DockPanel Margin="0,14,0,0">
                         <TextBlock DockPanel.Dock="Right" VerticalAlignment="Bottom">
@@ -147,14 +163,32 @@
                         </TextBlock>
                         <Label Content="Emulator path mappings" FontWeight="Bold" Margin="0" />
                     </DockPanel>
+                    <Border MaxHeight="22" MinHeight="22" CornerRadius="3" Margin="0,5,0,5">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RomMPlatforms.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Border.Background>
+                            <SolidColorBrush Color="#FF9F60" Opacity="0.15" />
+                        </Border.Background>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text=" &#xE730; " Foreground="#FF9F60" VerticalAlignment="Center" />
+                            <TextBlock Text="No platforms available, Press Sync RomM platforms!" Foreground="#FF9F60" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
                     <Separator Margin="0,4,0,10" />
-
                     <ItemsControl ItemsSource="{Binding Mappings}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Expander Margin="0,0,0,6" IsExpanded="False">
                                     <Expander.Header>
-                                        <TextBlock Text="{Binding MappingName, Mode=OneWay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <Label Content="{Binding MappingName, Mode=OneWay}" VerticalAlignment="Center"/>
                                     </Expander.Header>
                                     <Grid Margin="8,6,8,8">
                                         <Grid.ColumnDefinitions>
@@ -178,7 +212,7 @@
                                         <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6" ItemsSource="{Binding AvailableProfiles}" DisplayMemberPath="Name" SelectedItem="{Binding EmulatorProfile, Mode=TwoWay}" />
 
                                         <Label Grid.Row="2" Grid.Column="0" Content="Platform" Style="{StaticResource FieldLabel}" />
-                                        <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6" IsTextSearchEnabled="True" ItemsSource="{Binding AvailablePlatforms}" DisplayMemberPath="Name" SelectedItem="{Binding RomMPlatform, Mode=TwoWay}" />
+                                        <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6" IsTextSearchEnabled="True" ItemsSource="{Binding AvailablePlatforms}" DisplayMemberPath="PlayniteName" SelectedItem="{Binding RomMPlatform, Mode=TwoWay}" />
 
                                         <Label Grid.Row="3" Grid.Column="0" Content="Path" Style="{StaticResource FieldLabel}" />
                                         <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,8,6" VerticalAlignment="Center" Text="{Binding DestinationPath, Mode=TwoWay}" />

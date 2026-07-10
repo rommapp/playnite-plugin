@@ -47,5 +47,29 @@ namespace RomM.Tests
             Assert.False(a.Equals((object)null));
             Assert.False(a.Equals((RomMPlatform)null));
         }
+
+        [Fact]
+        public void PlayniteName_prefers_display_name_when_available()
+        {
+            var platform = new RomMPlatform
+            {
+                Name = "gba",
+                DisplayName = "Game Boy Advance",
+            };
+
+            Assert.Equal("Game Boy Advance", platform.PlayniteName);
+        }
+
+        [Fact]
+        public void PlayniteName_falls_back_to_name_when_display_name_missing()
+        {
+            var platform = new RomMPlatform
+            {
+                Name = "Nintendo DS",
+                DisplayName = "",
+            };
+
+            Assert.Equal("Nintendo DS", platform.PlayniteName);
+        }
     }
 }
