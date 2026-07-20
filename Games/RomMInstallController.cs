@@ -41,8 +41,11 @@ namespace RomM.Games
             var dstPath = _gameData.Mapping?.DestinationPathResolved
                 ?? throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
 
-            // Paths (same as before)
-            var installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(_gameData.FileName));
+            // Install dir mirrors RomM's on-disk layout: folder-based ROMs (nested single / multiple
+            // files) install into the ROM's folder (fs_name); simple single files fall back to a
+            // folder derived from the file name. Must match the path computed at import time so
+            // IsInstalled detection lines up.
+            var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
 
             // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
             // Otherwise we download the single ROM file.

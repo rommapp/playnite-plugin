@@ -47,6 +47,61 @@ namespace RomM.Tests
         }
 
         [Fact]
+        public void Simple_single_file_has_no_folder_name()
+        {
+            var rom = new RomMRom
+            {
+                Id = 32,
+                HasSimpleSingleFile = true,
+                HasMultipleFiles = false,
+                FileName = "game.gba",
+                Files = new List<RomMFile> { new RomMFile { Id = 7, FileName = "game.gba", FullPath = "game.gba" } },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.Null(rev.FolderName);
+        }
+
+        [Fact]
+        public void Nested_single_file_folder_name_is_the_rom_folder()
+        {
+            var rom = new RomMRom
+            {
+                Id = 33,
+                HasNestedSingleFile = true,
+                HasMultipleFiles = false,
+                FileName = "All-Star Baseball '99",
+                Files = new List<RomMFile>
+                {
+                    new RomMFile { Id = 8, FileName = "All-Star Baseball '99 (Europe).zip", FullPath = "All-Star Baseball '99/All-Star Baseball '99 (Europe).zip" },
+                },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            // File is the real inner file; folder is fs_name (the ROM folder).
+            Assert.Equal("All-Star Baseball '99 (Europe).zip", rev.FileName);
+            Assert.Equal("All-Star Baseball '99", rev.FolderName);
+        }
+
+        [Fact]
+        public void Multi_file_folder_name_is_the_rom_folder()
+        {
+            var rom = new RomMRom
+            {
+                Id = 40,
+                HasMultipleFiles = true,
+                FileName = "1080 TenEighty Snowboarding",
+                Files = new List<RomMFile>(),
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.Equal("1080 TenEighty Snowboarding", rev.FolderName);
+        }
+
+        [Fact]
         public void Single_file_without_id_falls_back_to_rom_endpoint()
         {
             var rom = new RomMRom

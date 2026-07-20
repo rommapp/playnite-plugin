@@ -189,10 +189,19 @@ namespace RomM.Games
             // Paths must be derived from the actual ROM file (what RomMInstallController downloads),
             // not the display Name. Using Name drops the extension and can include characters that
             // don't match the installed file, breaking IsInstalled detection and the play path.
+            //
+            // For folder-based ROMs we point at a real file inside the ROM's folder (fs_name):
+            //   - nested single file: the one file in the folder,
+            //   - multiple files: the primary file (the download descriptor's FileName is the folder
+            //     name / archive base, which is not itself a real file, so use the primary file here).
             var baseRevision = BuildRevision(ROM);
-            var fileName = !string.IsNullOrEmpty(baseRevision?.FileName) ? baseRevision.FileName : ROM.Name;
-            var gameInstallDir = RomMInstallPaths.InstallDir(rootInstallDir, fileName);
-            var pathToGame = RomMInstallPaths.GamePath(rootInstallDir, fileName);
+            var folderName = baseRevision?.FolderName;
+            var playableFile = ROM.HasMultipleFiles
+                ? RomMRevisionFactory.SelectPrimaryFile(ROM.Files)?.FileName
+                : baseRevision?.FileName;
+            var fileName = !string.IsNullOrEmpty(playableFile) ? playableFile : ROM.Name;
+            var gameInstallDir = RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
+            var pathToGame = RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
 
             var status = _plugin.Playnite.Database.CompletionStatuses.Get(StatusID);
             var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;

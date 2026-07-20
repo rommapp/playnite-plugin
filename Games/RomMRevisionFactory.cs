@@ -39,6 +39,9 @@ namespace RomM.Games
                     return null;
 
                 revision.FileName = romfile.FileName;
+                // A nested single file lives inside a folder named after the ROM (fs_name); a simple
+                // single file sits directly in the platform folder and has no wrapping folder.
+                revision.FolderName = rom.HasNestedSingleFile ? rom.FileName : null;
                 revision.DownloadURL = romfile.Id.HasValue
                     ? RomMUrl.Combine(romMHost, $"api/roms/{romfile.Id}/files/content/{romfile.FileName}")
                     : RomMUrl.Combine(romMHost, $"api/roms/{rom.Id}/content/{romfile.FileName}");
@@ -46,6 +49,8 @@ namespace RomM.Games
             else
             {
                 revision.FileName = rom.FileName;
+                // Multi-file ROMs are always stored in a folder named after the ROM (fs_name).
+                revision.FolderName = rom.FileName;
                 revision.DownloadURL = RomMUrl.Combine(romMHost, $"api/roms/{rom.Id}/content/{rom.FileName}");
             }
 
