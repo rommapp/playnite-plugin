@@ -417,36 +417,7 @@ namespace RomM.Settings
                 // Profile (name/role/avatar) is only needed for the settings UI, not for import.
                 if (fetchProfile)
                 {
-                    // Get user info
-                    response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/users/me", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
-                    response.EnsureSuccessStatusCode();
-
-                    body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
-                    RomMUser userinfo;
-
-                    using (StreamReader reader = new StreamReader(body))
-                    {
-                        var jsonResponse = JObject.Parse(reader.ReadToEnd());
-                        userinfo = jsonResponse.ToObject<RomMUser>();
-                    }
-
-                    if (!string.IsNullOrEmpty(userinfo.IconPath))
-                    {
-                        response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/raw/assets/{userinfo.IconPath}", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
-                        response.EnsureSuccessStatusCode();
-                        var imagebytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                        var extensionDataDir = $"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}";
-                        Directory.CreateDirectory(extensionDataDir);
-                        File.WriteAllBytes($"{extensionDataDir}\\avatar.png", imagebytes);
-                        ProfilePath = $"{extensionDataDir}\\avatar.png";
-                    }
-                    else
-                    {
-                        ProfilePath = _defaultprofilepath;
-                    }
-
-                    RomMProfileType = userinfo.Role;
-                    RomMUser = userinfo.Username;
+                    FetchProfileInfo();
                 }
 
                 if(UpdateNotificationBar)
@@ -469,6 +440,63 @@ namespace RomM.Settings
             }
 
             return true;
+        }
+
+        private void FetchProfileInfo()
+        {
+            try
+            {
+                // Get user info
+                var response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/users/me", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+
+                var body = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                RomMUser userinfo;
+
+                using (StreamReader reader = new StreamReader(body))
+                {
+                    var jsonResponse = JObject.Parse(reader.ReadToEnd());
+                    userinfo = jsonResponse.ToObject<RomMUser>();
+                }
+
+                RomMProfileType = userinfo.Role;
+                RomMUser = userinfo.Username;
+
+                if (!string.IsNullOrEmpty(userinfo.IconPath))
+                {
+                    string raw = (ServerVersion ?? string.Empty).Split('-', '+')[0];
+                    if (Version.TryParse(raw, out Version parsed) && parsed.CompareTo(new Version(5, 0, 0)) >= 0)
+                    {
+                        response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/users/{userinfo.Id}/avatar", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
+                    }
+                    else
+                    {
+                        response = HttpClientSingleton.Instance.GetAsync($"{RomMHost}/api/raw/assets/{userinfo.IconPath}", System.Net.Http.HttpCompletionOption.ResponseContentRead, new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30)).Token).GetAwaiter().GetResult();
+                    }
+                    response.EnsureSuccessStatusCode();
+                    var imagebytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    var extensionDataDir = $"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}";
+                    Directory.CreateDirectory(extensionDataDir);
+                    File.WriteAllBytes($"{extensionDataDir}\\avatar.png", imagebytes);
+                    ProfilePath = $"{extensionDataDir}\\avatar.png";
+                }
+                else
+                {
+                    ProfilePath = _defaultprofilepath;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger().Error($"Failed to get profile info, skipping! {ex}");
+                
+                if(File.Exists($"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}\\avatar.png"))
+                    File.Delete($"{PlayniteAPI.Paths.ExtensionsDataPath}\\{RomM.Id.ToString()}\\avatar.png");
+
+                ProfilePath = _defaultprofilepath;
+                RomMUser = "----";
+                RomMProfileType = "----";
+            }
         }
 
         // Fetches the RomM platform list and assigns it to RomMPlatforms, which propagates to every

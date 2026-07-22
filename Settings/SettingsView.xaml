@@ -126,7 +126,15 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
                             <Hyperlink NavigateUri="{Binding ClientTokenURL}" RequestNavigate="Hyperlink_RequestNavigate">Client Token</Hyperlink>
                         </TextBlock>
-                        <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource FieldBox}" Text="{Binding RomMClientToken, Mode=TwoWay}" />
+                        <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource FieldBox}" Text="{Binding RomMClientToken, Mode=TwoWay}" ToolTip="Required Scopes:&#x0a;
+    me.read, me.write,&#x0a;
+    assets.read, assets.write,&#x0a;
+    devices.read, devices.write,&#x0a;
+    roms.user.read, roms.user.write,&#x0a;
+    roms.read,&#x0a;
+    platforms.read,&#x0a;
+    firmware.read,&#x0a;
+    collections.read, collections.write"/>
 
                         <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,6" VerticalAlignment="Center" Content="Use basic auth (username / password)" IsChecked="{Binding UseBasicAuth, Mode=TwoWay}" />
 
