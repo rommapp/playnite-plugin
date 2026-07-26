@@ -197,9 +197,19 @@ namespace RomM.Games
             var baseRevision = BuildRevision(ROM);
             var folderName = baseRevision?.FolderName;
             var playableFile = ROM.HasMultipleFiles
-                ? RomMRevisionFactory.SelectPrimaryFile(ROM.Files)?.FileName
+                ? RomMRevisionFactory.RelativeFilePath(RomMRevisionFactory.SelectPrimaryFile(ROM.Files), folderName)
                 : baseRevision?.FileName;
-            var fileName = !string.IsNullOrEmpty(playableFile) ? playableFile : ROM.Name;
+            // With no file list, fs_name still beats the extensionless display Name.
+            var fileName = !string.IsNullOrEmpty(playableFile) ? playableFile
+                : !string.IsNullOrEmpty(ROM.FileName) ? ROM.FileName
+                : ROM.Name;
+            // Skip the ROM rather than letting the throw from RomMInstallPaths abort the whole platform.
+            if (!RomMInstallPaths.IsContained(folderName) || !RomMInstallPaths.IsContained(fileName))
+            {
+                _plugin.Logger.Error($"[Importer] RomM ID {ROM.Id} has a path outside the install root: {folderName} / {fileName}");
+                return null;
+            }
+
             var gameInstallDir = RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
             var pathToGame = RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
 

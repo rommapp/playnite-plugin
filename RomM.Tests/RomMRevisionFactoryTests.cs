@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using RomM.Games;
 using RomM.Models.RomM.Rom;
 using Xunit;
@@ -26,6 +27,25 @@ namespace RomM.Tests
         {
             Assert.Null(RomMRevisionFactory.SelectPrimaryFile(new List<RomMFile>()));
             Assert.Null(RomMRevisionFactory.SelectPrimaryFile(null));
+        }
+
+        [Fact]
+        public void RelativeFilePath_keeps_path_below_the_rom_folder()
+        {
+            var file = new RomMFile { FileName = "disc1.bin", FullPath = "roms/ps1/Final Fantasy VII/Disc 1/disc1.bin" };
+
+            Assert.Equal(Path.Combine("Disc 1", "disc1.bin"),
+                RomMRevisionFactory.RelativeFilePath(file, "Final Fantasy VII"));
+        }
+
+        [Fact]
+        public void RelativeFilePath_falls_back_to_leaf_name()
+        {
+            var file = new RomMFile { FileName = "disc1.bin", FullPath = "roms/ps1/Other Folder/disc1.bin" };
+
+            Assert.Equal("disc1.bin", RomMRevisionFactory.RelativeFilePath(file, "Final Fantasy VII"));
+            Assert.Equal("disc1.bin", RomMRevisionFactory.RelativeFilePath(file, null));
+            Assert.Null(RomMRevisionFactory.RelativeFilePath(null, "Final Fantasy VII"));
         }
 
         [Fact]

@@ -1,5 +1,6 @@
 ﻿using Playnite.SDK;
 using Playnite.SDK.Plugins;
+using RomM.Games;
 using SharpCompress.Archives;
 using SharpCompress.Common;
 using System;
@@ -213,6 +214,32 @@ namespace RomM.Downloads
         }
 
 
+        // 7-Zip extracts into the output dir and drops absolute paths and ".." components unless -spf
+        // is passed (we never pass it), but the entry names are checked up front anyway so both
+        // extraction paths refuse traversal the same way. Formats SharpCompress cannot open fall back
+        // to 7-Zip's own handling rather than failing a download that used to work.
+        private void EnsureEntriesContained(string archivePath, string installDir)
+        {
+            try
+            {
+                using (var archive = ArchiveFactory.Open(archivePath))
+                {
+                    foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
+                    {
+                        RomMInstallPaths.ResolveWithin(installDir, entry.Key);
+                    }
+                }
+            }
+            catch (ArgumentException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Could not inspect {archivePath} before extraction: {ex.Message}");
+            }
+        }
+
         private void ExtractArchiveWith7z(string pathTo7z, string archivePath, string installDir, DownloadQueueItem item, CancellationToken ct)
         {
             if (archivePath == null || archivePath.Contains("../") || archivePath.Contains(@"..\"))
@@ -223,6 +250,8 @@ namespace RomM.Downloads
             {
                 throw new ArgumentException("Invalid install directory path");
             }
+
+            EnsureEntriesContained(archivePath, installDir);
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
@@ -256,11 +285,17 @@ namespace RomM.Downloads
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    entry.WriteToDirectory(installDir, new ExtractionOptions
+                    // Entry names come from the downloaded archive, so they are untrusted: handing a
+                    // "../" or rooted key to ExtractFullPath would write outside installDir. Resolve
+                    // and verify each destination, then copy the entry there ourselves.
+                    var destination = RomMInstallPaths.ResolveWithin(installDir, entry.Key);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destination));
+
+                    using (var entryStream = entry.OpenEntryStream())
+                    using (var file = File.Create(destination))
                     {
-                        ExtractFullPath = true,
-                        Overwrite = true
-                    });
+                        entryStream.CopyTo(file);
+                    }
 
                     done++;
                     item.SetProgress(done, total, false);
