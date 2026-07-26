@@ -110,3 +110,17 @@ Packages:
       - Auto-sync RomM platforms on connect, drop manual button reliance by @gantoine
       - Add unit test framework (RomM.Tests) and CI by @gantoine
       - Resolve ProfilePath at runtime to prevent crash when Playnite install folder is moved by @gantoine
+  - Version: 0.8.0
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-07-26
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/0.8.0/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_8_0.pext
+    Changelog:
+      - Login via QR code by @matthew-pye
+      - Add open in browser button by @matthew-pye
+      - Notify user when platforms need syncing by @matthew-pye
+      - Add required scopes to token textbox tooltip by @matthew-pye
+      - Patch avatar endpoint for v5 by @matthew-pye
+      - Use platform display names in Playnite mappings by @gantoine
+      - Better error message when no mapping found by @gantoine
+      - Derive install paths from RomM folder (fs_name) for folder-based ROMs by @gantoine
+      - Keep nested ROM paths and contain untrusted paths in the install root by @gantoine

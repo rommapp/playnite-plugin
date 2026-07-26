@@ -164,7 +164,7 @@ namespace RomM.Settings
                     name = $"Playnite-{Environment.MachineName}",
                     client = "Playnite Plugin",
                     platform = "Windows",
-                    client_version = "0.7.0", // This should be probably be changed to reading the extension.yaml at runtime or
+                    client_version = "0.8.0", // This should be probably be changed to reading the extension.yaml at runtime or
                                               //    adding a plugin version to the main file that devs change every update
                     requested_scopes = new List<string>
                     {
