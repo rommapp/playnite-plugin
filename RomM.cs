@@ -418,6 +418,7 @@ namespace RomM
                     {
                         Id = gameData.ROMVersions[0].Id,
                         FileName = gameData.ROMVersions[0].FileName,
+                        FolderName = gameData.ROMVersions[0].FolderName,
                         HasMultipleFiles = gameData.ROMVersions[0].HasMultipleFiles,
                         DownloadURL = gameData.ROMVersions[0].DownloadURL,
                         Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
@@ -466,6 +467,7 @@ namespace RomM
                             var selectedrevision = VersionSelectorControl.RomVersions.First(x => x.IsSelected);
                             romData.Id = selectedrevision.Id;
                             romData.FileName = selectedrevision.FileName;
+                            romData.FolderName = selectedrevision.FolderName;
                             romData.HasMultipleFiles = selectedrevision.HasMultipleFiles;
                             romData.DownloadURL = selectedrevision.DownloadURL;
                             
