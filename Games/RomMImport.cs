@@ -210,8 +210,8 @@ namespace RomM.Games
                 return null;
             }
 
-            var gameInstallDir = RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
-            var pathToGame = RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
+            var gameInstallDir = _mapping.InstallFlat ? rootInstallDir : RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
+            var pathToGame = _mapping.InstallFlat ? $"{rootInstallDir}\\{fileName}" : RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
 
             var status = _plugin.Playnite.Database.CompletionStatuses.Get(StatusID);
             var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
@@ -245,6 +245,7 @@ namespace RomM.Games
                     IsPlayAction = false
                 }
             };
+
 
             // Import new game
             Game game = _plugin.Playnite.Database.ImportGame(metadata, _plugin);

@@ -41,6 +41,8 @@ namespace RomM.Settings
         public int _romMPlatformId = -1;
         [JsonIgnore]
         private string _destinationPath = "";
+        [JsonIgnore]
+        private bool _installFlat = false;
 
         public EmulatorMapping(List<RomMPlatform> romMPlatforms)
         {
@@ -232,10 +234,20 @@ namespace RomM.Settings
             {
                 _destinationPath = value;
                 OnPropertyChanged();
-    }
-}
+            }
+        }
 
-[JsonIgnore]
+        public bool InstallFlat
+        {
+            get => _installFlat;
+            set
+            {
+                _installFlat = value;
+                OnPropertyChanged();
+            }
+        }
+
+            [JsonIgnore]
         public static IEnumerable<Emulator> AvailableEmulators => SettingsViewModel.Instance.PlayniteAPI.Database.Emulators?.OrderBy(x => x.Name) ?? Enumerable.Empty<Emulator>();
         [JsonIgnore]
         public IEnumerable<EmulatorProfile> AvailableProfiles

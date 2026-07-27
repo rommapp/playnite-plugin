@@ -229,6 +229,7 @@
                                         <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,8">
                                             <CheckBox Content="Enabled" Margin="0,0,16,0" IsChecked="{Binding Enabled, Mode=TwoWay}" />
                                             <CheckBox Content="Auto-extract" Margin="0,0,16,0" IsChecked="{Binding AutoExtract, Mode=TwoWay}" ToolTip="Extract ROMs stored on the server as Rar, Zip, Tar, 7z, GZip, or BZip2." />
+                                            <CheckBox Content="Install Flat" Margin="0,0,16,0" IsChecked="{Binding InstallFlat, Mode=TwoWay}" ToolTip="Will download ROMs into the Path/ instead of Path/Gamename/" />
                                             <CheckBox Content="Prefer .m3u" IsChecked="{Binding UseM3U, Mode=TwoWay}" ToolTip="Use the .m3u file for multi-file ROMs when the emulator supports it." />
                                         </StackPanel>
 

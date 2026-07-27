@@ -1,14 +1,15 @@
-﻿using Playnite.SDK;
+﻿using Newtonsoft.Json;
+using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using RomM.Downloads;
 using RomM.Models.RomM.Rom;
+using RomM.Settings;
 using SharpCompress.Archives;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Newtonsoft.Json;
 
 namespace RomM.Games
 {
@@ -46,6 +47,9 @@ namespace RomM.Games
             // folder derived from the file name. Must match the path computed at import time so
             // IsInstalled detection lines up.
             var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
+
+            if (_gameData.Mapping.InstallFlat)
+                installDir = dstPath;
 
             // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
             // Otherwise we download the single ROM file.
