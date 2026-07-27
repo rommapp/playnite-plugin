@@ -490,7 +490,28 @@ namespace RomM
         {
             if (args.Game.PluginId == Id)
             {
-                yield return new RomMUninstallController(args.Game, this);
+                EmulatorMapping mapping = null;
+
+                try
+                {
+                    var splitID = args.Game.GameId.Split(':');
+                    string sidecarPath = $"{ROMDataPath}{splitID[1]}.json";
+                    if (File.Exists(sidecarPath))
+                    { 
+                            var existingJson = File.ReadAllText(sidecarPath);
+                            var localROM = JsonConvert.DeserializeObject<RomMRomLocal>(existingJson);
+                            mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == localROM.MappingID);
+                    }
+                }
+                catch (Exception)
+                {
+                    Logger.Error($"{args.Game.Name} GameID is malformed or json file is corrupted!");
+                }
+
+                if (mapping == null)
+                    yield return null;
+
+                yield return new RomMUninstallController(args.Game, this, mapping);
             }
         }
         public override void OnGameInstalled(OnGameInstalledEventArgs args)
