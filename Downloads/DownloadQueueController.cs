@@ -177,7 +177,8 @@ namespace RomM.Downloads
             }
 
             // Extract if needed (we treat extract as 0..100 in its own bar)
-            if (req.HasMultipleFiles || (req.AutoExtract && IsFileCompressed(req.GamePath)))
+            // Don't extract archives when install flat is enabled
+            if (req.HasMultipleFiles || (req.AutoExtract && IsFileCompressed(req.GamePath) && !req.InstallFlat))
             {
                 item.SetStatus(DownloadStatus.Extracting, "Extracting...");
                 Logger.Info($"Extracting {req.GamePath}...");
@@ -323,7 +324,8 @@ namespace RomM.Downloads
                 SafeDeleteFileWithRetry(req.GamePath);
 
                 // delete folder (recursively) if it exists
-                SafeDeleteDirectoryWithRetry(req.InstallDir);
+                if(!req.InstallFlat)
+                    SafeDeleteDirectoryWithRetry(req.InstallDir);
             }
             catch (Exception ex)
             {

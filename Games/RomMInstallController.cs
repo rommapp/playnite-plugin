@@ -70,6 +70,7 @@ namespace RomM.Games
 
                 HasMultipleFiles = _gameData.HasMultipleFiles,
                 AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
+                InstallFlat = _gameData.Mapping.InstallFlat,
 
                 // Called by queue AFTER download/extract is done
                 BuildRoms = () =>
