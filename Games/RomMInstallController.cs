@@ -1,14 +1,15 @@
-﻿using Playnite.SDK;
+﻿using Newtonsoft.Json;
+using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using RomM.Downloads;
 using RomM.Models.RomM.Rom;
+using RomM.Settings;
 using SharpCompress.Archives;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Newtonsoft.Json;
 
 namespace RomM.Games
 {
@@ -41,8 +42,14 @@ namespace RomM.Games
             var dstPath = _gameData.Mapping?.DestinationPathResolved
                 ?? throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
 
-            // Paths (same as before)
-            var installDir = Path.Combine(dstPath, Path.GetFileNameWithoutExtension(_gameData.FileName));
+            // Install dir mirrors RomM's on-disk layout: folder-based ROMs (nested single / multiple
+            // files) install into the ROM's folder (fs_name); simple single files fall back to a
+            // folder derived from the file name. Must match the path computed at import time so
+            // IsInstalled detection lines up.
+            var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
+
+            if (_gameData.Mapping.InstallFlat)
+                installDir = dstPath;
 
             // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
             // Otherwise we download the single ROM file.
@@ -63,6 +70,7 @@ namespace RomM.Games
 
                 HasMultipleFiles = _gameData.HasMultipleFiles,
                 AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
+                InstallFlat = _gameData.Mapping.InstallFlat,
 
                 // Called by queue AFTER download/extract is done
                 BuildRoms = () =>

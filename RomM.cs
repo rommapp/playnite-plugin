@@ -433,6 +433,7 @@ namespace RomM
                     {
                         Id = gameData.ROMVersions[0].Id,
                         FileName = gameData.ROMVersions[0].FileName,
+                        FolderName = gameData.ROMVersions[0].FolderName,
                         HasMultipleFiles = gameData.ROMVersions[0].HasMultipleFiles,
                         DownloadURL = gameData.ROMVersions[0].DownloadURL,
                         Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
@@ -481,6 +482,7 @@ namespace RomM
                             var selectedrevision = VersionSelectorControl.RomVersions.First(x => x.IsSelected);
                             romData.Id = selectedrevision.Id;
                             romData.FileName = selectedrevision.FileName;
+                            romData.FolderName = selectedrevision.FolderName;
                             romData.HasMultipleFiles = selectedrevision.HasMultipleFiles;
                             romData.DownloadURL = selectedrevision.DownloadURL;
                             
@@ -503,7 +505,28 @@ namespace RomM
         {
             if (args.Game.PluginId == Id)
             {
-                yield return new RomMUninstallController(args.Game, this);
+                EmulatorMapping mapping = null;
+
+                try
+                {
+                    var splitID = args.Game.GameId.Split(':');
+                    string sidecarPath = $"{ROMDataPath}{splitID[1]}.json";
+                    if (File.Exists(sidecarPath))
+                    { 
+                            var existingJson = File.ReadAllText(sidecarPath);
+                            var localROM = JsonConvert.DeserializeObject<RomMRomLocal>(existingJson);
+                            mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == localROM.MappingID);
+                    }
+                }
+                catch (Exception)
+                {
+                    Logger.Error($"{args.Game.Name} GameID is malformed or json file is corrupted!");
+                }
+
+                if (mapping == null)
+                    yield return null;
+
+                yield return new RomMUninstallController(args.Game, this, mapping);
             }
         }
         public override void OnGameInstalled(OnGameInstalledEventArgs args)
