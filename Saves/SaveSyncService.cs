@@ -17,24 +17,32 @@ using System.Text;
 namespace RomM.Saves
 {
     /// <summary>
-    /// Synchronises a game's local RetroArch battery save (.srm) with the RomM server using the
-    /// API sync mode (see romm PRs #3137 / #3479): register a device once, POST /sync/negotiate to
-    /// let the server decide upload / download / conflict / no_op per save, execute the returned
-    /// operations, then POST the session complete. Conflicts are resolved most-recent-wins.
+    /// Synchronises a game's local save with the RomM server using the API sync mode (see romm PRs
+    /// #3137 / #3479): register a device once, POST /sync/negotiate to let the server decide
+    /// upload / download / conflict / no_op per save, execute the returned operations, then POST
+    /// the session complete. Conflicts are resolved most-recent-wins.
     ///
-    /// Currently scoped to RetroArch, whose SRAM location is derived from retroarch.cfg.
+    /// Where a save lives, and whether it is one file or a packed directory, is the business of
+    /// an <see cref="ISaveHandler"/>; this class only moves bytes. RetroArch is the handler that
+    /// exists today.
     /// </summary>
     internal class SaveSyncService
     {
-        private const string Emulator = "retroarch";
         private const string DeviceClient = "playnite";
 
         private readonly IRomM _romM;
+        private readonly SaveHandlerRegistry _handlers;
         private readonly object _deviceLock = new object();
 
         public SaveSyncService(IRomM romM)
+            : this(romM, new SaveHandlerRegistry())
+        {
+        }
+
+        public SaveSyncService(IRomM romM, SaveHandlerRegistry handlers)
         {
             _romM = romM;
+            _handlers = handlers;
         }
 
         private ILogger Logger => _romM.Logger;
@@ -70,10 +78,10 @@ namespace RomM.Saves
                     return outcome;
                 }
 
-                var target = ResolveRetroArchTarget(game);
+                var target = ResolveTarget(game);
                 if (target == null)
                 {
-                    outcome.Message = "Save sync currently only supports RetroArch games.";
+                    outcome.Message = "Save sync does not know where this game's emulator keeps its saves.";
                     return outcome;
                 }
 
@@ -122,22 +130,21 @@ namespace RomM.Saves
 
         #region Negotiate / session
 
-        private RomMSyncNegotiateResponse Negotiate(string deviceId, int romId, RetroArchTarget target)
+        private RomMSyncNegotiateResponse Negotiate(string deviceId, int romId, SaveTarget target)
         {
             var payload = new RomMSyncNegotiatePayload { DeviceId = deviceId };
 
-            if (File.Exists(target.LocalSavePath))
+            if (target.Exists)
             {
-                var info = new FileInfo(target.LocalSavePath);
                 payload.Saves.Add(new RomMClientSaveState
                 {
                     RomId = romId,
-                    FileName = Path.GetFileName(target.LocalSavePath),
+                    FileName = target.FileName,
                     Slot = null,
-                    Emulator = Emulator,
-                    ContentHash = SaveFileHash.Md5HexFile(target.LocalSavePath),
-                    UpdatedAt = info.LastWriteTimeUtc,
-                    FileSizeBytes = info.Length,
+                    Emulator = target.EmulatorTag,
+                    ContentHash = target.ContentHash(),
+                    UpdatedAt = target.UpdatedAtUtc,
+                    FileSizeBytes = target.SizeBytes,
                 });
             }
 
@@ -167,7 +174,7 @@ namespace RomM.Saves
 
         #region Operation handling
 
-        private void ApplyOperation(RomMSyncOperation op, string deviceId, int sessionId, RetroArchTarget target, SyncOutcome outcome)
+        private void ApplyOperation(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, SyncOutcome outcome)
         {
             try
             {
@@ -205,11 +212,9 @@ namespace RomM.Saves
         }
 
         /// <summary>Most-recent-wins: whichever side was modified later overwrites the other.</summary>
-        private void ResolveConflict(RomMSyncOperation op, string deviceId, int sessionId, RetroArchTarget target, SyncOutcome outcome)
+        private void ResolveConflict(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, SyncOutcome outcome)
         {
-            var localTime = File.Exists(target.LocalSavePath)
-                ? (DateTime?)new FileInfo(target.LocalSavePath).LastWriteTimeUtc
-                : null;
+            var localTime = target.Exists ? (DateTime?)target.UpdatedAtUtc : null;
             var serverTime = op.ServerUpdatedAt?.ToUniversalTime();
 
             bool serverWins = serverTime.HasValue && (!localTime.HasValue || serverTime.Value > localTime.Value);
@@ -227,15 +232,16 @@ namespace RomM.Saves
             }
         }
 
-        private bool Upload(RomMSyncOperation op, string deviceId, int sessionId, RetroArchTarget target)
+        private bool Upload(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target)
         {
-            if (!File.Exists(target.LocalSavePath))
+            if (!target.Exists)
             {
-                Logger.Warn($"[SaveSync] Asked to upload rom {op.RomId} but no local save at {target.LocalSavePath}.");
+                Logger.Warn($"[SaveSync] Asked to upload rom {op.RomId} but there is no local save for it.");
                 return false;
             }
 
-            using (var content = BuildSaveContent(target.LocalSavePath))
+            using (var prepared = target.PrepareUpload())
+            using (var content = BuildSaveContent(prepared))
             {
                 HttpResponseMessage response;
                 if (op.SaveId.HasValue)
@@ -247,7 +253,7 @@ namespace RomM.Saves
                 else
                 {
                     var url = RomMUrl.Combine(Settings.RomMHost,
-                        $"api/saves?rom_id={op.RomId}&emulator={Emulator}" +
+                        $"api/saves?rom_id={op.RomId}&emulator={target.EmulatorTag}" +
                         $"&device_id={WebUtility.UrlEncode(deviceId)}&session_id={sessionId}");
                     response = HttpClientSingleton.Instance.PostAsync(url, content).GetAwaiter().GetResult();
                 }
@@ -261,7 +267,7 @@ namespace RomM.Saves
             return true;
         }
 
-        private bool Download(RomMSyncOperation op, string deviceId, int sessionId, RetroArchTarget target)
+        private bool Download(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target)
         {
             if (!op.SaveId.HasValue)
             {
@@ -279,20 +285,17 @@ namespace RomM.Saves
                 bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
             }
 
-            // Overwrite the file RetroArch already uses when we found one, otherwise write to the
-            // path RetroArch would create for this content.
-            var destination = target.ExistingSavePath ?? target.LocalSavePath;
-            var directory = Path.GetDirectoryName(destination);
-            if (!string.IsNullOrEmpty(directory))
-                Directory.CreateDirectory(directory);
-
-            File.WriteAllBytes(destination, bytes);
-
-            // Align the local timestamp with the server so the next negotiate sees them as in-sync.
-            if (op.ServerUpdatedAt.HasValue)
+            // The handler decides what "apply" means -- overwrite a file, or unpack an archive over
+            // the save directory. It also aligns the local timestamp with the server's so the next
+            // negotiate sees the two sides as in sync rather than as a fresh local edit.
+            try
             {
-                try { File.SetLastWriteTimeUtc(destination, op.ServerUpdatedAt.Value.ToUniversalTime()); }
-                catch (Exception ex) { Logger.Warn($"[SaveSync] Could not set save timestamp: {ex.Message}"); }
+                target.ApplyDownload(bytes, op.ServerUpdatedAt);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"[SaveSync] Could not write the downloaded save for rom {op.RomId}.");
+                return false;
             }
 
             ConfirmDownloaded(op.SaveId.Value, deviceId);
@@ -312,13 +315,13 @@ namespace RomM.Saves
             }
         }
 
-        private static HttpContent BuildSaveContent(string filePath)
+        private static HttpContent BuildSaveContent(PreparedUpload upload)
         {
-            var fileContent = new ByteArrayContent(File.ReadAllBytes(filePath));
+            var fileContent = new ByteArrayContent(File.ReadAllBytes(upload.FilePath));
             fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
             var form = new MultipartFormDataContent();
-            form.Add(fileContent, "saveFile", Path.GetFileName(filePath));
+            form.Add(fileContent, "saveFile", upload.FileName);
             return form;
         }
 
@@ -373,55 +376,37 @@ namespace RomM.Saves
 
         #endregion
 
-        #region RetroArch resolution
+        #region Save location
 
-        /// <summary>Where a game's RetroArch save lives locally, plus any already-existing file.</summary>
-        private class RetroArchTarget
+        /// <summary>
+        /// Finds the emulator Playnite launches this game with, hands it to whichever handler
+        /// recognises it, and lets that handler locate the save. Null when the game has no
+        /// emulator, no ROM path, or runs on an emulator no handler covers yet.
+        /// </summary>
+        private SaveTarget ResolveTarget(Game game)
         {
-            public string LocalSavePath { get; set; }
-            public string ExistingSavePath { get; set; }
-        }
+            var contentPath = game.Roms?.FirstOrDefault()?.Path;
+            if (string.IsNullOrEmpty(contentPath))
+                return null;
 
-        private RetroArchTarget ResolveRetroArchTarget(Game game)
-        {
-            try
+            var emulator = ResolveEmulator(game);
+            if (emulator == null)
+                return null;
+
+            var handler = _handlers.Find(emulator);
+            if (handler == null)
             {
-                var contentPath = game.Roms?.FirstOrDefault()?.Path;
-                if (string.IsNullOrEmpty(contentPath))
-                    return null;
-
-                contentPath = _romM.Playnite.ExpandGameVariables(game, contentPath);
-
-                var emulator = ResolveEmulator(game);
-                if (emulator == null || !IsRetroArch(emulator))
-                    return null;
-
-                var cfgPath = FindRetroArchConfig(emulator);
-                var cfg = cfgPath != null
-                    ? RetroArchConfig.Parse(File.ReadAllText(cfgPath))
-                    : new Dictionary<string, string>();
-
-                var baseDir = emulator.InstallDir;
-                var localSavePath = RetroArchConfig.ResolveSaveFilePath(cfg, contentPath, null, baseDir);
-                if (string.IsNullOrEmpty(localSavePath))
-                    return null;
-
-                var existing = File.Exists(localSavePath)
-                    ? localSavePath
-                    : FindExistingSave(RetroArchConfig.ResolveSaveBaseDirectory(cfg, contentPath, baseDir),
-                                       Path.GetFileNameWithoutExtension(contentPath));
-
-                return new RetroArchTarget
-                {
-                    LocalSavePath = existing ?? localSavePath,
-                    ExistingSavePath = existing,
-                };
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, $"[SaveSync] Failed to resolve RetroArch save path for {game?.Name}.");
+                Logger.Info($"[SaveSync] No save handler for emulator '{emulator.Name}', skipping {game.Name}.");
                 return null;
             }
+
+            return handler.ResolveTarget(new SaveTargetRequest
+            {
+                Game = game,
+                Emulator = emulator,
+                ContentPath = _romM.Playnite.ExpandGameVariables(game, contentPath),
+                Logger = Logger,
+            });
         }
 
         private Emulator ResolveEmulator(Game game)
@@ -433,54 +418,6 @@ namespace RomM.Saves
                 return _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
 
             return null;
-        }
-
-        private static bool IsRetroArch(Emulator emulator)
-        {
-            if (string.Equals(emulator.BuiltInConfigId, "retroarch", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (!string.IsNullOrEmpty(emulator.Name) &&
-                emulator.Name.IndexOf("retroarch", StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-
-            if (!string.IsNullOrEmpty(emulator.InstallDir) &&
-                File.Exists(Path.Combine(emulator.InstallDir, "retroarch.exe")))
-                return true;
-
-            return false;
-        }
-
-        private static string FindRetroArchConfig(Emulator emulator)
-        {
-            if (!string.IsNullOrEmpty(emulator.InstallDir))
-            {
-                var inInstall = Path.Combine(emulator.InstallDir, "retroarch.cfg");
-                if (File.Exists(inInstall))
-                    return inInstall;
-            }
-
-            var appData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "RetroArch", "retroarch.cfg");
-            return File.Exists(appData) ? appData : null;
-        }
-
-        private static string FindExistingSave(string baseDir, string contentName)
-        {
-            if (string.IsNullOrEmpty(baseDir) || !Directory.Exists(baseDir) || string.IsNullOrEmpty(contentName))
-                return null;
-
-            try
-            {
-                return Directory
-                    .EnumerateFiles(baseDir, contentName + RetroArchConfig.SaveExtension, SearchOption.AllDirectories)
-                    .FirstOrDefault();
-            }
-            catch
-            {
-                return null;
-            }
         }
 
         #endregion
