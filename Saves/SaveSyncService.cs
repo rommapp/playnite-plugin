@@ -140,7 +140,7 @@ namespace RomM.Saves
                 {
                     RomId = romId,
                     FileName = target.FileName,
-                    Slot = null,
+                    Slot = target.Slot,
                     Emulator = target.EmulatorTag,
                     ContentHash = target.ContentHash(),
                     UpdatedAt = target.UpdatedAtUtc,
@@ -254,6 +254,7 @@ namespace RomM.Saves
                 {
                     var url = RomMUrl.Combine(Settings.RomMHost,
                         $"api/saves?rom_id={op.RomId}&emulator={target.EmulatorTag}" +
+                        $"&slot={WebUtility.UrlEncode(target.Slot)}" +
                         $"&device_id={WebUtility.UrlEncode(deviceId)}&session_id={sessionId}");
                     response = HttpClientSingleton.Instance.PostAsync(url, content).GetAwaiter().GetResult();
                 }
@@ -404,6 +405,7 @@ namespace RomM.Saves
             {
                 Game = game,
                 Emulator = emulator,
+                Profile = ResolveProfile(game, emulator),
                 ContentPath = _romM.Playnite.ExpandGameVariables(game, contentPath),
                 Logger = Logger,
             });
@@ -411,13 +413,27 @@ namespace RomM.Saves
 
         private Emulator ResolveEmulator(Game game)
         {
-            var action = game.GameActions?.FirstOrDefault(a => a.IsPlayAction && a.Type == GameActionType.Emulator)
-                         ?? game.GameActions?.FirstOrDefault(a => a.Type == GameActionType.Emulator);
+            var action = EmulatorAction(game);
 
             if (action != null && action.EmulatorId != Guid.Empty)
                 return _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
 
             return null;
+        }
+
+        private static EmulatorProfile ResolveProfile(Game game, Emulator emulator)
+        {
+            var profileId = EmulatorAction(game)?.EmulatorProfileId;
+            if (string.IsNullOrEmpty(profileId))
+                return null;
+
+            return emulator.SelectableProfiles?.FirstOrDefault(p => p.Id == profileId);
+        }
+
+        private static GameAction EmulatorAction(Game game)
+        {
+            return game.GameActions?.FirstOrDefault(a => a.IsPlayAction && a.Type == GameActionType.Emulator)
+                   ?? game.GameActions?.FirstOrDefault(a => a.Type == GameActionType.Emulator);
         }
 
         #endregion

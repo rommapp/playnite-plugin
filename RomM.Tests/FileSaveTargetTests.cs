@@ -31,6 +31,15 @@ namespace RomM.Tests
             Assert.False(target.Exists);
         }
 
+        // sync/negotiate skips saves without a slot entirely: they upload fine and are then
+        // invisible to every device, including the one that wrote them. "autosave" is what the
+        // other RomM clients use for a game's live save.
+        [Fact]
+        public void Carries_a_slot_so_the_save_is_visible_to_negotiate()
+        {
+            Assert.Equal("autosave", new FileSaveTarget("retroarch", Path_("game.srm"), null).Slot);
+        }
+
         [Fact]
         public void Reports_the_file_it_found_rather_than_the_configured_path()
         {

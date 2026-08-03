@@ -29,6 +29,8 @@ namespace RomM.Saves
 
         public override string EmulatorTag { get; }
 
+        public override string Slot => "autosave";
+
         public override bool Exists => File.Exists(_readPath);
 
         public override string FileName => Path.GetFileName(_readPath);

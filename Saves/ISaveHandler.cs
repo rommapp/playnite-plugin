@@ -37,6 +37,12 @@ namespace RomM.Saves
 
         public Emulator Emulator { get; set; }
 
+        /// <summary>
+        /// The profile the game launches with, when one is set. Carries the detail that decides
+        /// where some emulators file a save — for RetroArch, which core is running.
+        /// </summary>
+        public EmulatorProfile Profile { get; set; }
+
         /// <summary>The ROM's path with Playnite's variables already expanded.</summary>
         public string ContentPath { get; set; }
 

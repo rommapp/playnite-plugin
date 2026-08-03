@@ -23,6 +23,15 @@ namespace RomM.Saves
         /// </summary>
         public abstract string EmulatorTag { get; }
 
+        /// <summary>
+        /// The slot the save is filed under. Not optional in practice: `sync/negotiate` only
+        /// considers saves that carry one, so a slot-less upload lands on the server correctly and
+        /// is then invisible to every device, including the one that wrote it. Other RomM clients
+        /// use "autosave" for a game's live save regardless of platform, and matching that is what
+        /// keeps the same save reconcilable across them.
+        /// </summary>
+        public abstract string Slot { get; }
+
         /// <summary>Whether there is anything locally to report or upload yet.</summary>
         public abstract bool Exists { get; }
 
