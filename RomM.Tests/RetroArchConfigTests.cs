@@ -62,6 +62,9 @@ namespace RomM.Tests
             Assert.Equal(Path.Combine(saveDir, "Game.srm"), path);
         }
 
+        // "Content" here is the directory the ROM sits in, not the ROM itself — checked against
+        // RetroArch, which puts a rom in roms\ under <saves>\roms\. See RetroArchConfigLayoutTests
+        // for the full set of layouts.
         [Fact]
         public void ResolveSaveFilePath_sorts_by_content_when_enabled()
         {
@@ -75,7 +78,7 @@ namespace RomM.Tests
 
             var path = RetroArchConfig.ResolveSaveFilePath(cfg, content);
 
-            Assert.Equal(Path.Combine(saveDir, "Game", "Game.srm"), path);
+            Assert.Equal(Path.Combine(saveDir, "roms", "Game.srm"), path);
         }
 
         [Fact]

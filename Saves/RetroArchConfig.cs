@@ -9,11 +9,17 @@ namespace RomM.Saves
     /// Pure, Playnite-free logic so it can be unit-tested; the filesystem/emulator lookups live in
     /// <see cref="SaveSyncService"/>.
     ///
-    /// RetroArch save path rules (battery / SRAM):
-    ///   base = savefile_directory (empty / "default" -> the content's own directory)
-    ///   + per-core subfolder      when sort_savefiles_enable = true
-    ///   + per-content subfolder   when sort_savefiles_by_content_enable = true
+    /// RetroArch save path rules (battery / SRAM), as observed against RetroArch itself:
+    ///   base = savefile_directory (empty / "default" -> the content's own directory),
+    ///          overridden entirely by savefiles_in_content_dir
+    ///   + subfolder named after the content's *parent directory*, when
+    ///     sort_savefiles_by_content_enable = true
+    ///   + per-core subfolder, when sort_savefiles_enable = true
     ///   file = &lt;content base name&gt;.srm
+    ///
+    /// The order matters and is not the one the option names suggest: content-directory sorting
+    /// is applied first and the core folder nests inside it, giving
+    /// &lt;base&gt;/&lt;rom's folder&gt;/&lt;core&gt;/&lt;rom&gt;.srm.
     /// </summary>
     public static class RetroArchConfig
     {
@@ -70,35 +76,47 @@ namespace RomM.Saves
             if (string.IsNullOrEmpty(contentFilePath))
                 return null;
 
-            var contentDir = Path.GetDirectoryName(contentFilePath);
             var contentName = Path.GetFileNameWithoutExtension(contentFilePath);
+            var saveDir = ResolveSaveBaseDirectory(cfg, contentFilePath, retroArchBaseDir);
 
-            var saveDir = ExpandPath(GetValue(cfg, "savefile_directory"), retroArchBaseDir);
-            if (string.IsNullOrEmpty(saveDir))
-                saveDir = contentDir;
+            // Sorting by content uses the name of the folder the ROM sits in, not the ROM's own
+            // name, and it wraps around the per-core folder rather than nesting inside it.
+            if (GetBool(cfg, "sort_savefiles_by_content_enable"))
+            {
+                var contentDirName = Path.GetFileName(Path.GetDirectoryName(contentFilePath) ?? string.Empty);
+                if (!string.IsNullOrEmpty(contentDirName))
+                    saveDir = Path.Combine(saveDir, contentDirName);
+            }
 
             if (GetBool(cfg, "sort_savefiles_enable") && !string.IsNullOrEmpty(coreName))
                 saveDir = Path.Combine(saveDir, coreName);
-
-            if (GetBool(cfg, "sort_savefiles_by_content_enable"))
-                saveDir = Path.Combine(saveDir, contentName);
 
             return Path.Combine(saveDir, contentName + SaveExtension);
         }
 
         /// <summary>
-        /// Resolves the configured save base directory (without any per-core / per-content sorting),
-        /// used as the root for a recursive ".srm" search when the exact path doesn't exist. Falls
-        /// back to the content directory when savefile_directory is unset.
+        /// Resolves the save base directory (without any per-core / per-content sorting), used as
+        /// the root for a recursive ".srm" search when the exact path doesn't exist.
+        ///
+        /// savefiles_in_content_dir puts saves beside the ROM and takes precedence over
+        /// savefile_directory rather than merely filling in for an empty one — searching the
+        /// configured directory in that case looks in a tree the saves were never written to.
         /// </summary>
         public static string ResolveSaveBaseDirectory(
             IDictionary<string, string> cfg,
             string contentFilePath,
             string retroArchBaseDir = null)
         {
+            var contentDir = string.IsNullOrEmpty(contentFilePath)
+                ? null
+                : Path.GetDirectoryName(contentFilePath);
+
+            if (GetBool(cfg, "savefiles_in_content_dir"))
+                return contentDir;
+
             var saveDir = ExpandPath(GetValue(cfg, "savefile_directory"), retroArchBaseDir);
-            if (string.IsNullOrEmpty(saveDir) && !string.IsNullOrEmpty(contentFilePath))
-                saveDir = Path.GetDirectoryName(contentFilePath);
+            if (string.IsNullOrEmpty(saveDir))
+                saveDir = contentDir;
 
             return saveDir;
         }
