@@ -2,7 +2,7 @@ using Playnite.SDK.Models;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace RomM.Saves
+namespace RomM.Saves.Handlers
 {
     /// <summary>
     /// Picks the handler that knows a given emulator. The single place that has to change when a

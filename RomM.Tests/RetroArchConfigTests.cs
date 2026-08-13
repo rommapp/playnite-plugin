@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using RomM.Saves;
+using RomM.Saves.Handlers;
 using Xunit;
 
 namespace RomM.Tests

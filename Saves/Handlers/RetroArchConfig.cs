@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace RomM.Saves
+namespace RomM.Saves.Handlers
 {
     /// <summary>
     /// Parses a retroarch.cfg and resolves where RetroArch writes a game's battery save (.srm).

@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace RomM.Saves
+namespace RomM.Saves.Handlers
 {
     /// <summary>
     /// RetroArch's battery saves. The location comes out of retroarch.cfg rather than being fixed,

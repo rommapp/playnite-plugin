@@ -52,13 +52,13 @@
     <Compile Include="..\Games\RomMCompletionStatus.cs" Link="Linked\Games\RomMCompletionStatus.cs" />
     <Compile Include="..\Games\RomMHash.cs" Link="Linked\Games\RomMHash.cs" />
     <Compile Include="..\Games\RomMSiblings.cs" Link="Linked\Games\RomMSiblings.cs" />
-    <Compile Include="..\Saves\RetroArchConfig.cs" Link="Linked\Saves\RetroArchConfig.cs" />
     <Compile Include="..\Saves\SaveFileHash.cs" Link="Linked\Saves\SaveFileHash.cs" />
     <Compile Include="..\Saves\SaveTarget.cs" Link="Linked\Saves\SaveTarget.cs" />
     <Compile Include="..\Saves\FileSaveTarget.cs" Link="Linked\Saves\FileSaveTarget.cs" />
-    <Compile Include="..\Saves\ISaveHandler.cs" Link="Linked\Saves\ISaveHandler.cs" />
-    <Compile Include="..\Saves\RetroArchSaveHandler.cs" Link="Linked\Saves\RetroArchSaveHandler.cs" />
-    <Compile Include="..\Saves\SaveHandlerRegistry.cs" Link="Linked\Saves\SaveHandlerRegistry.cs" />
+    <Compile Include="..\Saves\Handlers\ISaveHandler.cs" Link="Linked\Saves\Handlers\ISaveHandler.cs" />
+    <Compile Include="..\Saves\Handlers\RetroArchConfig.cs" Link="Linked\Saves\Handlers\RetroArchConfig.cs" />
+    <Compile Include="..\Saves\Handlers\RetroArchSaveHandler.cs" Link="Linked\Saves\Handlers\RetroArchSaveHandler.cs" />
+    <Compile Include="..\Saves\Handlers\SaveHandlerRegistry.cs" Link="Linked\Saves\Handlers\SaveHandlerRegistry.cs" />
   </ItemGroup>
 
 </Project>

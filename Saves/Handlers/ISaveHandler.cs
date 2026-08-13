@@ -1,7 +1,7 @@
 using Playnite.SDK;
 using Playnite.SDK.Models;
 
-namespace RomM.Saves
+namespace RomM.Saves.Handlers
 {
     /// <summary>
     /// Knows where one emulator keeps its saves. Handlers own everything platform-specific --

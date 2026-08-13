@@ -3,6 +3,7 @@ using Playnite.SDK;
 using Playnite.SDK.Models;
 using RomM.Games;
 using RomM.Models.RomM.Save;
+using RomM.Saves.Handlers;
 using RomM.Settings;
 using System;
 using System.Collections.Generic;
