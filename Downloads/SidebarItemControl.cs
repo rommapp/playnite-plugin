@@ -40,7 +40,7 @@ namespace RomM.Downloads
                 FontSize = 18
             };
 
-            // Link contener
+            // Link container
             StackPanel stackPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,

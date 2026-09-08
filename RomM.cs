@@ -424,7 +424,7 @@ namespace RomM
                         Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
                     };
 
-                    // If Siblings are avaiable prompt user with version selection
+                    // If Siblings are available prompt user with version selection
                     if (Settings.MergeRevisions && gameData.ROMVersions?.Count > 1)
                     {
 
