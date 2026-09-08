@@ -107,7 +107,7 @@ namespace RomM.Games
                         continue;
                     }
 
-                    // Fail-safe incase none of these are set to true
+                    // Fail-safe in case none of these are set to true
                     if (!ROM.HasSimpleSingleFile & !ROM.HasNestedSingleFile & !ROM.HasMultipleFiles)
                         ROM.HasMultipleFiles = true;
 
