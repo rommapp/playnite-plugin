@@ -63,6 +63,24 @@ namespace RomM.Saves
     }
 
     /// <summary>
+    /// Timestamps coming back from RomM are UTC, but they do not always carry a zone: a naive
+    /// "2024-05-17T09:30:00" deserialises with <see cref="DateTimeKind.Unspecified"/>, and
+    /// <c>ToUniversalTime</c> would then treat it as local time and shift it by the machine's UTC
+    /// offset. That skews every comparison against a file's real UTC write time, so conflicts
+    /// resolve the wrong way and a downloaded file is stamped hours off -- which negotiate reads as
+    /// a fresh edit and bounces the save back and forth on every sync.
+    /// </summary>
+    internal static class SaveTimestamp
+    {
+        public static DateTime AsUtc(DateTime value)
+        {
+            return value.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(value, DateTimeKind.Utc)
+                : value.ToUniversalTime();
+        }
+    }
+
+    /// <summary>
     /// A file ready to be uploaded. <see cref="IsTemporary"/> marks archives built on the fly, so
     /// a single-file save is sent straight from disk without being copied.
     /// </summary>

@@ -22,6 +22,8 @@ namespace RomM.Tests
         [InlineData("-L \"cores\\mgba_libretro.dll\" \"{ImagePath}\"", "mgba")]
         [InlineData("-L cores\\snes9x_libretro.dll \"{ImagePath}\"", "snes9x")]
         [InlineData("-f -L \"D:\\RetroArch\\cores\\gambatte_libretro.dll\"", "gambatte")]
+        // A quoted path may contain spaces; stopping at the first one would name the core "Program".
+        [InlineData(@"-L ""C:\Program Files\RetroArch\cores\mgba_libretro.dll""", "mgba")]
         public void Core_name_of_a_custom_profile_comes_from_the_libretro_argument(string args, string expected)
         {
             var profile = new CustomEmulatorProfile { Arguments = args };

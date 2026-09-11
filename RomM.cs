@@ -541,14 +541,23 @@ namespace RomM
 
         // Pull the newest save down before the emulator launches so the player continues from the
         // latest device. Playnite blocks the launch until this returns, so any failure is swallowed
-        // (logged inside Sync) rather than preventing the game from starting.
+        // (logged inside Sync) rather than preventing the game from starting -- and the wait is
+        // bounded, because an unreachable or slow RomM would otherwise freeze Playnite for the full
+        // HTTP timeout of every request in the cycle before the game is allowed to start.
+        private static readonly TimeSpan PreLaunchSyncWait = TimeSpan.FromSeconds(20);
+
         public override void OnGameStarting(OnGameStartingEventArgs args)
         {
             base.OnGameStarting(args);
 
             if (Settings.EnableSaveSync && args.Game.PluginId == PluginId)
             {
-                SaveSync.Sync(args.Game);
+                var game = args.Game;
+                if (!Task.Run(() => SaveSync.Sync(game)).Wait(PreLaunchSyncWait))
+                {
+                    Logger.Warn($"[SaveSync] Pre-launch sync for \"{game.Name}\" is still running after " +
+                                $"{PreLaunchSyncWait.TotalSeconds:0}s; starting the game without waiting for it.");
+                }
             }
         }
 
@@ -772,6 +781,13 @@ namespace RomM
                 var summary = $"Save sync complete: {downloaded} downloaded, {uploaded} uploaded" +
                               (conflicts > 0 ? $", {conflicts} conflict(s) resolved" : "") +
                               (failed > 0 ? $", {failed} failed" : "") + ".";
+
+                // Without this the reason a sync failed (bad token, unreachable server) never
+                // reaches the user -- they only see a count.
+                if (failed > 0 && !string.IsNullOrEmpty(lastMessage))
+                {
+                    summary += $" {lastMessage}";
+                }
 
                 Playnite.Notifications.Add("RomMPlugin.SaveSync", summary,
                     failed > 0 ? NotificationType.Error : NotificationType.Info);

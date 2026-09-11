@@ -77,6 +77,29 @@ namespace RomM.Saves.Handlers
                 return null;
 
             var contentName = Path.GetFileNameWithoutExtension(contentFilePath);
+            var saveDir = ResolveCoreFolderRoot(cfg, contentFilePath, retroArchBaseDir);
+
+            if (GetBool(cfg, "sort_savefiles_enable") && !string.IsNullOrEmpty(coreName))
+                saveDir = Path.Combine(saveDir, coreName);
+
+            return Path.Combine(saveDir, contentName + SaveExtension);
+        }
+
+        /// <summary>
+        /// The directory the per-core folders live in: the save base plus the content-sorting
+        /// folder, but without the core folder itself. Callers that want to match the spelling of a
+        /// core folder RetroArch already created have to look here and not in the plain base --
+        /// content sorting wraps around the core folder, so with it enabled the core folders sit
+        /// under &lt;base&gt;/&lt;rom's folder&gt; and never directly under &lt;base&gt;.
+        /// </summary>
+        public static string ResolveCoreFolderRoot(
+            IDictionary<string, string> cfg,
+            string contentFilePath,
+            string retroArchBaseDir = null)
+        {
+            if (string.IsNullOrEmpty(contentFilePath))
+                return null;
+
             var saveDir = ResolveSaveBaseDirectory(cfg, contentFilePath, retroArchBaseDir);
 
             // Sorting by content uses the name of the folder the ROM sits in, not the ROM's own
@@ -88,10 +111,7 @@ namespace RomM.Saves.Handlers
                     saveDir = Path.Combine(saveDir, contentDirName);
             }
 
-            if (GetBool(cfg, "sort_savefiles_enable") && !string.IsNullOrEmpty(coreName))
-                saveDir = Path.Combine(saveDir, coreName);
-
-            return Path.Combine(saveDir, contentName + SaveExtension);
+            return saveDir;
         }
 
         /// <summary>

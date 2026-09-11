@@ -247,6 +247,10 @@ namespace RomM.Settings
         // registration and persisted so this machine keeps the same RomM device across sessions.
         public bool EnableSaveSync { get; set; } = false;
         public string SaveSyncDeviceId { get; set; } = "";
+        // The host that issued SaveSyncDeviceId. A device id only means anything on the server that
+        // created it, so pointing the plugin at a different RomM has to re-register rather than
+        // sync against an id that server has never seen.
+        public string SaveSyncDeviceHost { get; set; } = "";
         public bool Use7z { get; set; } = false;
         public string PathTo7z
         {
@@ -333,6 +337,7 @@ namespace RomM.Settings
                 ExcludeGenres = savedSettings.ExcludeGenres;
                 EnableSaveSync = savedSettings.EnableSaveSync;
                 SaveSyncDeviceId = savedSettings.SaveSyncDeviceId;
+                SaveSyncDeviceHost = savedSettings.SaveSyncDeviceHost;
             }
             
             if (Mappings == null)
@@ -564,6 +569,11 @@ namespace RomM.Settings
         // registration) that need to store a value without going through the settings dialog edit cycle.
         internal void Persist() => SavePluginSettings(this);
 
+        // config.json is now written from background threads too (save sync registers its device id
+        // without going through the dialog), and two overlapping File.WriteAllText calls truncate
+        // each other's output.
+        private static readonly object _saveLock = new object();
+
         private void SavePluginSettings<SettingsViewModel>(SettingsViewModel settings)
         {
             var setDir = _plugin.GetPluginUserDataPath();
@@ -574,7 +584,10 @@ namespace RomM.Settings
             }
 
             var strConf = JsonConvert.SerializeObject(settings);
-            File.WriteAllText(setFile, strConf);
+            lock (_saveLock)
+            {
+                File.WriteAllText(setFile, strConf);
+            }
         }
 
         public bool VerifySettings(out List<string> errors)

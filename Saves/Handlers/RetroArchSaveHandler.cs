@@ -45,19 +45,25 @@ namespace RomM.Saves.Handlers
                 if (string.IsNullOrEmpty(request.ContentPath))
                     return null;
 
-                var cfgPath = FindConfig(request.Emulator);
+                // The service hands over an install directory with Playnite's variables already
+                // resolved: on a portable install Emulator.InstallDir still reads "{PlayniteDir}\..."
+                // and every path built from it -- the config lookup, the ':' base-directory token --
+                // would point at a folder that does not exist.
+                var baseDir = request.EmulatorInstallDir;
+
+                var cfgPath = FindConfig(baseDir);
                 var cfg = cfgPath != null
                     ? RetroArchConfig.Parse(File.ReadAllText(cfgPath))
                     : new Dictionary<string, string>();
 
-                var baseDir = request.Emulator.InstallDir;
                 var saveRoot = RetroArchConfig.ResolveSaveBaseDirectory(cfg, request.ContentPath, baseDir);
 
                 // With sort_savefiles_enable the save sits in a folder named after the running core.
                 // Resolving without that name only matters once a download has to create the file:
                 // it would land beside the core folders instead of inside the right one, where
                 // RetroArch never looks, and the game would start over on a save that is present.
-                var coreName = MatchExistingCoreFolder(saveRoot, ResolveCoreName(request.Profile));
+                var coreRoot = RetroArchConfig.ResolveCoreFolderRoot(cfg, request.ContentPath, baseDir);
+                var coreName = MatchExistingCoreFolder(coreRoot, ResolveCoreName(request.Profile));
 
                 var expectedPath = RetroArchConfig.ResolveSaveFilePath(cfg, request.ContentPath, coreName, baseDir);
                 if (string.IsNullOrEmpty(expectedPath))
@@ -98,8 +104,12 @@ namespace RomM.Saves.Handlers
             return null;
         }
 
+        // A quoted core path may contain spaces (RetroArch under "C:\Program Files\..."), so the
+        // quoted form has to be matched as its own alternative -- treating the quotes as optional
+        // around a run of non-space characters would stop at the first space and name the core
+        // after a folder ("Program"), sending downloads to a directory RetroArch never reads.
         private static readonly Regex LibretroArgument =
-            new Regex(@"-L\s+""?(?<path>[^""\s]+)""?", RegexOptions.IgnoreCase);
+            new Regex(@"-L\s+(?:""(?<path>[^""]+)""|(?<path>[^""\s]+))", RegexOptions.IgnoreCase);
 
         private static string CoreFromArguments(string arguments)
         {
@@ -145,11 +155,11 @@ namespace RomM.Saves.Handlers
             }
         }
 
-        private static string FindConfig(Emulator emulator)
+        private static string FindConfig(string installDir)
         {
-            if (!string.IsNullOrEmpty(emulator.InstallDir))
+            if (!string.IsNullOrEmpty(installDir))
             {
-                var inInstall = Path.Combine(emulator.InstallDir, "retroarch.cfg");
+                var inInstall = Path.Combine(installDir, "retroarch.cfg");
                 if (File.Exists(inInstall))
                     return inInstall;
             }
@@ -167,8 +177,12 @@ namespace RomM.Saves.Handlers
 
             try
             {
+                // The same ROM can have an .srm under several core folders. Enumeration order is
+                // arbitrary, so taking the first would hash and overwrite whichever the filesystem
+                // happened to list first; the newest is the one the player actually last played.
                 return Directory
                     .EnumerateFiles(baseDir, contentName + RetroArchConfig.SaveExtension, SearchOption.AllDirectories)
+                    .OrderByDescending(p => new FileInfo(p).LastWriteTimeUtc)
                     .FirstOrDefault();
             }
             catch

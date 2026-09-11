@@ -38,6 +38,13 @@ namespace RomM.Saves.Handlers
         public Emulator Emulator { get; set; }
 
         /// <summary>
+        /// <see cref="Emulator"/>'s install directory with Playnite's variables expanded. On a
+        /// portable install the stored value is "{PlayniteDir}\...", which no filesystem call
+        /// resolves, so handlers must use this rather than reading InstallDir themselves.
+        /// </summary>
+        public string EmulatorInstallDir { get; set; }
+
+        /// <summary>
         /// The profile the game launches with, when one is set. Carries the detail that decides
         /// where some emulators file a save — for RetroArch, which core is running.
         /// </summary>

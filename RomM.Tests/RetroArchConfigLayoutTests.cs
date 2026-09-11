@@ -73,6 +73,17 @@ namespace RomM.Tests
                 RetroArchConfig.ResolveSaveFilePath(cfg, Rom, "mGBA"));
         }
 
+        // The per-core folders sit under the content folder when content sorting is on, so anything
+        // matching the spelling of a folder RetroArch already made has to look there and not in the
+        // plain save base.
+        [Fact]
+        public void Core_folder_root_follows_the_content_folder()
+        {
+            var cfg = Cfg("sort_savefiles_by_content_enable", "true", "sort_savefiles_enable", "true");
+
+            Assert.Equal(@"D:\RetroArch\saves\gba", RetroArchConfig.ResolveCoreFolderRoot(cfg, Rom));
+        }
+
         [Fact]
         public void Base_directory_follows_saves_in_content_dir_for_the_recursive_search()
         {

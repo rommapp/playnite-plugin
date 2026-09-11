@@ -6,6 +6,7 @@ using RomM.Models.RomM.Save;
 using RomM.Saves.Handlers;
 using RomM.Settings;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,6 +35,11 @@ namespace RomM.Saves
         private readonly IRomM _romM;
         private readonly SaveHandlerRegistry _handlers;
         private readonly object _deviceLock = new object();
+
+        // One sync at a time per ROM. The pre-launch sync, the post-play sync and the manual menu
+        // action can all be in flight together (the pre-launch one keeps running after its wait
+        // expires), and two negotiate sessions writing the same file would clobber each other.
+        private readonly ConcurrentDictionary<int, object> _romLocks = new ConcurrentDictionary<int, object>();
 
         public SaveSyncService(IRomM romM)
             : this(romM, new SaveHandlerRegistry())
@@ -79,45 +85,49 @@ namespace RomM.Saves
                     return outcome;
                 }
 
-                var target = ResolveTarget(game);
-                if (target == null)
+                lock (_romLocks.GetOrAdd(romId, _ => new object()))
                 {
-                    outcome.Message = "Save sync does not know where this game's emulator keeps its saves.";
-                    return outcome;
+                    var target = ResolveTarget(game);
+                    if (target == null)
+                    {
+                        outcome.Message = "Save sync does not know where this game's emulator keeps its saves.";
+                        return outcome;
+                    }
+
+                    outcome.Applicable = true;
+
+                    var deviceId = EnsureDeviceRegistered();
+                    if (string.IsNullOrEmpty(deviceId))
+                    {
+                        outcome.Message = "Could not register this device with RomM (check token scopes).";
+                        outcome.Failed++;
+                        return outcome;
+                    }
+
+                    var negotiation = Negotiate(deviceId, romId, target);
+                    if (negotiation == null)
+                    {
+                        outcome.Message = "Save sync negotiation with RomM failed.";
+                        outcome.Failed++;
+                        return outcome;
+                    }
+
+                    // Negotiate may surface operations for saves we didn't report (e.g. created on another
+                    // device). We only resolved a local path for THIS game, so apply only its operations;
+                    // other ROMs are handled when their own games sync.
+                    var operations = negotiation.Operations ?? new List<RomMSyncOperation>();
+                    foreach (var op in operations.Where(o => o.RomId == romId))
+                    {
+                        ApplyOperation(op, deviceId, negotiation.SessionId, target, outcome);
+                    }
+
+                    CompleteSession(negotiation.SessionId,
+                        outcome.Uploaded + outcome.Downloaded,
+                        outcome.Failed);
+
+                    Logger.Info($"[SaveSync] {game.Name}: {outcome.Uploaded} uploaded, {outcome.Downloaded} downloaded, " +
+                                $"{outcome.Conflicts} conflicts, {outcome.Failed} failed.");
                 }
-
-                outcome.Applicable = true;
-
-                var deviceId = EnsureDeviceRegistered();
-                if (string.IsNullOrEmpty(deviceId))
-                {
-                    outcome.Message = "Could not register this device with RomM (check token scopes).";
-                    outcome.Failed++;
-                    return outcome;
-                }
-
-                var negotiation = Negotiate(deviceId, romId, target);
-                if (negotiation == null)
-                {
-                    outcome.Message = "Save sync negotiation with RomM failed.";
-                    outcome.Failed++;
-                    return outcome;
-                }
-
-                // Negotiate may surface operations for saves we didn't report (e.g. created on another
-                // device). We only resolved a local path for THIS game, so apply only its operations;
-                // other ROMs are handled when their own games sync.
-                foreach (var op in negotiation.Operations.Where(o => o.RomId == romId))
-                {
-                    ApplyOperation(op, deviceId, negotiation.SessionId, target, outcome);
-                }
-
-                CompleteSession(negotiation.SessionId,
-                    outcome.Uploaded + outcome.Downloaded,
-                    outcome.Failed);
-
-                Logger.Info($"[SaveSync] {game.Name}: {outcome.Uploaded} uploaded, {outcome.Downloaded} downloaded, " +
-                            $"{outcome.Conflicts} conflicts, {outcome.Failed} failed.");
             }
             catch (Exception ex)
             {
@@ -216,7 +226,9 @@ namespace RomM.Saves
         private void ResolveConflict(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, SyncOutcome outcome)
         {
             var localTime = target.Exists ? (DateTime?)target.UpdatedAtUtc : null;
-            var serverTime = op.ServerUpdatedAt?.ToUniversalTime();
+            var serverTime = op.ServerUpdatedAt.HasValue
+                ? (DateTime?)SaveTimestamp.AsUtc(op.ServerUpdatedAt.Value)
+                : null;
 
             bool serverWins = serverTime.HasValue && (!localTime.HasValue || serverTime.Value > localTime.Value);
 
@@ -254,7 +266,7 @@ namespace RomM.Saves
                 else
                 {
                     var url = RomMUrl.Combine(Settings.RomMHost,
-                        $"api/saves?rom_id={op.RomId}&emulator={target.EmulatorTag}" +
+                        $"api/saves?rom_id={op.RomId}&emulator={WebUtility.UrlEncode(target.EmulatorTag)}" +
                         $"&slot={WebUtility.UrlEncode(target.Slot)}" +
                         $"&device_id={WebUtility.UrlEncode(deviceId)}&session_id={sessionId}");
                     response = HttpClientSingleton.Instance.PostAsync(url, content).GetAwaiter().GetResult();
@@ -331,15 +343,21 @@ namespace RomM.Saves
 
         #region Device registration
 
-        /// <summary>Registers this machine as a RomM device once, persisting the returned id in settings.</summary>
+        /// <summary>
+        /// Registers this machine as a RomM device once per server, persisting the returned id in
+        /// settings. A device id is only meaningful on the host that issued it, so pointing the
+        /// plugin at a different RomM re-registers rather than sending an unknown id forever.
+        /// </summary>
         private string EnsureDeviceRegistered()
         {
-            if (!string.IsNullOrEmpty(Settings.SaveSyncDeviceId))
+            var host = Settings.RomMHost ?? string.Empty;
+
+            if (HasDeviceFor(host))
                 return Settings.SaveSyncDeviceId;
 
             lock (_deviceLock)
             {
-                if (!string.IsNullOrEmpty(Settings.SaveSyncDeviceId))
+                if (HasDeviceFor(host))
                     return Settings.SaveSyncDeviceId;
 
                 try
@@ -354,7 +372,7 @@ namespace RomM.Saves
                         AllowExisting = true,
                     };
 
-                    var url = RomMUrl.Combine(Settings.RomMHost, "api/devices");
+                    var url = RomMUrl.Combine(host, "api/devices");
                     var body = PostJson(url, payload);
                     if (body == null)
                         return null;
@@ -364,6 +382,7 @@ namespace RomM.Saves
                         return null;
 
                     Settings.SaveSyncDeviceId = created.DeviceId;
+                    Settings.SaveSyncDeviceHost = host;
                     Settings.Persist();
                     Logger.Info($"[SaveSync] Registered device '{created.DeviceId}' with RomM.");
                     return created.DeviceId;
@@ -374,6 +393,12 @@ namespace RomM.Saves
                     return null;
                 }
             }
+        }
+
+        private bool HasDeviceFor(string host)
+        {
+            return !string.IsNullOrEmpty(Settings.SaveSyncDeviceId)
+                   && string.Equals(Settings.SaveSyncDeviceHost, host, StringComparison.OrdinalIgnoreCase);
         }
 
         #endregion
@@ -391,7 +416,8 @@ namespace RomM.Saves
             if (string.IsNullOrEmpty(contentPath))
                 return null;
 
-            var emulator = ResolveEmulator(game);
+            var action = EmulatorAction(game);
+            var emulator = ResolveEmulator(action);
             if (emulator == null)
                 return null;
 
@@ -406,25 +432,40 @@ namespace RomM.Saves
             {
                 Game = game,
                 Emulator = emulator,
-                Profile = ResolveProfile(game, emulator),
+                EmulatorInstallDir = ResolveEmulatorInstallDir(emulator),
+                Profile = ResolveProfile(action, emulator),
                 ContentPath = _romM.Playnite.ExpandGameVariables(game, contentPath),
                 Logger = Logger,
             });
         }
 
-        private Emulator ResolveEmulator(Game game)
+        private Emulator ResolveEmulator(GameAction action)
         {
-            var action = EmulatorAction(game);
-
             if (action != null && action.EmulatorId != Guid.Empty)
                 return _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
 
             return null;
         }
 
-        private static EmulatorProfile ResolveProfile(Game game, Emulator emulator)
+        /// <summary>
+        /// The emulator's install directory as a real path. A portable Playnite stores it with the
+        /// "{PlayniteDir}" token, exactly as <c>EmulatorMapping.EmulatorBasePathResolved</c> handles it.
+        /// </summary>
+        private string ResolveEmulatorInstallDir(Emulator emulator)
         {
-            var profileId = EmulatorAction(game)?.EmulatorProfileId;
+            var installDir = emulator.InstallDir;
+            if (string.IsNullOrEmpty(installDir))
+                return installDir;
+
+            var paths = _romM.Playnite.Paths;
+            return paths.IsPortable
+                ? installDir.Replace(ExpandableVariables.PlayniteDirectory, paths.ApplicationPath)
+                : installDir;
+        }
+
+        private static EmulatorProfile ResolveProfile(GameAction action, Emulator emulator)
+        {
+            var profileId = action?.EmulatorProfileId;
             if (string.IsNullOrEmpty(profileId))
                 return null;
 

@@ -57,7 +57,7 @@ namespace RomM.Saves
             File.WriteAllBytes(destination, payload);
 
             if (serverUpdatedAtUtc.HasValue)
-                File.SetLastWriteTimeUtc(destination, serverUpdatedAtUtc.Value.ToUniversalTime());
+                File.SetLastWriteTimeUtc(destination, SaveTimestamp.AsUtc(serverUpdatedAtUtc.Value));
         }
     }
 }
