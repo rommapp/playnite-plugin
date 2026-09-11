@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Xml.Serialization;
+using RomM.Games;
 using RomM.Models.RomM.Platform;
 using SharpCompress;
 
@@ -277,14 +278,8 @@ namespace RomM.Settings
 
         [JsonIgnore]
         [XmlIgnore]
-        public string DestinationPathResolved
-        {
-            get
-            {
-                var playnite = SettingsViewModel.Instance.PlayniteAPI;
-                return playnite.Paths.IsPortable ? DestinationPath?.Replace(ExpandableVariables.PlayniteDirectory, playnite.Paths.ApplicationPath) : DestinationPath;
-            }
-        }
+        public string DestinationPathResolved =>
+            PlaynitePath.Resolve(SettingsViewModel.Instance.PlayniteAPI, DestinationPath);
 
         [JsonIgnore]
         [XmlIgnore]
@@ -292,19 +287,8 @@ namespace RomM.Settings
 
         [JsonIgnore]
         [XmlIgnore]
-        public string EmulatorBasePathResolved
-        {
-            get
-            {
-                var playnite = SettingsViewModel.Instance.PlayniteAPI;
-                var ret = Emulator?.InstallDir;
-                if (playnite.Paths.IsPortable)
-                {
-                    ret = ret?.Replace(ExpandableVariables.PlayniteDirectory, playnite.Paths.ApplicationPath);
-                }
-                return ret;
-            }
-        }
+        public string EmulatorBasePathResolved =>
+            PlaynitePath.Resolve(SettingsViewModel.Instance.PlayniteAPI, EmulatorBasePath);
 
 
         public IEnumerable<string> GetDescriptionLines()
