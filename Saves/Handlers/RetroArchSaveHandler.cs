@@ -19,6 +19,9 @@ namespace RomM.Saves.Handlers
     {
         public string EmulatorTag => "retroarch";
 
+        // Playnite's own definition first, then the name the user gave it. Deliberately no probe for
+        // retroarch.exe on disk: the only path available here is the unexpanded InstallDir, which is
+        // "{PlayniteDir}\..." on a portable install and never exists.
         public bool CanHandle(Emulator emulator)
         {
             if (emulator == null)
@@ -27,15 +30,8 @@ namespace RomM.Saves.Handlers
             if (string.Equals(emulator.BuiltInConfigId, "retroarch", StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            if (!string.IsNullOrEmpty(emulator.Name) &&
-                emulator.Name.IndexOf("retroarch", StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-
-            if (!string.IsNullOrEmpty(emulator.InstallDir) &&
-                File.Exists(Path.Combine(emulator.InstallDir, "retroarch.exe")))
-                return true;
-
-            return false;
+            return !string.IsNullOrEmpty(emulator.Name) &&
+                   emulator.Name.IndexOf("retroarch", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public SaveTarget ResolveTarget(SaveTargetRequest request)

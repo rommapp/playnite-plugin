@@ -15,6 +15,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 
 namespace RomM.Saves
 {
@@ -32,28 +33,34 @@ namespace RomM.Saves
     {
         private const string DeviceClient = "playnite";
 
+        // RomM's timestamps do not always carry a zone, and a naive "2024-05-17T09:30:00" would
+        // otherwise deserialise as DateTimeKind.Unspecified and be read as local time -- shifting
+        // every comparison against a file's real UTC write time by the machine's offset. Fixing the
+        // kind where the value is born means no call site has to remember to.
+        private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
+        {
+            DateTimeZoneHandling = DateTimeZoneHandling.Utc,
+        };
+
         private readonly IRomM _romM;
-        private readonly SaveHandlerRegistry _handlers;
+        private readonly SaveHandlerRegistry _handlers = new SaveHandlerRegistry();
         private readonly object _deviceLock = new object();
 
-        // One sync at a time per ROM. The pre-launch sync, the post-play sync and the manual menu
-        // action can all be in flight together (the pre-launch one keeps running after its wait
-        // expires), and two negotiate sessions writing the same file would clobber each other.
+        // One sync at a time per ROM: the post-play sync and the manual menu action can be in
+        // flight together, and two negotiate sessions writing the same file would clobber each
+        // other.
         private readonly ConcurrentDictionary<int, object> _romLocks = new ConcurrentDictionary<int, object>();
 
         public SaveSyncService(IRomM romM)
-            : this(romM, new SaveHandlerRegistry())
-        {
-        }
-
-        public SaveSyncService(IRomM romM, SaveHandlerRegistry handlers)
         {
             _romM = romM;
-            _handlers = handlers;
         }
 
         private ILogger Logger => _romM.Logger;
         private SettingsViewModel Settings => _romM.Settings;
+
+        /// <summary>The emulators sync covers today, for the message shown when none applied.</summary>
+        public string SupportedEmulators => string.Join(", ", _handlers.SupportedEmulatorTags);
 
         public class SyncOutcome
         {
@@ -68,13 +75,17 @@ namespace RomM.Saves
         /// <summary>
         /// Runs a full negotiate + apply cycle for a single game. Safe to call off the UI thread.
         /// Never throws; failures are logged and reflected in the returned <see cref="SyncOutcome"/>.
+        ///
+        /// <paramref name="cancellationToken"/> bounds the whole cycle rather than any one request,
+        /// which is what the launch path needs: an unreachable RomM would otherwise cost the
+        /// HTTP client's default timeout per request before the game is allowed to start.
         /// </summary>
-        public SyncOutcome Sync(Game game)
+        public SyncOutcome Sync(Game game, CancellationToken cancellationToken = default(CancellationToken))
         {
             var outcome = new SyncOutcome();
             try
             {
-                if (game == null || game.PluginId != _romM.Id)
+                if (game == null || game.PluginId != _romM.Id || !Settings.EnableSaveSync)
                 {
                     return outcome;
                 }
@@ -96,7 +107,7 @@ namespace RomM.Saves
 
                     outcome.Applicable = true;
 
-                    var deviceId = EnsureDeviceRegistered();
+                    var deviceId = EnsureDeviceRegistered(cancellationToken);
                     if (string.IsNullOrEmpty(deviceId))
                     {
                         outcome.Message = "Could not register this device with RomM (check token scopes).";
@@ -104,7 +115,7 @@ namespace RomM.Saves
                         return outcome;
                     }
 
-                    var negotiation = Negotiate(deviceId, romId, target);
+                    var negotiation = Negotiate(deviceId, romId, target, cancellationToken);
                     if (negotiation == null)
                     {
                         outcome.Message = "Save sync negotiation with RomM failed.";
@@ -118,16 +129,23 @@ namespace RomM.Saves
                     var operations = negotiation.Operations ?? new List<RomMSyncOperation>();
                     foreach (var op in operations.Where(o => o.RomId == romId))
                     {
-                        ApplyOperation(op, deviceId, negotiation.SessionId, target, outcome);
+                        ApplyOperation(op, deviceId, negotiation.SessionId, target, outcome, cancellationToken);
                     }
 
                     CompleteSession(negotiation.SessionId,
                         outcome.Uploaded + outcome.Downloaded,
-                        outcome.Failed);
+                        outcome.Failed,
+                        cancellationToken);
 
                     Logger.Info($"[SaveSync] {game.Name}: {outcome.Uploaded} uploaded, {outcome.Downloaded} downloaded, " +
                                 $"{outcome.Conflicts} conflicts, {outcome.Failed} failed.");
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Warn($"[SaveSync] Sync of {game?.Name} hit its deadline and was abandoned.");
+                outcome.Failed++;
+                outcome.Message = "RomM did not answer in time.";
             }
             catch (Exception ex)
             {
@@ -141,7 +159,7 @@ namespace RomM.Saves
 
         #region Negotiate / session
 
-        private RomMSyncNegotiateResponse Negotiate(string deviceId, int romId, SaveTarget target)
+        private RomMSyncNegotiateResponse Negotiate(string deviceId, int romId, SaveTarget target, CancellationToken ct)
         {
             var payload = new RomMSyncNegotiatePayload { DeviceId = deviceId };
 
@@ -160,11 +178,11 @@ namespace RomM.Saves
             }
 
             var url = RomMUrl.Combine(Settings.RomMHost, "api/sync/negotiate");
-            var body = PostJson(url, payload);
-            return body == null ? null : JsonConvert.DeserializeObject<RomMSyncNegotiateResponse>(body);
+            var body = PostJson(url, payload, ct);
+            return body == null ? null : JsonConvert.DeserializeObject<RomMSyncNegotiateResponse>(body, JsonSettings);
         }
 
-        private void CompleteSession(int sessionId, int completed, int failed)
+        private void CompleteSession(int sessionId, int completed, int failed, CancellationToken ct)
         {
             try
             {
@@ -173,7 +191,7 @@ namespace RomM.Saves
                 {
                     OperationsCompleted = completed,
                     OperationsFailed = failed,
-                });
+                }, ct);
             }
             catch (Exception ex)
             {
@@ -185,35 +203,45 @@ namespace RomM.Saves
 
         #region Operation handling
 
-        private void ApplyOperation(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, SyncOutcome outcome)
+        private void ApplyOperation(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, SyncOutcome outcome, CancellationToken ct)
         {
             try
             {
-                switch (op.Action)
+                // A conflict is not a third kind of transfer: it resolves to one of the other two,
+                // so it decides and then falls into the same dispatch.
+                var action = op.Action;
+                if (action == RomMSyncAction.Conflict)
+                {
+                    outcome.Conflicts++;
+                    action = ResolveConflict(op, target);
+                }
+
+                switch (action)
                 {
                     case RomMSyncAction.Upload:
-                        if (Upload(op, deviceId, sessionId, target))
+                        if (Upload(op, deviceId, sessionId, target, ct))
                             outcome.Uploaded++;
                         else
                             outcome.Failed++;
                         break;
 
                     case RomMSyncAction.Download:
-                        if (Download(op, deviceId, sessionId, target))
+                        if (Download(op, deviceId, sessionId, target, ct))
                             outcome.Downloaded++;
                         else
                             outcome.Failed++;
-                        break;
-
-                    case RomMSyncAction.Conflict:
-                        outcome.Conflicts++;
-                        ResolveConflict(op, deviceId, sessionId, target, outcome);
                         break;
 
                     case RomMSyncAction.NoOp:
                     default:
                         break;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // The deadline is the whole cycle's, not this operation's: let it end the sync
+                // rather than being counted as one more failed transfer.
+                throw;
             }
             catch (Exception ex)
             {
@@ -222,30 +250,24 @@ namespace RomM.Saves
             }
         }
 
-        /// <summary>Most-recent-wins: whichever side was modified later overwrites the other.</summary>
-        private void ResolveConflict(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, SyncOutcome outcome)
+        /// <summary>
+        /// Most-recent-wins: whichever side was modified later overwrites the other. Returns the
+        /// transfer that decision comes down to.
+        /// </summary>
+        private string ResolveConflict(RomMSyncOperation op, SaveTarget target)
         {
             var localTime = target.Exists ? (DateTime?)target.UpdatedAtUtc : null;
-            var serverTime = op.ServerUpdatedAt.HasValue
-                ? (DateTime?)SaveTimestamp.AsUtc(op.ServerUpdatedAt.Value)
-                : null;
+            var serverTime = op.ServerUpdatedAt;
 
             bool serverWins = serverTime.HasValue && (!localTime.HasValue || serverTime.Value > localTime.Value);
 
             Logger.Warn($"[SaveSync] Conflict for rom {op.RomId} ({op.Reason}); " +
                         $"resolving most-recent-wins -> {(serverWins ? "download" : "upload")}.");
 
-            if (serverWins)
-            {
-                if (Download(op, deviceId, sessionId, target)) outcome.Downloaded++; else outcome.Failed++;
-            }
-            else
-            {
-                if (Upload(op, deviceId, sessionId, target)) outcome.Uploaded++; else outcome.Failed++;
-            }
+            return serverWins ? RomMSyncAction.Download : RomMSyncAction.Upload;
         }
 
-        private bool Upload(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target)
+        private bool Upload(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, CancellationToken ct)
         {
             if (!target.Exists)
             {
@@ -261,7 +283,7 @@ namespace RomM.Saves
                 {
                     var url = RomMUrl.Combine(Settings.RomMHost,
                         $"api/saves/{op.SaveId.Value}?device_id={WebUtility.UrlEncode(deviceId)}");
-                    response = HttpClientSingleton.Instance.PutAsync(url, content).GetAwaiter().GetResult();
+                    response = HttpClientSingleton.Instance.PutAsync(url, content, ct).GetAwaiter().GetResult();
                 }
                 else
                 {
@@ -269,7 +291,7 @@ namespace RomM.Saves
                         $"api/saves?rom_id={op.RomId}&emulator={WebUtility.UrlEncode(target.EmulatorTag)}" +
                         $"&slot={WebUtility.UrlEncode(target.Slot)}" +
                         $"&device_id={WebUtility.UrlEncode(deviceId)}&session_id={sessionId}");
-                    response = HttpClientSingleton.Instance.PostAsync(url, content).GetAwaiter().GetResult();
+                    response = HttpClientSingleton.Instance.PostAsync(url, content, ct).GetAwaiter().GetResult();
                 }
 
                 using (response)
@@ -281,7 +303,7 @@ namespace RomM.Saves
             return true;
         }
 
-        private bool Download(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target)
+        private bool Download(RomMSyncOperation op, string deviceId, int sessionId, SaveTarget target, CancellationToken ct)
         {
             if (!op.SaveId.HasValue)
             {
@@ -293,7 +315,7 @@ namespace RomM.Saves
                 $"api/saves/{op.SaveId.Value}/content?device_id={WebUtility.UrlEncode(deviceId)}&session_id={sessionId}");
 
             byte[] bytes;
-            using (var response = HttpClientSingleton.Instance.GetAsync(url).GetAwaiter().GetResult())
+            using (var response = HttpClientSingleton.Instance.GetAsync(url, ct).GetAwaiter().GetResult())
             {
                 response.EnsureSuccessStatusCode();
                 bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
@@ -312,16 +334,16 @@ namespace RomM.Saves
                 return false;
             }
 
-            ConfirmDownloaded(op.SaveId.Value, deviceId);
+            ConfirmDownloaded(op.SaveId.Value, deviceId, ct);
             return true;
         }
 
-        private void ConfirmDownloaded(int saveId, string deviceId)
+        private void ConfirmDownloaded(int saveId, string deviceId, CancellationToken ct)
         {
             try
             {
                 var url = RomMUrl.Combine(Settings.RomMHost, $"api/saves/{saveId}/downloaded");
-                PostJson(url, new { device_id = deviceId });
+                PostJson(url, new { device_id = deviceId }, ct);
             }
             catch (Exception ex)
             {
@@ -348,7 +370,7 @@ namespace RomM.Saves
         /// settings. A device id is only meaningful on the host that issued it, so pointing the
         /// plugin at a different RomM re-registers rather than sending an unknown id forever.
         /// </summary>
-        private string EnsureDeviceRegistered()
+        private string EnsureDeviceRegistered(CancellationToken ct)
         {
             var host = Settings.RomMHost ?? string.Empty;
 
@@ -362,22 +384,22 @@ namespace RomM.Saves
 
                 try
                 {
+                    // SyncMode and AllowExisting keep the model's defaults; what they are and why
+                    // is documented there.
                     var payload = new RomMDeviceCreate
                     {
                         Name = Environment.MachineName,
                         Platform = "Windows",
                         Client = DeviceClient,
                         ClientVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString(),
-                        SyncMode = "api",
-                        AllowExisting = true,
                     };
 
                     var url = RomMUrl.Combine(host, "api/devices");
-                    var body = PostJson(url, payload);
+                    var body = PostJson(url, payload, ct);
                     if (body == null)
                         return null;
 
-                    var created = JsonConvert.DeserializeObject<RomMDeviceCreateResponse>(body);
+                    var created = JsonConvert.DeserializeObject<RomMDeviceCreateResponse>(body, JsonSettings);
                     if (created == null || string.IsNullOrEmpty(created.DeviceId))
                         return null;
 
@@ -386,6 +408,10 @@ namespace RomM.Saves
                     Settings.Persist();
                     Logger.Info($"[SaveSync] Registered device '{created.DeviceId}' with RomM.");
                     return created.DeviceId;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -431,36 +457,24 @@ namespace RomM.Saves
             return handler.ResolveTarget(new SaveTargetRequest
             {
                 Game = game,
-                Emulator = emulator,
-                EmulatorInstallDir = ResolveEmulatorInstallDir(emulator),
+                EmulatorInstallDir = PlaynitePath.Resolve(_romM.Playnite, emulator.InstallDir),
                 Profile = ResolveProfile(action, emulator),
                 ContentPath = _romM.Playnite.ExpandGameVariables(game, contentPath),
                 Logger = Logger,
             });
         }
 
+        /// <summary>
+        /// The emulator comes from the action Playnite actually launches with, not from the
+        /// <see cref="EmulatorMapping"/> the game was imported under: a user who repoints the play
+        /// action at another emulator should have their saves follow it.
+        /// </summary>
         private Emulator ResolveEmulator(GameAction action)
         {
             if (action != null && action.EmulatorId != Guid.Empty)
                 return _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
 
             return null;
-        }
-
-        /// <summary>
-        /// The emulator's install directory as a real path. A portable Playnite stores it with the
-        /// "{PlayniteDir}" token, exactly as <c>EmulatorMapping.EmulatorBasePathResolved</c> handles it.
-        /// </summary>
-        private string ResolveEmulatorInstallDir(Emulator emulator)
-        {
-            var installDir = emulator.InstallDir;
-            if (string.IsNullOrEmpty(installDir))
-                return installDir;
-
-            var paths = _romM.Playnite.Paths;
-            return paths.IsPortable
-                ? installDir.Replace(ExpandableVariables.PlayniteDirectory, paths.ApplicationPath)
-                : installDir;
         }
 
         private static EmulatorProfile ResolveProfile(GameAction action, Emulator emulator)
@@ -482,11 +496,11 @@ namespace RomM.Saves
 
         #region HTTP helper
 
-        private string PostJson(string url, object payload)
+        private string PostJson(string url, object payload, CancellationToken ct)
         {
             var json = JsonConvert.SerializeObject(payload);
             using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-            using (var response = HttpClientSingleton.Instance.PostAsync(url, content).GetAwaiter().GetResult())
+            using (var response = HttpClientSingleton.Instance.PostAsync(url, content, ct).GetAwaiter().GetResult())
             {
                 if (!response.IsSuccessStatusCode)
                 {

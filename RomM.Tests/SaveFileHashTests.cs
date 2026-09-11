@@ -96,7 +96,7 @@ namespace RomM.Tests
         // throwaway archive, so the two paths have to agree -- including the '/' separator, which
         // a Windows path would otherwise contribute as '\'.
         [Fact]
-        public void FolderAsZipHex_matches_the_archive_it_would_produce()
+        public void FoldersAsZipHex_matches_the_archive_it_would_produce()
         {
             var work = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             var folder = Path.Combine(work, "BESCES-53326nico");
@@ -111,7 +111,7 @@ namespace RomM.Tests
                     new ZipEntrySpec("BESCES-53326nico/icon.sys", new byte[] { 0x01, 0x02 }),
                     new ZipEntrySpec("BESCES-53326nico/nested/data.bin", new byte[] { 0x03 }));
 
-                Assert.Equal(SaveFileHash.ZipHexFile(zipPath), SaveFileHash.FolderAsZipHex(folder));
+                Assert.Equal(SaveFileHash.ZipHexFile(zipPath), SaveFileHash.FoldersAsZipHex(new[] { folder }));
             }
             finally
             {

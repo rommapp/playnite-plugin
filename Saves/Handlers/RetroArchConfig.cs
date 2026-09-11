@@ -7,7 +7,7 @@ namespace RomM.Saves.Handlers
     /// <summary>
     /// Parses a retroarch.cfg and resolves where RetroArch writes a game's battery save (.srm).
     /// Pure, Playnite-free logic so it can be unit-tested; the filesystem/emulator lookups live in
-    /// <see cref="SaveSyncService"/>.
+    /// <see cref="RetroArchSaveHandler"/>.
     ///
     /// RetroArch save path rules (battery / SRAM), as observed against RetroArch itself:
     ///   base = savefile_directory (empty / "default" -> the content's own directory),
@@ -63,7 +63,7 @@ namespace RomM.Saves.Handlers
         /// <summary>
         /// Resolves the expected .srm path for <paramref name="contentFilePath"/> given the parsed
         /// config. <paramref name="coreName"/> may be null when unknown (the per-core subfolder is
-        /// then skipped; <see cref="SaveSyncService"/> falls back to a recursive search at runtime).
+        /// then skipped; <see cref="RetroArchSaveHandler"/> falls back to a recursive search at runtime).
         /// <paramref name="retroArchBaseDir"/> expands RetroArch's leading ':' base-directory token.
         /// Returns null when no content path is available.
         /// </summary>

@@ -13,13 +13,18 @@ namespace RomM.Games
 
             using (var sha1 = new SHA1Managed())
             {
-                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(toHash));
-                var sb = new StringBuilder(hash.Length * 2);
-                foreach (byte b in hash)
-                    sb.Append(b.ToString("x2"));
-
-                return sb.ToString();
+                return ToHex(sha1.ComputeHash(Encoding.UTF8.GetBytes(toHash)));
             }
+        }
+
+        /// <summary>Lower-case hex, the spelling every hash this plugin exchanges is written in.</summary>
+        public static string ToHex(byte[] hash)
+        {
+            var sb = new StringBuilder(hash.Length * 2);
+            foreach (byte b in hash)
+                sb.Append(b.ToString("x2"));
+
+            return sb.ToString();
         }
     }
 }

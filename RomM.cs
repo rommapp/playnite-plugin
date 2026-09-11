@@ -539,25 +539,36 @@ namespace RomM
             }
         }
 
-        // Pull the newest save down before the emulator launches so the player continues from the
-        // latest device. Playnite blocks the launch until this returns, so any failure is swallowed
-        // (logged inside Sync) rather than preventing the game from starting -- and the wait is
-        // bounded, because an unreachable or slow RomM would otherwise freeze Playnite for the full
-        // HTTP timeout of every request in the cycle before the game is allowed to start.
-        private static readonly TimeSpan PreLaunchSyncWait = TimeSpan.FromSeconds(20);
+        // Playnite blocks the launch until OnGameStarting returns, so the sync runs under a deadline
+        // the requests themselves honour: an unreachable RomM aborts the cycle instead of costing
+        // the HTTP client's default timeout per request, and nothing is left running into gameplay
+        // where it could write over the save the emulator has already loaded.
+        private static readonly TimeSpan PreLaunchSyncDeadline = TimeSpan.FromSeconds(20);
 
+        // Pull the newest save down before the emulator launches so the player continues from the
+        // latest device. Any failure is swallowed (logged inside Sync) rather than preventing the
+        // game from starting.
         public override void OnGameStarting(OnGameStartingEventArgs args)
         {
             base.OnGameStarting(args);
 
-            if (Settings.EnableSaveSync && args.Game.PluginId == PluginId)
+            if (args.Game.PluginId != PluginId)
+                return;
+
+            var game = args.Game;
+            var deadline = new CancellationTokenSource(PreLaunchSyncDeadline);
+
+            // The deadline cancels the requests themselves, so the task ends on its own; the grace
+            // on Wait is only a backstop for a blocking filesystem call, which no token can
+            // interrupt. Disposal rides on the task rather than on this scope, so a task that did
+            // outlive the wait is not left holding a disposed source.
+            var sync = Task.Run(() => SaveSync.Sync(game, deadline.Token));
+            sync.ContinueWith(_ => deadline.Dispose());
+
+            if (!sync.Wait(PreLaunchSyncDeadline + TimeSpan.FromSeconds(5)))
             {
-                var game = args.Game;
-                if (!Task.Run(() => SaveSync.Sync(game)).Wait(PreLaunchSyncWait))
-                {
-                    Logger.Warn($"[SaveSync] Pre-launch sync for \"{game.Name}\" is still running after " +
-                                $"{PreLaunchSyncWait.TotalSeconds:0}s; starting the game without waiting for it.");
-                }
+                Logger.Warn($"[SaveSync] Pre-launch sync for \"{game.Name}\" did not stop at its deadline; " +
+                            "starting the game anyway.");
             }
         }
 
@@ -567,7 +578,7 @@ namespace RomM
         {
             base.OnGameStopped(args);
 
-            if (Settings.EnableSaveSync && args.Game.PluginId == PluginId)
+            if (args.Game.PluginId == PluginId)
             {
                 var game = args.Game;
                 Task.Run(() => SaveSync.Sync(game));
@@ -749,20 +760,21 @@ namespace RomM
 
             Task.Run(() =>
             {
-                int uploaded = 0, downloaded = 0, conflicts = 0, failed = 0, applicable = 0;
+                int uploaded = 0, downloaded = 0, conflicts = 0, failed = 0;
+                bool anyApplicable = false;
                 string lastMessage = null;
 
                 foreach (var game in games)
                 {
                     var outcome = SaveSync.Sync(game);
-                    if (outcome.Applicable)
-                    {
-                        applicable++;
-                        uploaded += outcome.Uploaded;
-                        downloaded += outcome.Downloaded;
-                        conflicts += outcome.Conflicts;
-                        failed += outcome.Failed;
-                    }
+
+                    // Counted whether or not a save location was resolved: a game that failed before
+                    // becoming applicable still failed, and dropping it hides the failure.
+                    anyApplicable |= outcome.Applicable;
+                    uploaded += outcome.Uploaded;
+                    downloaded += outcome.Downloaded;
+                    conflicts += outcome.Conflicts;
+                    failed += outcome.Failed;
 
                     if (!string.IsNullOrEmpty(outcome.Message))
                     {
@@ -770,10 +782,10 @@ namespace RomM
                     }
                 }
 
-                if (applicable == 0)
+                if (!anyApplicable)
                 {
                     Playnite.Notifications.Add("RomMPlugin.SaveSync",
-                        lastMessage ?? "Save sync currently only supports RetroArch games.",
+                        lastMessage ?? $"Save sync currently supports: {SaveSync.SupportedEmulators}.",
                         NotificationType.Info);
                     return;
                 }

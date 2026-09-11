@@ -1,3 +1,4 @@
+using RomM.Games;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -33,11 +34,7 @@ namespace RomM.Saves
         {
             using (var md5 = MD5.Create())
             {
-                var hash = md5.ComputeHash(stream);
-                var sb = new StringBuilder(hash.Length * 2);
-                foreach (var b in hash)
-                    sb.Append(b.ToString("x2"));
-                return sb.ToString();
+                return RomMHash.ToHex(md5.ComputeHash(stream));
             }
         }
 
@@ -72,18 +69,11 @@ namespace RomM.Saves
         }
 
         /// <summary>
-        /// The digest <see cref="ZipHexFile"/> would produce for this folder, without building the
-        /// archive first. Entry names are rooted at the folder's own name so they match what an
-        /// upload writes, which lets negotiate report local state without a temp file.
-        /// </summary>
-        public static string FolderAsZipHex(string folder)
-        {
-            return FoldersAsZipHex(new[] { folder });
-        }
-
-        /// <summary>
-        /// Same as <see cref="FolderAsZipHex"/> for a save whose unit spans several sibling folders
-        /// (a PS2 game owning multiple card entries, a PSP game's profile and system data).
+        /// The digest <see cref="ZipHexFile"/> would produce for these folders, without building
+        /// the archive first. Entry names are rooted at each folder's own name so they match what
+        /// an upload writes, which lets negotiate report local state without a temp file. Takes a
+        /// set rather than one folder because a save's unit can span siblings -- a PS2 game owning
+        /// several card entries, a PSP game's profile and system data.
         /// </summary>
         public static string FoldersAsZipHex(IEnumerable<string> folders)
         {

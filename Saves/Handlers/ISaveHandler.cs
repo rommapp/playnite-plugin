@@ -35,12 +35,10 @@ namespace RomM.Saves.Handlers
     {
         public Game Game { get; set; }
 
-        public Emulator Emulator { get; set; }
-
         /// <summary>
-        /// <see cref="Emulator"/>'s install directory with Playnite's variables expanded. On a
-        /// portable install the stored value is "{PlayniteDir}\...", which no filesystem call
-        /// resolves, so handlers must use this rather than reading InstallDir themselves.
+        /// Where the emulator is installed, as a real path: a portable Playnite stores
+        /// Emulator.InstallDir as "{PlayniteDir}\...", which no filesystem call resolves. The
+        /// unexpanded form is deliberately not on this request, so a handler cannot reach for it.
         /// </summary>
         public string EmulatorInstallDir { get; set; }
 
