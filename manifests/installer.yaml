@@ -124,3 +124,12 @@ Packages:
       - Better error message when no mapping found by @gantoine
       - Derive install paths from RomM folder (fs_name) for folder-based ROMs by @gantoine
       - Keep nested ROM paths and contain untrusted paths in the install root by @gantoine
+  - Version: 0.9.0
+    RequiredApiVersion: 6.17.0
+    ReleaseDate: 2026-09-16
+    PackageUrl: https://github.com/rommapp/playnite-plugin/releases/download/0.9.0/RomM_9700aa21-447d-41b4-a989-acd38f407d9f_0_9_0.pext
+    Changelog:
+      - Sync RetroArch saves with RomM, downloading the newest save before launch and uploading after play by @LxKnsy
+      - Add option to install ROMs flat, without per-game folders by @matthew-pye
+      - Fix typos in comments, README, and addon manifests by @Avicennasis
+      - Bump PlayniteSDK from 6.16.0 to 6.17.0 by @dependabot
