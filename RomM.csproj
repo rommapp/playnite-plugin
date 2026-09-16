@@ -7,6 +7,8 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>RomM</RootNamespace>
     <AssemblyName>RomM</AssemblyName>
+    <!-- Keep in sync with extension.yaml; save sync reports it as the client version. -->
+    <Version>0.9.0</Version>
     <TargetFramework>net462</TargetFramework>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
