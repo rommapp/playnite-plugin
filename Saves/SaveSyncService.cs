@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 using RomM.Games;
@@ -13,7 +13,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 
@@ -391,7 +390,7 @@ namespace RomM.Saves
                         Name = Environment.MachineName,
                         Platform = "Windows",
                         Client = DeviceClient,
-                        ClientVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString(),
+                        ClientVersion = PluginVersion.Current,
                     };
 
                     var url = RomMUrl.Combine(host, "api/devices");

@@ -41,6 +41,7 @@
     <Compile Include="..\Models\**\*.cs" Exclude="..\Models\**\GameInstallInfo.cs">
       <Link>Linked\Models\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Compile>
+    <Compile Include="..\PluginVersion.cs" Link="Linked\PluginVersion.cs" />
     <Compile Include="..\Games\RomMGameId.cs" Link="Linked\Games\RomMGameId.cs" />
     <Compile Include="..\Games\RomMGameInfo.cs" Link="Linked\Games\RomMGameInfo.cs" />
     <Compile Include="..\Games\RomMMetadataMapper.cs" Link="Linked\Games\RomMMetadataMapper.cs" />
@@ -59,6 +60,15 @@
     <Compile Include="..\Saves\Handlers\RetroArchConfig.cs" Link="Linked\Saves\Handlers\RetroArchConfig.cs" />
     <Compile Include="..\Saves\Handlers\RetroArchSaveHandler.cs" Link="Linked\Saves\Handlers\RetroArchSaveHandler.cs" />
     <Compile Include="..\Saves\Handlers\SaveHandlerRegistry.cs" Link="Linked\Saves\Handlers\SaveHandlerRegistry.cs" />
+  </ItemGroup>
+
+  <!-- The version declarations PluginVersionTests compares. Copied rather than read from the
+       repo so the check does not depend on where the test assembly ends up; the project file
+       lands as .txt so nothing mistakes the copy for a project it should build. -->
+  <ItemGroup>
+    <None Include="..\extension.yaml" Link="Declarations\extension.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\manifests\installer.yaml" Link="Declarations\installer.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\RomM.csproj" Link="Declarations\RomM.csproj.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
