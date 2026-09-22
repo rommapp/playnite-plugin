@@ -97,10 +97,12 @@ namespace RomM.Saves
 
                 lock (_romLocks.GetOrAdd(romId, _ => new object()))
                 {
-                    var target = ResolveTarget(game);
+                    // ResolveTarget words the reason it gave up: which emulator it looked at, and
+                    // whether the problem is that none is set, that none is supported, or that the
+                    // supported one's save path could not be worked out.
+                    var target = ResolveTarget(game, outcome);
                     if (target == null)
                     {
-                        outcome.Message = "Save sync does not know where this game's emulator keeps its saves.";
                         return outcome;
                     }
 
@@ -431,64 +433,102 @@ namespace RomM.Saves
         #region Save location
 
         /// <summary>
-        /// Finds the emulator Playnite launches this game with, hands it to whichever handler
-        /// recognises it, and lets that handler locate the save. Null when the game has no
-        /// emulator, no ROM path, or runs on an emulator no handler covers yet.
+        /// Finds the emulator this game's saves belong to, hands it to whichever handler recognises
+        /// it, and lets that handler locate the save. Null when no emulator is set, none is
+        /// supported, or the handler cannot work out a path -- each of which writes its own reason
+        /// into <paramref name="outcome"/>, because "somewhere in these three" is not something a
+        /// user can act on.
         /// </summary>
-        private SaveTarget ResolveTarget(Game game)
+        private SaveTarget ResolveTarget(Game game, SyncOutcome outcome)
         {
             var contentPath = game.Roms?.FirstOrDefault()?.Path;
             if (string.IsNullOrEmpty(contentPath))
-                return null;
-
-            var action = EmulatorAction(game);
-            var emulator = ResolveEmulator(action);
-            if (emulator == null)
-                return null;
-
-            var handler = _handlers.Find(emulator);
-            if (handler == null)
             {
-                Logger.Info($"[SaveSync] No save handler for emulator '{emulator.Name}', skipping {game.Name}.");
+                outcome.Message = $"{game.Name} has no ROM file for save sync to work from.";
                 return null;
             }
 
-            return handler.ResolveTarget(new SaveTargetRequest
+            var resolution = ResolveEmulator(game);
+            if (resolution.Problem == SaveEmulatorProblem.NoEmulator)
+            {
+                outcome.Message = $"{game.Name} has no emulator set. Choose one in the game's Actions, " +
+                                  "or map its platform under RomM settings.";
+                return null;
+            }
+
+            if (resolution.Problem == SaveEmulatorProblem.Unsupported)
+            {
+                Logger.Info($"[SaveSync] No save handler for emulator '{resolution.UnsupportedEmulatorName}', skipping {game.Name}.");
+                outcome.Message = $"Save sync does not support {resolution.UnsupportedEmulatorName} yet. " +
+                                  $"Supported: {SupportedEmulators}.";
+                return null;
+            }
+
+            if (resolution.Source == SaveEmulatorSource.Mapping)
+            {
+                Logger.Info($"[SaveSync] {game.Name}'s play action names no emulator save sync supports; " +
+                            $"using {resolution.Emulator.Name} from its RomM platform mapping instead.");
+            }
+
+            var target = resolution.Handler.ResolveTarget(new SaveTargetRequest
             {
                 Game = game,
-                EmulatorInstallDir = PlaynitePath.Resolve(_romM.Playnite, emulator.InstallDir),
-                Profile = ResolveProfile(action, emulator),
+                EmulatorInstallDir = PlaynitePath.Resolve(_romM.Playnite, resolution.Emulator.InstallDir),
+                Profile = resolution.Profile,
                 ContentPath = _romM.Playnite.ExpandGameVariables(game, contentPath),
                 Logger = Logger,
             });
+
+            if (target == null)
+            {
+                outcome.Message = $"Could not work out where {resolution.Emulator.Name} keeps this game's saves.";
+            }
+
+            return target;
         }
 
         /// <summary>
-        /// The emulator comes from the action Playnite actually launches with, not from the
-        /// <see cref="EmulatorMapping"/> the game was imported under: a user who repoints the play
-        /// action at another emulator should have their saves follow it.
+        /// The play action leads -- a user who repoints it at another emulator should have their
+        /// saves follow it -- but it is only a snapshot of the emulator mapping taken at import, so
+        /// the mapping gets its turn when the action names an emulator no handler covers. See
+        /// <see cref="SaveEmulatorResolver"/> for the rules; this half is only the Playnite lookups.
         /// </summary>
-        private Emulator ResolveEmulator(GameAction action)
+        private SaveEmulatorResolution ResolveEmulator(Game game)
         {
-            if (action != null && action.EmulatorId != Guid.Empty)
-                return _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
+            var candidates = new List<SaveEmulatorCandidate>();
 
-            return null;
+            var action = RomMPlayAction.Find(game.GameActions);
+            if (action != null && action.EmulatorId != Guid.Empty)
+            {
+                var emulator = _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
+                candidates.Add(new SaveEmulatorCandidate
+                {
+                    Source = SaveEmulatorSource.PlayAction,
+                    Emulator = emulator,
+                    Profile = ProfileOf(emulator, action.EmulatorProfileId),
+                });
+            }
+
+            var mapping = _romM.MappingFor(game);
+            if (mapping != null)
+            {
+                candidates.Add(new SaveEmulatorCandidate
+                {
+                    Source = SaveEmulatorSource.Mapping,
+                    Emulator = mapping.Emulator,
+                    Profile = ProfileOf(mapping.Emulator, mapping.EmulatorProfileId),
+                });
+            }
+
+            return SaveEmulatorResolver.Resolve(_handlers, candidates);
         }
 
-        private static EmulatorProfile ResolveProfile(GameAction action, Emulator emulator)
+        private static EmulatorProfile ProfileOf(Emulator emulator, string profileId)
         {
-            var profileId = action?.EmulatorProfileId;
-            if (string.IsNullOrEmpty(profileId))
+            if (emulator == null || string.IsNullOrEmpty(profileId))
                 return null;
 
             return emulator.SelectableProfiles?.FirstOrDefault(p => p.Id == profileId);
-        }
-
-        private static GameAction EmulatorAction(Game game)
-        {
-            return game.GameActions?.FirstOrDefault(a => a.IsPlayAction && a.Type == GameActionType.Emulator)
-                   ?? game.GameActions?.FirstOrDefault(a => a.Type == GameActionType.Emulator);
         }
 
         #endregion

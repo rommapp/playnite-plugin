@@ -32,6 +32,13 @@ namespace RomM.Models.RomM.Rom
         public string SHA1 { get; set; }
         public Guid MappingID { get; set; }
 
+        // The emulator and profile the importer last wrote onto the game's play action. An action
+        // that still carries them has not been touched since, so a later import may repoint it at
+        // the mapping's current emulator; one that differs is the user's own choice and is left
+        // alone. Empty on sidecars written before the plugin recorded this.
+        public Guid AppliedEmulatorID { get; set; }
+        public string AppliedEmulatorProfileID { get; set; }
+
         public List<RomMRevision> ROMVersions { get; set; }
 
     }
