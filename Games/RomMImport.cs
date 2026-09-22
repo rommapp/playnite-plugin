@@ -208,8 +208,15 @@ namespace RomM.Games
                 return null;
             }
 
-            var gameInstallDir = _mapping.InstallFlat ? rootInstallDir : RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
-            var pathToGame = _mapping.InstallFlat ? $"{rootInstallDir}\\{fileName}" : RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
+            // A ROM fetched as a whole folder keeps a folder of its own even under install flat, so
+            // the extras it carries are not scattered across the platform folder.
+            var flatLayout = RomMInstallPaths.UsesFlatLayout(
+                _mapping.InstallFlat,
+                baseRevision?.DownloadAsArchive ?? false,
+                baseRevision?.HasMultipleFiles ?? false);
+
+            var gameInstallDir = flatLayout ? rootInstallDir : RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
+            var pathToGame = flatLayout ? $"{rootInstallDir}\\{fileName}" : RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
 
             var status = _plugin.Playnite.Database.CompletionStatuses.Get(StatusID);
             var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;

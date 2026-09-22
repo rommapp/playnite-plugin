@@ -48,7 +48,13 @@ namespace RomM.Games
             // IsInstalled detection lines up.
             var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
 
-            if (_gameData.Mapping.InstallFlat)
+            // Not _gameData.Mapping.InstallFlat directly: a ROM fetched as a whole folder keeps its
+            // own folder even under flat. Must stay the same call the importer makes, or the install
+            // path drifts from the one recorded at import and IsInstalled detection breaks.
+            var flatLayout = RomMInstallPaths.UsesFlatLayout(
+                _gameData.Mapping.InstallFlat, _gameData.DownloadAsArchive, _gameData.HasMultipleFiles);
+
+            if (flatLayout)
                 installDir = dstPath;
 
             // A folder download arrives as an archive named after the ROM folder; a single file keeps
@@ -70,7 +76,9 @@ namespace RomM.Games
 
                 DownloadAsArchive = _gameData.DownloadAsArchive,
                 AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
-                InstallFlat = _gameData.Mapping.InstallFlat,
+                // The layout actually being installed, so cancelling a download cleans up the game's
+                // folder when it has one.
+                InstallFlat = flatLayout,
 
                 // Called by queue AFTER download/extract is done
                 BuildRoms = () =>
