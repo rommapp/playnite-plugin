@@ -48,18 +48,25 @@ namespace RomM.Games
             // IsInstalled detection lines up.
             var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
 
+            // A sidecar written before DownloadAsArchive existed reads it back as false, so the flag
+            // alone would stop a ROM imported by an earlier version from being treated as the archive
+            // it still downloads as. A ROM RomM itself calls multi-file has always been fetched whole,
+            // which makes the two the same thing here and keeps such a ROM extracting until the next
+            // library update rewrites its sidecar.
+            var downloadsArchive = _gameData.DownloadAsArchive || _gameData.HasMultipleFiles;
+
             // Not _gameData.Mapping.InstallFlat directly: a ROM fetched as a whole folder keeps its
             // own folder even under flat. Must stay the same call the importer makes, or the install
             // path drifts from the one recorded at import and IsInstalled detection breaks.
             var flatLayout = RomMInstallPaths.UsesFlatLayout(
-                _gameData.Mapping.InstallFlat, _gameData.DownloadAsArchive, _gameData.HasMultipleFiles);
+                _gameData.Mapping.InstallFlat, downloadsArchive, _gameData.HasMultipleFiles);
 
             if (flatLayout)
                 installDir = dstPath;
 
             // A folder download arrives as an archive named after the ROM folder; a single file keeps
             // its own name. See RomMRevision.DownloadAsArchive for why this is not HasMultipleFiles.
-            var downloadFilePath = _gameData.DownloadAsArchive
+            var downloadFilePath = downloadsArchive
                 ? Path.Combine(installDir, _gameData.FileName + ".zip")
                 : Path.Combine(installDir, _gameData.FileName);
 
@@ -74,7 +81,7 @@ namespace RomM.Games
                 Use7z = _romM.Settings.Use7z,
                 PathTo7Z = _romM.Settings.PathTo7z,
 
-                DownloadAsArchive = _gameData.DownloadAsArchive,
+                DownloadAsArchive = downloadsArchive,
                 AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
                 // The layout actually being installed, so cancelling a download cleans up the game's
                 // folder when it has one.
@@ -98,7 +105,7 @@ namespace RomM.Games
                     // genuine multi-file ROM are, so the primary file is named outright instead of
                     // being inferred from whatever the folder scan turns up. A missing file falls
                     // through to that scan rather than leaving the game with no ROM at all.
-                    if (_gameData.DownloadAsArchive && !_gameData.HasMultipleFiles &&
+                    if (downloadsArchive && !_gameData.HasMultipleFiles &&
                         !string.IsNullOrEmpty(_gameData.PlayableFile))
                     {
                         var primaryPath = Path.Combine(installDir, _gameData.PlayableFile);
