@@ -120,14 +120,8 @@ namespace RomM
         internal RomMRomLocal LoadGameData(Game game) =>
             RomMGameData.Load(ROMDataPath, game?.GameId, Logger, game?.Name);
 
-        public EmulatorMapping MappingFor(Game game)
-        {
-            var gameData = LoadGameData(game);
-            if (gameData == null)
-                return null;
-
-            return Settings?.Mappings?.FirstOrDefault(x => x.MappingId == gameData.MappingID);
-        }
+        public EmulatorMapping MappingFor(Game game) =>
+            Settings?.MappingById(LoadGameData(game)?.MappingID ?? Guid.Empty);
 
         public RomMRom FetchRom(string romId)
         {
@@ -415,13 +409,9 @@ namespace RomM
                     }
 
                     gameData = LoadGameData(args.Game);
-                    if (gameData == null)
+                    if (gameData?.ROMVersions == null || gameData.ROMVersions.Count == 0)
                     {
-                        Logger.Error($"{args.Game.Name} has no readable ROM data file; run update game library before installing!");
-                    }
-
-                    if (romData.Id == (int)InstallStatus.Cancelled || gameData?.ROMVersions == null || gameData.ROMVersions.Count == 0)
-                    {
+                        Logger.Error($"{args.Game.Name} has no usable ROM data file; run update game library before installing!");
                         romData.Id = (int)InstallStatus.Cancelled;
                         yield return new RomMInstallController(args.Game, this, romData);
                         yield break;
@@ -435,7 +425,7 @@ namespace RomM
                         FolderName = gameData.ROMVersions[0].FolderName,
                         HasMultipleFiles = gameData.ROMVersions[0].HasMultipleFiles,
                         DownloadURL = gameData.ROMVersions[0].DownloadURL,
-                        Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
+                        Mapping = Settings.MappingById(gameData.MappingID)
                     };
 
                     // If Siblings are available prompt user with version selection

@@ -135,7 +135,8 @@ namespace RomM.Games
                     // What the sidecar held before this import overwrites it: the record of the
                     // play action the plugin last wrote, which decides whether that action is
                     // still ours to repoint at the mapping's current emulator.
-                    var previous = RomMGameData.LoadBySha1(_plugin.ROMDataPath, ROM.SHA1, _plugin.Logger, ROM.Name);
+                    var previous = RomMGameData.LoadBySha1(_plugin.ROMDataPath, ROM.SHA1, _plugin.Logger,
+                                                          out string previousJson, ROM.Name);
 
                     // Skip full import if ROM has already been imported
                     Guid statusID = Guid.Empty;
@@ -155,7 +156,7 @@ namespace RomM.Games
                         }
 
                         // Save Game ROM data to file
-                        SaveGameData(ROM, previous, RefreshPlayAction(existingGame, previous));
+                        SaveGameData(ROM, previous, previousJson, RefreshPlayAction(existingGame, previous));
                         importedGameIds.Add(gameID);
                         continue;
                     }
@@ -167,13 +168,14 @@ namespace RomM.Games
                         // The adopted entry is an existing game re-keyed under the new id, so its
                         // action is refreshed on the same terms as any other existing game's.
                         _existingGames.TryGetValue(gameID, out var adoptedGame);
-                        SaveGameData(ROM, previous, RefreshPlayAction(adoptedGame, previous));
+                        SaveGameData(ROM, previous, previousJson, RefreshPlayAction(adoptedGame, previous));
                         importedGameIds.Add(gameID);
                         continue;
                     }
 
                     // A new game gets the mapping's emulator outright, below.
-                    SaveGameData(ROM, previous, new AppliedPlayAction(_mapping.EmulatorId, _mapping.EmulatorProfileId));
+                    SaveGameData(ROM, previous, previousJson,
+                                 new AppliedPlayAction(_mapping.EmulatorId, _mapping.EmulatorProfileId));
 
                     var importedGame = ImportGame(ROM, statusID);
                     if (importedGame != null)
@@ -378,7 +380,7 @@ namespace RomM.Games
         private MainSibling CheckForMainSibling(RomMRom ROM)
             => RomMSiblings.ClassifyMain(ROM, _romById);
 
-        private void SaveGameData(RomMRom ROM, RomMRomLocal previous, AppliedPlayAction applied)
+        private void SaveGameData(RomMRom ROM, RomMRomLocal previous, string previousJson, AppliedPlayAction applied)
         {
             RomMRomLocal toSave = new RomMRomLocal
             {
@@ -428,7 +430,7 @@ namespace RomM.Games
             }
 
             string json = JsonConvert.SerializeObject(toSave);
-            if (previous == null || json != JsonConvert.SerializeObject(previous))
+            if (json != previousJson)
                 RomMGameData.Save(_plugin.ROMDataPath, ROM.SHA1, toSave);
         }
 
@@ -445,9 +447,8 @@ namespace RomM.Games
         private AppliedPlayAction RefreshPlayAction(Game game, RomMRomLocal previous)
         {
             var mapped = new AppliedPlayAction(_mapping.EmulatorId, _mapping.EmulatorProfileId);
-            var applied = previous != null
-                ? new AppliedPlayAction(previous.AppliedEmulatorID, previous.AppliedEmulatorProfileID)
-                : AppliedPlayAction.Unknown;
+            var applied = new AppliedPlayAction(previous?.AppliedEmulatorID ?? Guid.Empty,
+                                                previous?.AppliedEmulatorProfileID);
 
             // No action to keep in step -- and no game at all, on the adoption path where the
             // re-keyed entry could not be found again.
@@ -455,27 +456,23 @@ namespace RomM.Games
             if (action == null || _platformHasRivalMapping)
                 return applied;
 
-            if (RomMPlayAction.Matches(action, mapped.EmulatorId, mapped.ProfileId))
+            if (RomMPlayAction.Matches(action, mapped))
                 return mapped;
 
-            var actionEmulatorName = _plugin.Playnite.Database.Emulators?
-                .FirstOrDefault(e => e.Id == action.EmulatorId)?.Name;
+            Func<string> actionEmulatorName = () =>
+                _plugin.Playnite.Database.Emulators?.Get(action.EmulatorId)?.Name;
 
-            if (!RomMPlayAction.IsUnedited(action, applied.EmulatorId, applied.ProfileId, actionEmulatorName))
+            if (!RomMPlayAction.IsUnedited(action, applied, actionEmulatorName))
             {
                 _plugin.Logger.Info($"[Importer] Leaving {game.Name}'s play action pointed at " +
-                                    $"{actionEmulatorName ?? "<Unknown>"}: it is no longer the one the plugin wrote.");
+                                    $"{actionEmulatorName() ?? "<Unknown>"}: it is no longer the one the plugin wrote.");
                 return applied;
             }
 
             if (_mapping.Emulator == null)
                 return applied;
 
-            action.Name = RomMPlayAction.NameFor(_mapping.Emulator.Name);
-            action.Type = GameActionType.Emulator;
-            action.EmulatorId = mapped.EmulatorId;
-            action.EmulatorProfileId = mapped.ProfileId;
-            action.IsPlayAction = true;
+            RomMPlayAction.Apply(action, _mapping.Emulator.Name, mapped.EmulatorId, mapped.ProfileId);
 
             // Our own write; OnItemUpdated has nothing to push to RomM for it.
             _plugin.SuppressSync(game.Id);

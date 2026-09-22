@@ -97,12 +97,10 @@ namespace RomM.Saves
 
                 lock (_romLocks.GetOrAdd(romId, _ => new object()))
                 {
-                    // ResolveTarget words the reason it gave up: which emulator it looked at, and
-                    // whether the problem is that none is set, that none is supported, or that the
-                    // supported one's save path could not be worked out.
-                    var target = ResolveTarget(game, outcome);
+                    var target = ResolveTarget(game, out string reason);
                     if (target == null)
                     {
+                        outcome.Message = reason;
                         return outcome;
                     }
 
@@ -435,36 +433,37 @@ namespace RomM.Saves
         /// <summary>
         /// Finds the emulator this game's saves belong to, hands it to whichever handler recognises
         /// it, and lets that handler locate the save. Null when no emulator is set, none is
-        /// supported, or the handler cannot work out a path -- each of which writes its own reason
-        /// into <paramref name="outcome"/>, because "somewhere in these three" is not something a
-        /// user can act on.
+        /// supported, or the handler cannot work out a path -- <paramref name="reason"/> says
+        /// which, because "somewhere in these three" is not something a user can act on.
         /// </summary>
-        private SaveTarget ResolveTarget(Game game, SyncOutcome outcome)
+        private SaveTarget ResolveTarget(Game game, out string reason)
         {
+            reason = null;
+
             var contentPath = game.Roms?.FirstOrDefault()?.Path;
             if (string.IsNullOrEmpty(contentPath))
             {
-                outcome.Message = $"{game.Name} has no ROM file for save sync to work from.";
+                reason = $"{game.Name} has no ROM file for save sync to work from.";
                 return null;
             }
 
             var resolution = ResolveEmulator(game);
-            if (resolution.Problem == SaveEmulatorProblem.NoEmulator)
+            if (resolution.Emulator == null)
             {
-                outcome.Message = $"{game.Name} has no emulator set. Choose one in the game's Actions, " +
-                                  "or map its platform under RomM settings.";
+                reason = $"{game.Name} has no emulator set. Choose one in the game's Actions, " +
+                         "or map its platform under RomM settings.";
                 return null;
             }
 
-            if (resolution.Problem == SaveEmulatorProblem.Unsupported)
+            if (resolution.Handler == null)
             {
-                Logger.Info($"[SaveSync] No save handler for emulator '{resolution.UnsupportedEmulatorName}', skipping {game.Name}.");
-                outcome.Message = $"Save sync does not support {resolution.UnsupportedEmulatorName} yet. " +
-                                  $"Supported: {SupportedEmulators}.";
+                Logger.Info($"[SaveSync] No save handler for emulator '{resolution.Emulator.Name}', skipping {game.Name}.");
+                reason = $"Save sync does not support {resolution.Emulator.Name} yet. " +
+                         $"Supported: {SupportedEmulators}.";
                 return null;
             }
 
-            if (resolution.Source == SaveEmulatorSource.Mapping)
+            if (resolution.FromMapping)
             {
                 Logger.Info($"[SaveSync] {game.Name}'s play action names no emulator save sync supports; " +
                             $"using {resolution.Emulator.Name} from its RomM platform mapping instead.");
@@ -481,7 +480,7 @@ namespace RomM.Saves
 
             if (target == null)
             {
-                outcome.Message = $"Could not work out where {resolution.Emulator.Name} keeps this game's saves.";
+                reason = $"Could not work out where {resolution.Emulator.Name} keeps this game's saves.";
             }
 
             return target;
@@ -498,26 +497,34 @@ namespace RomM.Saves
             var candidates = new List<SaveEmulatorCandidate>();
 
             var action = RomMPlayAction.Find(game.GameActions);
+            SaveEmulatorCandidate fromAction = null;
             if (action != null && action.EmulatorId != Guid.Empty)
             {
-                var emulator = _romM.Playnite.Database.Emulators?.FirstOrDefault(e => e.Id == action.EmulatorId);
-                candidates.Add(new SaveEmulatorCandidate
+                var emulator = _romM.Playnite.Database.Emulators?.Get(action.EmulatorId);
+                fromAction = new SaveEmulatorCandidate
                 {
-                    Source = SaveEmulatorSource.PlayAction,
                     Emulator = emulator,
                     Profile = ProfileOf(emulator, action.EmulatorProfileId),
-                });
+                };
+                candidates.Add(fromAction);
             }
 
-            var mapping = _romM.MappingFor(game);
-            if (mapping != null)
+            // Reading the mapping means reading the ROM's sidecar off disk, and this runs on the
+            // pre-launch path, so it is skipped when the action can answer on its own -- which it
+            // cannot if its emulator is unsupported, or if it names no profile for the handler to
+            // take the core from.
+            if (fromAction?.Profile == null || _handlers.Find(fromAction.Emulator) == null)
             {
-                candidates.Add(new SaveEmulatorCandidate
+                var mapping = _romM.MappingFor(game);
+                if (mapping != null)
                 {
-                    Source = SaveEmulatorSource.Mapping,
-                    Emulator = mapping.Emulator,
-                    Profile = ProfileOf(mapping.Emulator, mapping.EmulatorProfileId),
-                });
+                    candidates.Add(new SaveEmulatorCandidate
+                    {
+                        FromMapping = true,
+                        Emulator = mapping.Emulator,
+                        Profile = mapping.EmulatorProfile,
+                    });
+                }
             }
 
             return SaveEmulatorResolver.Resolve(_handlers, candidates);

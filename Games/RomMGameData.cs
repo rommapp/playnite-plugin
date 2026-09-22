@@ -7,7 +7,7 @@ using System.IO;
 namespace RomM.Games
 {
     /// <summary>
-    /// The per-ROM sidecar ("&lt;sha1&gt;.json" under the plugin's data folder): the download
+    /// The per-ROM sidecar ("{sha1}.json" under the plugin's data folder): the download
     /// descriptors for every revision, the emulator mapping the ROM was imported under, and what
     /// the importer last wrote onto the game's play action.
     ///
@@ -31,18 +31,28 @@ namespace RomM.Games
                 return null;
             }
 
-            return LoadBySha1(romDataPath, sha1, logger, gameName);
+            return LoadBySha1(romDataPath, sha1, logger, out string _, gameName);
         }
 
-        public static RomMRomLocal LoadBySha1(string romDataPath, string sha1, ILogger logger, string gameName = null)
+        /// <param name="rawJson">
+        /// The file's text exactly as read, or null when there was none. A caller about to rewrite
+        /// the sidecar compares against this to decide whether anything changed, rather than
+        /// re-serialising what it has just parsed once per ROM.
+        /// </param>
+        public static RomMRomLocal LoadBySha1(string romDataPath, string sha1, ILogger logger, out string rawJson, string gameName = null)
         {
+            rawJson = null;
+
             var path = PathFor(romDataPath, sha1);
             if (!File.Exists(path))
                 return null;
 
             try
             {
-                return JsonConvert.DeserializeObject<RomMRomLocal>(File.ReadAllText(path));
+                var text = File.ReadAllText(path);
+                var data = JsonConvert.DeserializeObject<RomMRomLocal>(text);
+                rawJson = text;
+                return data;
             }
             catch (Exception ex)
             {

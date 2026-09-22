@@ -17,8 +17,11 @@ namespace RomM.Tests
         private static Emulator Dolphin() =>
             new Emulator { Id = Guid.NewGuid(), Name = "Dolphin" };
 
-        private static SaveEmulatorCandidate Candidate(SaveEmulatorSource source, Emulator emulator, EmulatorProfile profile = null) =>
-            new SaveEmulatorCandidate { Source = source, Emulator = emulator, Profile = profile };
+        private static SaveEmulatorCandidate FromAction(Emulator emulator, EmulatorProfile profile = null) =>
+            new SaveEmulatorCandidate { Emulator = emulator, Profile = profile };
+
+        private static SaveEmulatorCandidate FromMapping(Emulator emulator, EmulatorProfile profile = null) =>
+            new SaveEmulatorCandidate { FromMapping = true, Emulator = emulator, Profile = profile };
 
         // The action a user repointed at another supported emulator is their choice, and outranks
         // whatever the platform mapping says.
@@ -29,13 +32,12 @@ namespace RomM.Tests
 
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
-                Candidate(SaveEmulatorSource.PlayAction, fromAction),
-                Candidate(SaveEmulatorSource.Mapping, RetroArch()),
+                FromAction(fromAction),
+                FromMapping(RetroArch()),
             });
 
             Assert.Same(fromAction, resolution.Emulator);
-            Assert.Equal(SaveEmulatorSource.PlayAction, resolution.Source);
-            Assert.Equal(SaveEmulatorProblem.None, resolution.Problem);
+            Assert.False(resolution.FromMapping);
             Assert.NotNull(resolution.Handler);
         }
 
@@ -48,13 +50,13 @@ namespace RomM.Tests
 
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
-                Candidate(SaveEmulatorSource.PlayAction, Dolphin()),
-                Candidate(SaveEmulatorSource.Mapping, fromMapping),
+                FromAction(Dolphin()),
+                FromMapping(fromMapping),
             });
 
             Assert.Same(fromMapping, resolution.Emulator);
-            Assert.Equal(SaveEmulatorSource.Mapping, resolution.Source);
-            Assert.Equal(SaveEmulatorProblem.None, resolution.Problem);
+            Assert.True(resolution.FromMapping);
+            Assert.NotNull(resolution.Handler);
         }
 
         // Reported as unsupported rather than as "no emulator": the two need different advice, and
@@ -64,12 +66,11 @@ namespace RomM.Tests
         {
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
-                Candidate(SaveEmulatorSource.PlayAction, Dolphin()),
-                Candidate(SaveEmulatorSource.Mapping, new Emulator { Id = Guid.NewGuid(), Name = "PCSX2" }),
+                FromAction(Dolphin()),
+                FromMapping(new Emulator { Id = Guid.NewGuid(), Name = "PCSX2" }),
             });
 
-            Assert.Equal(SaveEmulatorProblem.Unsupported, resolution.Problem);
-            Assert.Equal("Dolphin", resolution.UnsupportedEmulatorName);
+            Assert.Equal("Dolphin", resolution.Emulator?.Name);
             Assert.Null(resolution.Handler);
         }
 
@@ -78,20 +79,19 @@ namespace RomM.Tests
         {
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
-                Candidate(SaveEmulatorSource.PlayAction, null),
-                Candidate(SaveEmulatorSource.Mapping, null),
+                FromAction(null),
+                FromMapping(null),
                 null,
             });
 
-            Assert.Equal(SaveEmulatorProblem.NoEmulator, resolution.Problem);
             Assert.Null(resolution.Emulator);
+            Assert.Null(resolution.Handler);
         }
 
         [Fact]
         public void No_candidates_at_all_are_reported_as_none_set()
         {
-            Assert.Equal(SaveEmulatorProblem.NoEmulator,
-                SaveEmulatorResolver.Resolve(Handlers, null).Problem);
+            Assert.Null(SaveEmulatorResolver.Resolve(Handlers, null).Emulator);
         }
 
         // An action can name an emulator without naming a profile. For RetroArch the profile is the
@@ -105,11 +105,11 @@ namespace RomM.Tests
 
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
-                Candidate(SaveEmulatorSource.PlayAction, RetroArch(id)),
-                Candidate(SaveEmulatorSource.Mapping, RetroArch(id), profile),
+                FromAction(RetroArch(id)),
+                FromMapping(RetroArch(id), profile),
             });
 
-            Assert.Equal(SaveEmulatorSource.PlayAction, resolution.Source);
+            Assert.False(resolution.FromMapping);
             Assert.Same(profile, resolution.Profile);
         }
 
@@ -120,8 +120,8 @@ namespace RomM.Tests
         {
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
-                Candidate(SaveEmulatorSource.PlayAction, RetroArch()),
-                Candidate(SaveEmulatorSource.Mapping, RetroArch(), new BuiltInEmulatorProfile { Name = "mGBA" }),
+                FromAction(RetroArch()),
+                FromMapping(RetroArch(), new BuiltInEmulatorProfile { Name = "mGBA" }),
             });
 
             Assert.Null(resolution.Profile);
@@ -135,8 +135,8 @@ namespace RomM.Tests
 
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new List<SaveEmulatorCandidate>
             {
-                Candidate(SaveEmulatorSource.PlayAction, RetroArch(id), own),
-                Candidate(SaveEmulatorSource.Mapping, RetroArch(id), new BuiltInEmulatorProfile { Name = "mGBA" }),
+                FromAction(RetroArch(id), own),
+                FromMapping(RetroArch(id), new BuiltInEmulatorProfile { Name = "mGBA" }),
             });
 
             Assert.Same(own, resolution.Profile);

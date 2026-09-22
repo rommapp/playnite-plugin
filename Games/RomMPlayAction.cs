@@ -7,13 +7,11 @@ namespace RomM.Games
 {
     /// <summary>
     /// The emulator and profile the importer last wrote onto a game's play action, as recorded in
-    /// the ROM's sidecar. <see cref="Unknown"/> is what a sidecar written before the plugin kept
+    /// the ROM's sidecar. An empty emulator id is what a sidecar written before the plugin kept
     /// this record yields.
     /// </summary>
     internal struct AppliedPlayAction
     {
-        public static readonly AppliedPlayAction Unknown = new AppliedPlayAction(Guid.Empty, null);
-
         public readonly Guid EmulatorId;
         public readonly string ProfileId;
 
@@ -37,16 +35,22 @@ namespace RomM.Games
     {
         public static string NameFor(string emulatorName) => $"Play in {emulatorName}";
 
-        public static GameAction Build(string emulatorName, Guid emulatorId, string emulatorProfileId)
+        public static GameAction Build(string emulatorName, Guid emulatorId, string emulatorProfileId) =>
+            Apply(new GameAction(), emulatorName, emulatorId, emulatorProfileId);
+
+        /// <summary>
+        /// Writes the importer's play action onto an existing one, for repointing a game already in
+        /// the library. Shares its body with <see cref="Build"/> so a refreshed action cannot drift
+        /// from a freshly imported one.
+        /// </summary>
+        public static GameAction Apply(GameAction action, string emulatorName, Guid emulatorId, string emulatorProfileId)
         {
-            return new GameAction
-            {
-                Name = NameFor(emulatorName),
-                Type = GameActionType.Emulator,
-                EmulatorId = emulatorId,
-                EmulatorProfileId = emulatorProfileId,
-                IsPlayAction = true,
-            };
+            action.Name = NameFor(emulatorName);
+            action.Type = GameActionType.Emulator;
+            action.EmulatorId = emulatorId;
+            action.EmulatorProfileId = emulatorProfileId;
+            action.IsPlayAction = true;
+            return action;
         }
 
         /// <summary>
@@ -58,39 +62,39 @@ namespace RomM.Games
             if (actions == null)
                 return null;
 
-            var list = actions as IList<GameAction> ?? actions.ToList();
-            return list.FirstOrDefault(a => a != null && a.IsPlayAction && a.Type == GameActionType.Emulator)
-                   ?? list.FirstOrDefault(a => a != null && a.Type == GameActionType.Emulator);
+            var emulatorActions = actions.Where(a => a != null && a.Type == GameActionType.Emulator).ToList();
+            return emulatorActions.FirstOrDefault(a => a.IsPlayAction) ?? emulatorActions.FirstOrDefault();
         }
 
         /// <summary>Whether the action already launches the given emulator and profile.</summary>
-        public static bool Matches(GameAction action, Guid emulatorId, string emulatorProfileId)
+        public static bool Matches(GameAction action, AppliedPlayAction target)
         {
             return action != null
-                   && action.EmulatorId == emulatorId
-                   && SameProfile(action.EmulatorProfileId, emulatorProfileId);
+                   && action.EmulatorId == target.EmulatorId
+                   && SameProfile(action.EmulatorProfileId, target.ProfileId);
         }
 
         /// <summary>
         /// Whether the action is still the plugin's to repoint.
         ///
-        /// <paramref name="appliedEmulatorId"/> / <paramref name="appliedProfileId"/> are what the
-        /// plugin last wrote, recorded in the ROM's sidecar; if the action still carries them,
-        /// nobody has touched it. Sidecars written before the plugin recorded that (every install
+        /// <paramref name="applied"/> is what the plugin last wrote, recorded in the ROM's sidecar;
+        /// if the action still carries it, nobody has touched it. Sidecars written before the plugin recorded that (every install
         /// that predates this) carry no applied emulator, and then the generated name is the only
-        /// marker left: an action still called "Play in &lt;the emulator it points at&gt;" is one
-        /// the importer wrote and the user has not renamed or repointed.
+        /// marker left: an action still called "Play in {the emulator it points at}" is one
+        /// the importer wrote and the user has not renamed or repointed. That name costs a lookup
+        /// of the action's emulator, so it is passed as a thunk and only resolved on that path.
         /// </summary>
-        public static bool IsUnedited(GameAction action, Guid appliedEmulatorId, string appliedProfileId, string actionEmulatorName)
+        public static bool IsUnedited(GameAction action, AppliedPlayAction applied, Func<string> actionEmulatorName)
         {
             if (action == null)
                 return false;
 
-            if (appliedEmulatorId != Guid.Empty)
-                return Matches(action, appliedEmulatorId, appliedProfileId);
+            if (applied.EmulatorId != Guid.Empty)
+                return Matches(action, applied);
 
-            return !string.IsNullOrEmpty(actionEmulatorName)
-                   && string.Equals(action.Name, NameFor(actionEmulatorName), StringComparison.Ordinal);
+            var name = actionEmulatorName?.Invoke();
+            return !string.IsNullOrEmpty(name)
+                   && string.Equals(action.Name, NameFor(name), StringComparison.Ordinal);
         }
 
         // Playnite writes an unset profile as either null or "", and the two mean the same thing.

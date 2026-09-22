@@ -11,10 +11,29 @@ namespace RomM.Tests
         private static readonly Guid Mapped = Guid.NewGuid();
         private static readonly Guid Other = Guid.NewGuid();
 
+        private static AppliedPlayAction Applied(Guid emulatorId, string profileId) =>
+            new AppliedPlayAction(emulatorId, profileId);
+
         [Fact]
         public void Build_produces_the_importers_play_action()
         {
             var action = RomMPlayAction.Build("RetroArch", Mapped, "profile-1");
+
+            Assert.Equal("Play in RetroArch", action.Name);
+            Assert.Equal(GameActionType.Emulator, action.Type);
+            Assert.Equal(Mapped, action.EmulatorId);
+            Assert.Equal("profile-1", action.EmulatorProfileId);
+            Assert.True(action.IsPlayAction);
+        }
+
+        // Repointing an existing action has to leave it identical to a freshly imported one, which
+        // is why both go through the same writer.
+        [Fact]
+        public void Apply_rewrites_an_existing_action_into_the_importers_shape()
+        {
+            var action = new GameAction { Name = "Play in Dolphin", Type = GameActionType.URL, EmulatorId = Other };
+
+            RomMPlayAction.Apply(action, "RetroArch", Mapped, "profile-1");
 
             Assert.Equal("Play in RetroArch", action.Name);
             Assert.Equal(GameActionType.Emulator, action.Type);
@@ -68,7 +87,7 @@ namespace RomM.Tests
         {
             var action = new GameAction { EmulatorId = Mapped, EmulatorProfileId = actionProfile };
 
-            Assert.True(RomMPlayAction.Matches(action, Mapped, mappedProfile));
+            Assert.True(RomMPlayAction.Matches(action, Applied(Mapped, mappedProfile)));
         }
 
         [Fact]
@@ -76,9 +95,9 @@ namespace RomM.Tests
         {
             var action = new GameAction { EmulatorId = Mapped, EmulatorProfileId = "p" };
 
-            Assert.False(RomMPlayAction.Matches(action, Other, "p"));
-            Assert.False(RomMPlayAction.Matches(action, Mapped, "q"));
-            Assert.False(RomMPlayAction.Matches(null, Mapped, "p"));
+            Assert.False(RomMPlayAction.Matches(action, Applied(Other, "p")));
+            Assert.False(RomMPlayAction.Matches(action, Applied(Mapped, "q")));
+            Assert.False(RomMPlayAction.Matches(null, Applied(Mapped, "p")));
         }
 
         [Fact]
@@ -86,7 +105,7 @@ namespace RomM.Tests
         {
             var action = new GameAction { Name = "anything", EmulatorId = Mapped, EmulatorProfileId = "p" };
 
-            Assert.True(RomMPlayAction.IsUnedited(action, Mapped, "p", "Dolphin"));
+            Assert.True(RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => "Dolphin"));
         }
 
         // Once the user has repointed the action, the recorded applied emulator no longer matches
@@ -96,7 +115,7 @@ namespace RomM.Tests
         {
             var action = new GameAction { Name = "Play in Dolphin", EmulatorId = Other, EmulatorProfileId = "q" };
 
-            Assert.False(RomMPlayAction.IsUnedited(action, Mapped, "p", "Dolphin"));
+            Assert.False(RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => "Dolphin"));
         }
 
         // Sidecars from before the plugin recorded what it applied: the generated name is the only
@@ -106,7 +125,7 @@ namespace RomM.Tests
         {
             var action = new GameAction { Name = "Play in Dolphin", EmulatorId = Other };
 
-            Assert.True(RomMPlayAction.IsUnedited(action, Guid.Empty, null, "Dolphin"));
+            Assert.True(RomMPlayAction.IsUnedited(action, Applied(Guid.Empty, null), () => "Dolphin"));
         }
 
         [Theory]
@@ -117,13 +136,26 @@ namespace RomM.Tests
         {
             var action = new GameAction { Name = name, EmulatorId = Other };
 
-            Assert.False(RomMPlayAction.IsUnedited(action, Guid.Empty, null, emulatorName));
+            Assert.False(RomMPlayAction.IsUnedited(action, Applied(Guid.Empty, null), () => emulatorName));
+        }
+
+        // The emulator name costs a database lookup, so it is only resolved on the legacy path that
+        // actually needs it.
+        [Fact]
+        public void The_emulator_name_is_not_resolved_when_the_sidecar_records_what_we_applied()
+        {
+            var action = new GameAction { Name = "Play in Dolphin", EmulatorId = Mapped, EmulatorProfileId = "p" };
+            var resolved = false;
+
+            RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => { resolved = true; return "Dolphin"; });
+
+            Assert.False(resolved);
         }
 
         [Fact]
         public void A_missing_action_is_never_unedited()
         {
-            Assert.False(RomMPlayAction.IsUnedited(null, Mapped, "p", "RetroArch"));
+            Assert.False(RomMPlayAction.IsUnedited(null, Applied(Mapped, "p"), () => "RetroArch"));
         }
     }
 }

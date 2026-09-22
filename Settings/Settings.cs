@@ -276,6 +276,9 @@ namespace RomM.Settings
 
         public ObservableCollection<EmulatorMapping> Mappings { get; set; }
 
+        /// <summary>The mapping with this id, or null. The link a game keeps to its mapping.</summary>
+        internal EmulatorMapping MappingById(Guid id) => Mappings?.FirstOrDefault(x => x.MappingId == id);
+
         public List<RomMPlatform> RomMPlatforms
         {
             get => _romMPlatforms;

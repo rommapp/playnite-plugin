@@ -5,43 +5,26 @@ using System.Linq;
 
 namespace RomM.Saves
 {
-    /// <summary>Where a candidate emulator came from, for logging and messages.</summary>
-    internal enum SaveEmulatorSource
-    {
-        None = 0,
-        PlayAction = 1,
-        Mapping = 2,
-    }
-
-    /// <summary>Why no emulator could be used, when none could.</summary>
-    internal enum SaveEmulatorProblem
-    {
-        None = 0,
-
-        /// <summary>Neither the play action nor the mapping names an emulator.</summary>
-        NoEmulator = 1,
-
-        /// <summary>An emulator is set, but no handler knows where it keeps saves.</summary>
-        Unsupported = 2,
-    }
-
     internal class SaveEmulatorCandidate
     {
-        public SaveEmulatorSource Source { get; set; }
+        /// <summary>Whether this candidate came from the platform mapping rather than the play action.</summary>
+        public bool FromMapping { get; set; }
+
         public Emulator Emulator { get; set; }
         public EmulatorProfile Profile { get; set; }
     }
 
+    /// <summary>
+    /// The outcome of the pick. A null <see cref="Emulator"/> means no candidate named one at all;
+    /// an emulator with a null <see cref="Handler"/> means one is set but no handler knows where it
+    /// keeps its saves. The two need different advice, which is why they are distinguishable.
+    /// </summary>
     internal class SaveEmulatorResolution
     {
         public Emulator Emulator { get; set; }
         public EmulatorProfile Profile { get; set; }
         public ISaveHandler Handler { get; set; }
-        public SaveEmulatorSource Source { get; set; }
-        public SaveEmulatorProblem Problem { get; set; }
-
-        /// <summary>The emulator that is set but unsupported, for the message shown to the user.</summary>
-        public string UnsupportedEmulatorName { get; set; }
+        public bool FromMapping { get; set; }
     }
 
     /// <summary>
@@ -62,7 +45,7 @@ namespace RomM.Saves
                 .ToList();
 
             if (known.Count == 0)
-                return new SaveEmulatorResolution { Problem = SaveEmulatorProblem.NoEmulator };
+                return new SaveEmulatorResolution();
 
             foreach (var candidate in known)
             {
@@ -75,15 +58,13 @@ namespace RomM.Saves
                     Emulator = candidate.Emulator,
                     Profile = candidate.Profile ?? BorrowProfile(known, candidate),
                     Handler = handler,
-                    Source = candidate.Source,
+                    FromMapping = candidate.FromMapping,
                 };
             }
 
-            return new SaveEmulatorResolution
-            {
-                Problem = SaveEmulatorProblem.Unsupported,
-                UnsupportedEmulatorName = known[0].Emulator.Name,
-            };
+            // An emulator is set but unsupported. The first candidate is the one the user would go
+            // looking for, so it is the one the message names.
+            return new SaveEmulatorResolution { Emulator = known[0].Emulator };
         }
 
         /// <summary>
