@@ -10,6 +10,8 @@ namespace RomM.Models.RomM.Rom
         public string FileName { get; set; }
         public string FolderName { get; set; }
         public bool HasMultipleFiles { get; set; }
+        public bool DownloadAsArchive { get; set; }
+        public string PlayableFile { get; set; }
         public string DownloadURL { get; set; }
         public EmulatorMapping Mapping { get; set; }
     }

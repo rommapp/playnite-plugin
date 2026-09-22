@@ -435,6 +435,8 @@ namespace RomM
                         FileName = gameData.ROMVersions[0].FileName,
                         FolderName = gameData.ROMVersions[0].FolderName,
                         HasMultipleFiles = gameData.ROMVersions[0].HasMultipleFiles,
+                        DownloadAsArchive = gameData.ROMVersions[0].DownloadAsArchive,
+                        PlayableFile = gameData.ROMVersions[0].PlayableFile,
                         DownloadURL = gameData.ROMVersions[0].DownloadURL,
                         Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
                     };
@@ -484,6 +486,8 @@ namespace RomM
                             romData.FileName = selectedrevision.FileName;
                             romData.FolderName = selectedrevision.FolderName;
                             romData.HasMultipleFiles = selectedrevision.HasMultipleFiles;
+                            romData.DownloadAsArchive = selectedrevision.DownloadAsArchive;
+                            romData.PlayableFile = selectedrevision.PlayableFile;
                             romData.DownloadURL = selectedrevision.DownloadURL;
                             
                             gameData.ROMVersions = VersionSelectorControl.RomVersions.ToList();

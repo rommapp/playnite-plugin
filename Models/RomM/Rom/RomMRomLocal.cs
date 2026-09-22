@@ -22,6 +22,19 @@ namespace RomM.Models.RomM.Rom
         public string FolderName { get; set; }
 
         public bool HasMultipleFiles { get; set; }
+
+        // True when the download is the ROM's whole folder as one archive instead of a single file.
+        // Deliberately separate from HasMultipleFiles: RomM reports a Switch game that has an update
+        // or DLC beside it as a *single* file -- the game is the only file at the folder's root -- yet
+        // the folder still has to be fetched whole. Keeping the two apart is what lets a genuine
+        // multi-file ROM go on exposing every extracted file as a playable disc while these do not.
+        // Absent from sidecars written before this existed, where it reads back as false.
+        public bool DownloadAsArchive { get; set; }
+
+        // The file to launch, relative to the ROM folder: the file inside the extracted folder for an
+        // archive download, the downloaded file itself otherwise. Null in pre-existing sidecars.
+        public string PlayableFile { get; set; }
+
         public string DownloadURL { get; set; }
         public bool IsSelected { get; set; }
     }

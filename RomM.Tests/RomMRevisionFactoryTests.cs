@@ -161,5 +161,121 @@ namespace RomM.Tests
             Assert.Equal("Game (Disc).zip", rev.FileName);
             Assert.Equal(Host + "/api/roms/40/content/Game (Disc).zip", rev.DownloadURL);
         }
+
+        [Fact]
+        public void Nested_single_file_with_extras_downloads_the_whole_folder()
+        {
+            // RomM calls a game that keeps its update and DLC in subfolders a nested *single* file,
+            // because the game is the only file at the folder's root. Following that literally
+            // downloads the game and leaves the rest on the server, so the folder is fetched whole.
+            var rom = new RomMRom
+            {
+                Id = 51,
+                HasNestedSingleFile = true,
+                HasMultipleFiles = false,
+                FileName = "Sample Game",
+                Files = new List<RomMFile>
+                {
+                    new RomMFile { Id = 61, FileName = "Sample Game (Update).rom", FullPath = "Sample Game/patch/Sample Game (Update).rom" },
+                    new RomMFile { Id = 62, FileName = "Sample Game (DLC).rom", FullPath = "Sample Game/dlc/Sample Game (DLC).rom" },
+                    new RomMFile { Id = 60, FileName = "Sample Game.rom", FullPath = "Sample Game/Sample Game.rom" },
+                },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.True(rev.DownloadAsArchive);
+            // Still not multi-file: the update and the DLC are not second playable ROMs.
+            Assert.False(rev.HasMultipleFiles);
+            Assert.Equal("Sample Game", rev.FileName);
+            Assert.Equal("Sample Game", rev.FolderName);
+            Assert.Equal("Sample Game.rom", rev.PlayableFile);
+            Assert.Equal(Host + "/api/roms/51/content/Sample Game", rev.DownloadURL);
+        }
+
+        [Fact]
+        public void Nested_single_file_with_one_file_stays_on_the_file_endpoint()
+        {
+            var rom = new RomMRom
+            {
+                Id = 33,
+                HasNestedSingleFile = true,
+                HasMultipleFiles = false,
+                FileName = "All-Star Baseball '99",
+                Files = new List<RomMFile>
+                {
+                    new RomMFile { Id = 8, FileName = "All-Star Baseball '99 (Europe).zip", FullPath = "All-Star Baseball '99/All-Star Baseball '99 (Europe).zip" },
+                },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.False(rev.DownloadAsArchive);
+            Assert.Equal("All-Star Baseball '99 (Europe).zip", rev.PlayableFile);
+            Assert.Equal(Host + "/api/roms/8/files/content/All-Star Baseball '99 (Europe).zip", rev.DownloadURL);
+        }
+
+        [Fact]
+        public void Simple_single_file_is_never_fetched_as_a_folder()
+        {
+            // fs_name is the file itself here, not a folder, so there is no folder to ask for even
+            // when the payload carries more than one file.
+            var rom = new RomMRom
+            {
+                Id = 34,
+                HasSimpleSingleFile = true,
+                HasMultipleFiles = false,
+                FileName = "game.gba",
+                Files = new List<RomMFile>
+                {
+                    new RomMFile { Id = 9, FileName = "game.gba", FullPath = "roms/gba/game.gba" },
+                    new RomMFile { Id = 10, FileName = "game.sav", FullPath = "roms/gba/extra/game.sav" },
+                },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.False(rev.DownloadAsArchive);
+            Assert.Null(rev.FolderName);
+            Assert.Equal(Host + "/api/roms/9/files/content/game.gba", rev.DownloadURL);
+        }
+
+        [Fact]
+        public void Multi_file_keeps_its_archive_download_and_names_the_primary_file()
+        {
+            var rom = new RomMRom
+            {
+                Id = 41,
+                HasMultipleFiles = true,
+                FileName = "Final Fantasy VII",
+                Files = new List<RomMFile>
+                {
+                    new RomMFile { Id = 11, FileName = "disc1.bin", FullPath = "roms/ps1/Final Fantasy VII/Disc 1/disc1.bin" },
+                    new RomMFile { Id = 12, FileName = "ff7.cue", FullPath = "roms/ps1/Final Fantasy VII/ff7.cue" },
+                },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.True(rev.DownloadAsArchive);
+            Assert.True(rev.HasMultipleFiles);
+            Assert.Equal("ff7.cue", rev.PlayableFile);
+        }
+
+        [Fact]
+        public void Single_file_playable_file_is_the_downloaded_file()
+        {
+            var rom = new RomMRom
+            {
+                Id = 32,
+                HasMultipleFiles = false,
+                Files = new List<RomMFile> { new RomMFile { Id = 7, FileName = "game.gba", FullPath = "game.gba" } },
+            };
+
+            var rev = RomMRevisionFactory.Build(rom, Host);
+
+            Assert.False(rev.DownloadAsArchive);
+            Assert.Equal("game.gba", rev.PlayableFile);
+        }
     }
 }

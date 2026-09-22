@@ -51,9 +51,9 @@ namespace RomM.Games
             if (_gameData.Mapping.InstallFlat)
                 installDir = dstPath;
 
-            // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
-            // Otherwise we download the single ROM file.
-            var downloadFilePath = _gameData.HasMultipleFiles
+            // A folder download arrives as an archive named after the ROM folder; a single file keeps
+            // its own name. See RomMRevision.DownloadAsArchive for why this is not HasMultipleFiles.
+            var downloadFilePath = _gameData.DownloadAsArchive
                 ? Path.Combine(installDir, _gameData.FileName + ".zip")
                 : Path.Combine(installDir, _gameData.FileName);
 
@@ -68,7 +68,7 @@ namespace RomM.Games
                 Use7z = _romM.Settings.Use7z,
                 PathTo7Z = _romM.Settings.PathTo7z,
 
-                HasMultipleFiles = _gameData.HasMultipleFiles,
+                DownloadAsArchive = _gameData.DownloadAsArchive,
                 AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
                 InstallFlat = _gameData.Mapping.InstallFlat,
 
@@ -82,6 +82,25 @@ namespace RomM.Games
                     {
                         roms.Add(new GameRom(Game.Name, downloadFilePath));
                         return roms;
+                    }
+
+                    // A folder fetched whole for a ROM RomM still calls single-file -- a Switch game
+                    // with its update and DLC beside it -- has exactly one launchable file. Its patch/
+                    // and dlc/ contents must not be offered as alternative ROMs the way the discs of a
+                    // genuine multi-file ROM are, so the primary file is named outright instead of
+                    // being inferred from whatever the folder scan turns up. A missing file falls
+                    // through to that scan rather than leaving the game with no ROM at all.
+                    if (_gameData.DownloadAsArchive && !_gameData.HasMultipleFiles &&
+                        !string.IsNullOrEmpty(_gameData.PlayableFile))
+                    {
+                        var primaryPath = Path.Combine(installDir, _gameData.PlayableFile);
+                        if (File.Exists(primaryPath))
+                        {
+                            roms.Add(new GameRom(Game.Name, primaryPath));
+                            return roms;
+                        }
+
+                        Logger.Warn($"Expected {primaryPath} after extracting {Game.Name}; falling back to scanning the install folder.");
                     }
 
                     // Otherwise, we assume extracted files are in installDir
