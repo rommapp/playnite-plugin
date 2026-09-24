@@ -29,6 +29,8 @@ namespace RomM.Games
         // the play actions the other just wrote. Neither is more right than the other, so when that
         // is the setup the actions are left exactly as they are.
         bool _platformHasRivalMapping;
+        // The emulator and profile this import writes onto play actions.
+        readonly AppliedPlayAction _mapped;
 
         public RomMImport(RomM plugin, LibraryImportGamesArgs args, EmulatorMapping mapping, List<RomMRom> roms, List<int> favourites)
         {
@@ -66,8 +68,12 @@ namespace RomM.Games
             _completionStatusMap = plugin.Playnite.Database.CompletionStatuses.ToDictionary(cs => cs.Name, cs => cs.Id);
             _favourites = favourites;
 
+            // Only mappings the import controller will actually run count: one it skips as
+            // misconfigured writes nothing, so it cannot fight this one over the actions.
             _platformHasRivalMapping = plugin.Settings?.Mappings?
-                .Count(m => m.Enabled && m.RomMPlatformId == mapping.RomMPlatformId) > 1;
+                .Count(m => m.Enabled && m.IsImportable && m.RomMPlatformId == mapping.RomMPlatformId) > 1;
+
+            _mapped = new AppliedPlayAction(mapping.EmulatorId, mapping.EmulatorProfileId);
         }
 
         // Builds the per-ROM download descriptor via the shared factory (see RomMRevisionFactory).
@@ -142,6 +148,8 @@ namespace RomM.Games
                     Guid statusID = Guid.Empty;
                     if (_existingGames.TryGetValue(gameID, out var existingGame))
                     {
+                        bool changed = RefreshPlayAction(existingGame, previous, out var applied);
+
                         // Sync user data
                         if (_plugin.Settings.KeepRomMSynced)
                         {
@@ -149,33 +157,34 @@ namespace RomM.Games
                             existingGame.Favorite = _favourites.Exists(f => f == ROM.Id);
                             if (statusID != Guid.Empty)
                                 existingGame.CompletionStatusId = statusID;
-
-                            // This is our own write of the server's values; don't let OnItemUpdated echo it back.
-                            _plugin.SuppressSync(existingGame.Id);
-                            _plugin.Playnite.Database.Games.Update(existingGame);
+                            changed = true;
                         }
 
+                        if (changed)
+                            SaveOwnWrite(existingGame);
+
                         // Save Game ROM data to file
-                        SaveGameData(ROM, previous, previousJson, RefreshPlayAction(existingGame, previous));
+                        SaveGameData(ROM, previous, previousJson, applied);
                         importedGameIds.Add(gameID);
                         continue;
                     }
 
                     // If keep deleted games is enabled and a deleted game gets re-added back to the
                     // server under a new romMId, update the existing playnite entry instead.
-                    if (_plugin.Settings.KeepDeletedGames && UpdatedDeletedGame(ROM))
+                    if (_plugin.Settings.KeepDeletedGames && UpdatedDeletedGame(ROM, out var adoptedGame))
                     {
                         // The adopted entry is an existing game re-keyed under the new id, so its
                         // action is refreshed on the same terms as any other existing game's.
-                        _existingGames.TryGetValue(gameID, out var adoptedGame);
-                        SaveGameData(ROM, previous, previousJson, RefreshPlayAction(adoptedGame, previous));
+                        if (RefreshPlayAction(adoptedGame, previous, out var applied))
+                            SaveOwnWrite(adoptedGame);
+
+                        SaveGameData(ROM, previous, previousJson, applied);
                         importedGameIds.Add(gameID);
                         continue;
                     }
 
                     // A new game gets the mapping's emulator outright, below.
-                    SaveGameData(ROM, previous, previousJson,
-                                 new AppliedPlayAction(_mapping.EmulatorId, _mapping.EmulatorProfileId));
+                    SaveGameData(ROM, previous, previousJson, _mapped);
 
                     var importedGame = ImportGame(ROM, statusID);
                     if (importedGame != null)
@@ -255,7 +264,7 @@ namespace RomM.Games
             metadata.InstallSize = ROM.FileSizeBytes;
             metadata.GameActions = new List<GameAction>
             {
-                RomMPlayAction.Build(_mapping.Emulator.Name, _mapping.EmulatorId, _mapping.EmulatorProfileId),
+                RomMPlayAction.Build(_mapping.Emulator.Name, _mapped.EmulatorId, _mapped.ProfileId),
                 new GameAction
                 {
                     Type = GameActionType.URL,
@@ -364,7 +373,7 @@ namespace RomM.Games
             return false;
         }
 
-        private bool UpdatedDeletedGame(RomMRom ROM)
+        private bool UpdatedDeletedGame(RomMRom ROM, out Game adopted)
         {
             // A game with the same SHA1 but a different romMId means RomM deleted and re-added it; adopt
             // the existing entry under the new id.
@@ -377,9 +386,11 @@ namespace RomM.Games
 
                 _existingGames.Remove(oldId);
                 _existingGames[newId] = oldgame;
+                adopted = oldgame;
                 return true;
             }
 
+            adopted = null;
             return false;
         }
 
@@ -437,12 +448,20 @@ namespace RomM.Games
 
             string json = JsonConvert.SerializeObject(toSave);
             if (json != previousJson)
-                RomMGameData.Save(_plugin.ROMDataPath, ROM.SHA1, toSave);
+                RomMGameData.SaveJson(_plugin.ROMDataPath, ROM.SHA1, json);
+        }
+
+        // Saves a change the importer made to a game; OnItemUpdated must not echo it back to RomM.
+        private void SaveOwnWrite(Game game)
+        {
+            _plugin.SuppressSync(game.Id);
+            _plugin.Playnite.Database.Games.Update(game);
         }
 
         /// <summary>
         /// Brings an already-imported game's play action back in step with its mapping, and reports
-        /// the action the sidecar should now record.
+        /// the action the sidecar should now record. Returns whether the action was changed; the
+        /// caller saves the game, so a repoint and a user-data sync share one write.
         ///
         /// Existing games are otherwise skipped wholesale by the importer, so a mapping repointed
         /// at another emulator left every game it had imported launching -- and resolving its saves
@@ -450,20 +469,29 @@ namespace RomM.Games
         /// has repointed it themselves it is theirs, and the sidecar keeps remembering what we last
         /// wrote so that stays true across imports.
         /// </summary>
-        private AppliedPlayAction RefreshPlayAction(Game game, RomMRomLocal previous)
+        private bool RefreshPlayAction(Game game, RomMRomLocal previous, out AppliedPlayAction result)
         {
-            var mapped = new AppliedPlayAction(_mapping.EmulatorId, _mapping.EmulatorProfileId);
-            var applied = new AppliedPlayAction(previous?.AppliedEmulatorID ?? Guid.Empty,
-                                                previous?.AppliedEmulatorProfileID);
+            result = new AppliedPlayAction(previous?.AppliedEmulatorID ?? Guid.Empty,
+                                           previous?.AppliedEmulatorProfileID);
+            var applied = result;
 
-            // No action to keep in step -- and no game at all, on the adoption path where the
-            // re-keyed entry could not be found again.
+            // No action to keep in step.
             var action = RomMPlayAction.Find(game?.GameActions);
             if (action == null || _platformHasRivalMapping)
-                return applied;
+                return false;
 
-            if (RomMPlayAction.Matches(action, mapped))
-                return mapped;
+            if (RomMPlayAction.Matches(action, _mapped))
+            {
+                result = _mapped;
+                return false;
+            }
+
+            // A sidecar from before the plugin recorded what it applied leaves only the generated
+            // name to go on, and that name records which emulator the importer chose, not which
+            // profile. On the mapping's own emulator a different profile is as likely a core the
+            // user picked for this one game as a mapping edit, so it is left alone.
+            if (applied.EmulatorId == Guid.Empty && action.EmulatorId == _mapped.EmulatorId)
+                return false;
 
             Func<string> actionEmulatorName = () =>
                 _plugin.Playnite.Database.Emulators?.Get(action.EmulatorId)?.Name;
@@ -472,21 +500,14 @@ namespace RomM.Games
             {
                 _plugin.Logger.Info($"[Importer] Leaving {game.Name}'s play action pointed at " +
                                     $"{actionEmulatorName() ?? "<Unknown>"}: it is no longer the one the plugin wrote.");
-                return applied;
+                return false;
             }
 
-            if (_mapping.Emulator == null)
-                return applied;
-
-            RomMPlayAction.Apply(action, _mapping.Emulator.Name, mapped.EmulatorId, mapped.ProfileId);
-
-            // Our own write; OnItemUpdated has nothing to push to RomM for it.
-            _plugin.SuppressSync(game.Id);
-            _plugin.Playnite.Database.Games.Update(game);
-
+            RomMPlayAction.Apply(action, _mapping.Emulator.Name, _mapped.EmulatorId, _mapped.ProfileId);
             _plugin.Logger.Info($"[Importer] Repointed {game.Name}'s play action at {_mapping.Emulator.Name} " +
                                 $"to follow the {_mapping.MappingName} mapping.");
-            return mapped;
+            result = _mapped;
+            return true;
         }
 
         private Guid DetermineCompletionStatus(RomMRom ROM)

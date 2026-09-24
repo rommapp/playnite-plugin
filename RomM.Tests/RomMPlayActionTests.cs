@@ -103,7 +103,7 @@ namespace RomM.Tests
         [Fact]
         public void An_action_still_carrying_what_the_plugin_applied_is_unedited()
         {
-            var action = new GameAction { Name = "anything", EmulatorId = Mapped, EmulatorProfileId = "p" };
+            var action = new GameAction { Name = "anything", IsPlayAction = true, EmulatorId = Mapped, EmulatorProfileId = "p" };
 
             Assert.True(RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => "Dolphin"));
         }
@@ -113,7 +113,7 @@ namespace RomM.Tests
         [Fact]
         public void An_action_repointed_by_the_user_is_not_unedited()
         {
-            var action = new GameAction { Name = "Play in Dolphin", EmulatorId = Other, EmulatorProfileId = "q" };
+            var action = new GameAction { Name = "Play in Dolphin", IsPlayAction = true, EmulatorId = Other, EmulatorProfileId = "q" };
 
             Assert.False(RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => "Dolphin"));
         }
@@ -123,7 +123,7 @@ namespace RomM.Tests
         [Fact]
         public void Without_a_recorded_emulator_the_generated_name_marks_the_action_as_the_plugins()
         {
-            var action = new GameAction { Name = "Play in Dolphin", EmulatorId = Other };
+            var action = new GameAction { Name = "Play in Dolphin", IsPlayAction = true, EmulatorId = Other };
 
             Assert.True(RomMPlayAction.IsUnedited(action, Applied(Guid.Empty, null), () => "Dolphin"));
         }
@@ -134,7 +134,7 @@ namespace RomM.Tests
         [InlineData("Play in Dolphin", null)]
         public void Without_a_recorded_emulator_anything_but_the_generated_name_is_left_alone(string name, string emulatorName)
         {
-            var action = new GameAction { Name = name, EmulatorId = Other };
+            var action = new GameAction { Name = name, IsPlayAction = true, EmulatorId = Other };
 
             Assert.False(RomMPlayAction.IsUnedited(action, Applied(Guid.Empty, null), () => emulatorName));
         }
@@ -144,12 +144,35 @@ namespace RomM.Tests
         [Fact]
         public void The_emulator_name_is_not_resolved_when_the_sidecar_records_what_we_applied()
         {
-            var action = new GameAction { Name = "Play in Dolphin", EmulatorId = Mapped, EmulatorProfileId = "p" };
+            var action = new GameAction { Name = "Play in Dolphin", IsPlayAction = true, EmulatorId = Mapped, EmulatorProfileId = "p" };
             var resolved = false;
 
             RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => { resolved = true; return "Dolphin"; });
 
             Assert.False(resolved);
+        }
+
+        // The importer only writes a play action. One the user demoted is theirs: repointing it
+        // would mark it as a play action again beside the one they chose.
+        [Fact]
+        public void An_action_no_longer_marked_as_the_play_action_is_not_unedited()
+        {
+            var action = new GameAction { Name = "Play in Dolphin", IsPlayAction = false, EmulatorId = Mapped, EmulatorProfileId = "p" };
+
+            Assert.False(RomMPlayAction.IsUnedited(action, Applied(Mapped, "p"), () => "Dolphin"));
+            Assert.False(RomMPlayAction.IsUnedited(action, Applied(Guid.Empty, null), () => "Dolphin"));
+        }
+
+        // Repointing keeps every field the importer does not own, so arguments the user added for
+        // one emulator would be passed to the next.
+        [Fact]
+        public void An_action_with_argument_overrides_is_not_unedited()
+        {
+            var additional = new GameAction { IsPlayAction = true, EmulatorId = Mapped, EmulatorProfileId = "p", AdditionalArguments = "--fullscreen" };
+            var overridden = new GameAction { IsPlayAction = true, EmulatorId = Mapped, EmulatorProfileId = "p", OverrideDefaultArgs = true };
+
+            Assert.False(RomMPlayAction.IsUnedited(additional, Applied(Mapped, "p"), () => "Dolphin"));
+            Assert.False(RomMPlayAction.IsUnedited(overridden, Applied(Mapped, "p"), () => "Dolphin"));
         }
 
         [Fact]

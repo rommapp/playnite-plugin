@@ -44,9 +44,6 @@ namespace RomM.Saves
                 .Where(c => c != null && c.Emulator != null)
                 .ToList();
 
-            if (known.Count == 0)
-                return new SaveEmulatorResolution();
-
             foreach (var candidate in known)
             {
                 var handler = handlers?.Find(candidate.Emulator);
@@ -64,7 +61,7 @@ namespace RomM.Saves
 
             // An emulator is set but unsupported. The first candidate is the one the user would go
             // looking for, so it is the one the message names.
-            return new SaveEmulatorResolution { Emulator = known[0].Emulator };
+            return new SaveEmulatorResolution { Emulator = known.FirstOrDefault()?.Emulator };
         }
 
         /// <summary>

@@ -40,8 +40,9 @@ namespace RomM.Games
 
         /// <summary>
         /// Writes the importer's play action onto an existing one, for repointing a game already in
-        /// the library. Shares its body with <see cref="Build"/> so a refreshed action cannot drift
-        /// from a freshly imported one.
+        /// the library. Shares its body with <see cref="Build"/> so the fields the importer owns
+        /// cannot drift from a freshly imported action; anything else on the action is left as it
+        /// is, which is why <see cref="IsUnedited"/> refuses an action carrying argument overrides.
         /// </summary>
         public static GameAction Apply(GameAction action, string emulatorName, Guid emulatorId, string emulatorProfileId)
         {
@@ -83,10 +84,18 @@ namespace RomM.Games
         /// marker left: an action still called "Play in {the emulator it points at}" is one
         /// the importer wrote and the user has not renamed or repointed. That name costs a lookup
         /// of the action's emulator, so it is passed as a thunk and only resolved on that path.
+        ///
+        /// Either way the importer only ever writes a play action with no argument overrides, so an
+        /// action the user demoted from being the play action, or gave arguments of its own, is
+        /// theirs: repointing it would re-promote it beside their own play action, or launch the
+        /// new emulator with arguments meant for the old one.
         /// </summary>
         public static bool IsUnedited(GameAction action, AppliedPlayAction applied, Func<string> actionEmulatorName)
         {
-            if (action == null)
+            if (action == null
+                || !action.IsPlayAction
+                || action.OverrideDefaultArgs
+                || !string.IsNullOrEmpty(action.AdditionalArguments))
                 return false;
 
             if (applied.EmulatorId != Guid.Empty)
@@ -98,12 +107,7 @@ namespace RomM.Games
         }
 
         // Playnite writes an unset profile as either null or "", and the two mean the same thing.
-        private static bool SameProfile(string left, string right)
-        {
-            if (string.IsNullOrEmpty(left) && string.IsNullOrEmpty(right))
-                return true;
-
-            return string.Equals(left, right, StringComparison.Ordinal);
-        }
+        private static bool SameProfile(string left, string right) =>
+            string.Equals(left ?? "", right ?? "", StringComparison.Ordinal);
     }
 }

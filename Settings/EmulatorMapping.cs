@@ -108,6 +108,14 @@ namespace RomM.Settings
                     _emulator = value;
                     _emulatorId = value.Id;
                     AvailableProfiles = Emulator?.SelectableProfiles;
+                    // A profile belongs to one emulator. Keeping the previous emulator's would pair it
+                    // with this one and leave every game imported through the mapping unable to launch.
+                    if (_emulatorProfileId != null && value.SelectableProfiles?.Any(p => p.Id == _emulatorProfileId) != true)
+                    {
+                        _emulatorProfile = null;
+                        _emulatorProfileId = null;
+                        OnPropertyChanged(nameof(EmulatorProfile));
+                    }
                     RomMPlatform = new RomMPlatform();
                     MappingName = value.Name;
                     OnPropertyChanged();
@@ -160,6 +168,18 @@ namespace RomM.Settings
                 OnPropertyChanged();
             }
         }
+
+        /// <summary>Whether an emulator and one of its profiles are picked.</summary>
+        [JsonIgnore]
+        public bool HasEmulatorProfile => Emulator != null && EmulatorProfile != null;
+
+        /// <summary>Whether a RomM platform is picked; unset reads as -1 or an empty platform (Id 0).</summary>
+        [JsonIgnore]
+        public bool HasRomMPlatform => RomMPlatformId > 0 && RomMPlatform != null && RomMPlatform.Id > 0;
+
+        /// <summary>Whether the import controller will run this mapping, given it is enabled.</summary>
+        [JsonIgnore]
+        public bool IsImportable => HasEmulatorProfile && HasRomMPlatform;
 
         // (Deprecated) DON'T USE
         [JsonIgnore]   

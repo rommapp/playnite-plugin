@@ -54,6 +54,13 @@ namespace RomM.Games
                 rawJson = text;
                 return data;
             }
+            catch (IOException ex)
+            {
+                // Save sync reads the sidecar off the UI thread while an import may be rewriting it;
+                // that is a transient sharing violation, not a corrupt file.
+                logger?.Warn(ex, $"{gameName ?? sha1} ROM data file could not be read.");
+                return null;
+            }
             catch (Exception ex)
             {
                 logger?.Error(ex, $"{gameName ?? sha1} ROM data file is corrupted!");
@@ -62,6 +69,13 @@ namespace RomM.Games
         }
 
         public static void Save(string romDataPath, string sha1, RomMRomLocal data) =>
-            File.WriteAllText(PathFor(romDataPath, sha1), JsonConvert.SerializeObject(data));
+            SaveJson(romDataPath, sha1, JsonConvert.SerializeObject(data));
+
+        /// <summary>
+        /// For a caller that has already serialised the sidecar to compare it with what was on
+        /// disk, so it is not serialised a second time just to be written.
+        /// </summary>
+        public static void SaveJson(string romDataPath, string sha1, string json) =>
+            File.WriteAllText(PathFor(romDataPath, sha1), json);
     }
 }

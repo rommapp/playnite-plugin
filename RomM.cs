@@ -364,7 +364,7 @@ namespace RomM
 
                 if (Settings.MergeRevisions && game.IsInstalled)
                 {
-                    var gameData = LoadGameData(game);
+                    var gameData = RomMGameData.LoadBySha1(ROMDataPath, sha1, Logger, out _, game.Name);
                     if (gameData?.ROMVersions?.Count > 1)
                     {
                         gameMenuItems.Add(new GameMenuItem
@@ -408,7 +408,7 @@ namespace RomM
                         yield break;
                     }
 
-                    gameData = LoadGameData(args.Game);
+                    gameData = RomMGameData.LoadBySha1(ROMDataPath, romMSHA1, Logger, out _, args.Game.Name);
                     if (gameData?.ROMVersions == null || gameData.ROMVersions.Count == 0)
                     {
                         Logger.Error($"{args.Game.Name} has no usable ROM data file; run update game library before installing!");
@@ -637,14 +637,15 @@ namespace RomM
                         DownloadQueueController?.Cancel(newGame.Id);
                     }
                 
+                    // The importer wrote this change itself; don't push it back. Consumed whether or not
+                    // sync is on, so a suppression set while it is off cannot swallow a later real edit.
+                    if (ignoredGameIds.TryRemove(newGame.Id, out byte _))
+                    {
+                        continue;
+                    }
+
                     if (Settings.KeepRomMSynced == true)
                     {
-                        // The importer wrote the server's own values into this game; don't push them back.
-                        if (ignoredGameIds.TryRemove(newGame.Id, out byte _))
-                        {
-                            continue;
-                        }
-
                         if(!RomMGameId.TryParse(newGame.GameId, out int romMId, out string _))
                         {
                             Logger.Error($"{newGame.Name} GameID is malformed!");
