@@ -48,12 +48,20 @@ namespace RomM.Games
             // IsInstalled detection lines up.
             var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
 
-            if (_gameData.Mapping.InstallFlat)
+            var singleRomInFolder = RomMInstallPaths.IsSingleRomInFolder(
+                _gameData.DownloadAsArchive, _gameData.HasMultipleFiles);
+
+            // Not _gameData.Mapping.InstallFlat directly: a ROM fetched as a whole folder keeps its
+            // own folder even under flat. Must stay the same call the importer makes, or the install
+            // path drifts from the one recorded at import and IsInstalled detection breaks.
+            var flatLayout = RomMInstallPaths.UsesFlatLayout(_gameData.Mapping.InstallFlat, singleRomInFolder);
+
+            if (flatLayout)
                 installDir = dstPath;
 
-            // If RomM indicates multiple files, we download as an archive name (zip) into the install folder.
-            // Otherwise we download the single ROM file.
-            var downloadFilePath = _gameData.HasMultipleFiles
+            // A folder download arrives as an archive named after the ROM folder; a single file keeps
+            // its own name. See RomMRevision.DownloadAsArchive for why this is not HasMultipleFiles.
+            var downloadFilePath = _gameData.DownloadAsArchive
                 ? Path.Combine(installDir, _gameData.FileName + ".zip")
                 : Path.Combine(installDir, _gameData.FileName);
 
@@ -68,9 +76,11 @@ namespace RomM.Games
                 Use7z = _romM.Settings.Use7z,
                 PathTo7Z = _romM.Settings.PathTo7z,
 
-                HasMultipleFiles = _gameData.HasMultipleFiles,
+                DownloadAsArchive = _gameData.DownloadAsArchive,
                 AutoExtract = _gameData.Mapping != null && _gameData.Mapping.AutoExtract,
-                InstallFlat = _gameData.Mapping.InstallFlat,
+                // The layout actually being installed, so cancelling a download cleans up the game's
+                // folder when it has one.
+                InstallFlat = flatLayout,
 
                 // Called by queue AFTER download/extract is done
                 BuildRoms = () =>
@@ -82,6 +92,23 @@ namespace RomM.Games
                     {
                         roms.Add(new GameRom(Game.Name, downloadFilePath));
                         return roms;
+                    }
+
+                    // A single ROM in a folder has one launchable file; its extras are not offered
+                    // as alternative ROMs the way a multi-file ROM's discs are. A missing or unsafe
+                    // file falls through to the folder scan rather than leaving no ROM at all.
+                    if (singleRomInFolder &&
+                        !string.IsNullOrEmpty(_gameData.PlayableFile) &&
+                        RomMInstallPaths.IsContained(_gameData.PlayableFile))
+                    {
+                        var primaryPath = Path.Combine(installDir, _gameData.PlayableFile);
+                        if (File.Exists(primaryPath))
+                        {
+                            roms.Add(new GameRom(Game.Name, primaryPath));
+                            return roms;
+                        }
+
+                        Logger.Warn($"Expected {primaryPath} after extracting {Game.Name}; falling back to scanning the install folder.");
                     }
 
                     // Otherwise, we assume extracted files are in installDir
