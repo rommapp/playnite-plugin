@@ -25,16 +25,24 @@ namespace RomM.Saves
         public EmulatorProfile Profile { get; set; }
         public ISaveHandler Handler { get; set; }
         public bool FromMapping { get; set; }
+
+        /// <summary>
+        /// The mapping's emulator when it is supported but was passed over because the game launches
+        /// another one. Set so the "unsupported" advice can point at it; never a sync target.
+        /// </summary>
+        public Emulator PassedOverMappingEmulator { get; set; }
     }
 
     /// <summary>
     /// Picks the emulator a game's saves belong to, from the candidates in preference order.
     ///
-    /// The play action leads: a user who repoints it at another emulator should have their saves
-    /// follow it. But the action is only a snapshot of the mapping taken at import, so when it
-    /// names an emulator no handler covers, the platform's own emulator mapping -- which the
-    /// settings screen presents as the thing that decides this -- gets its turn before sync gives
-    /// up. Kept free of Playnite lookups so the preference order can be tested on its own.
+    /// The play action decides: it is what Playnite launches, so its emulator is the one that reads
+    /// and writes the saves. Syncing another emulator's saves in its place would download where the
+    /// launched emulator never reads and upload a save it never wrote, so a mapping naming a
+    /// different emulator is never a fallback -- a stale action is fixed by the importer repointing
+    /// it instead. The mapping only answers when the action names no emulator at all, or lends its
+    /// profile to that same emulator. Kept free of Playnite lookups so the rules can be tested on
+    /// their own.
     /// </summary>
     internal static class SaveEmulatorResolver
     {
@@ -43,6 +51,15 @@ namespace RomM.Saves
             var known = (candidates ?? Enumerable.Empty<SaveEmulatorCandidate>())
                 .Where(c => c != null && c.Emulator != null)
                 .ToList();
+
+            var launched = known.FirstOrDefault(c => !c.FromMapping)?.Emulator;
+            Emulator passedOver = null;
+            if (launched != null)
+            {
+                passedOver = known.FirstOrDefault(c => c.FromMapping && c.Emulator.Id != launched.Id
+                                                       && handlers?.Find(c.Emulator) != null)?.Emulator;
+                known = known.Where(c => c.Emulator.Id == launched.Id).ToList();
+            }
 
             foreach (var candidate in known)
             {
@@ -61,7 +78,11 @@ namespace RomM.Saves
 
             // An emulator is set but unsupported. The first candidate is the one the user would go
             // looking for, so it is the one the message names.
-            return new SaveEmulatorResolution { Emulator = known.FirstOrDefault()?.Emulator };
+            return new SaveEmulatorResolution
+            {
+                Emulator = known.FirstOrDefault()?.Emulator,
+                PassedOverMappingEmulator = passedOver,
+            };
         }
 
         /// <summary>

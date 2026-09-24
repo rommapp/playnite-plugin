@@ -460,12 +460,17 @@ namespace RomM.Saves
                 Logger.Info($"[SaveSync] No save handler for emulator '{resolution.Emulator.Name}', skipping {game.Name}.");
                 reason = $"Save sync does not support {resolution.Emulator.Name} yet. " +
                          $"Supported: {SupportedEmulators}.";
+                if (resolution.PassedOverMappingEmulator != null)
+                {
+                    reason += $" Its RomM platform mapping uses {resolution.PassedOverMappingEmulator.Name}: " +
+                              "point the game's play action at it to sync its saves.";
+                }
                 return null;
             }
 
             if (resolution.FromMapping)
             {
-                Logger.Info($"[SaveSync] {game.Name}'s play action names no emulator save sync supports; " +
+                Logger.Info($"[SaveSync] {game.Name}'s play action names no emulator; " +
                             $"using {resolution.Emulator.Name} from its RomM platform mapping instead.");
             }
 
@@ -487,10 +492,9 @@ namespace RomM.Saves
         }
 
         /// <summary>
-        /// The play action leads -- a user who repoints it at another emulator should have their
-        /// saves follow it -- but it is only a snapshot of the emulator mapping taken at import, so
-        /// the mapping gets its turn when the action names an emulator no handler covers. See
-        /// <see cref="SaveEmulatorResolver"/> for the rules; this half is only the Playnite lookups.
+        /// The play action decides, since it is what launches; the mapping fills in when the action
+        /// names no emulator or no profile. See <see cref="SaveEmulatorResolver"/> for the rules;
+        /// this half is only the Playnite lookups.
         /// </summary>
         private SaveEmulatorResolution ResolveEmulator(Game game)
         {
@@ -512,11 +516,12 @@ namespace RomM.Saves
             // Reading the mapping means reading the ROM's sidecar off disk, and this runs on the
             // pre-launch path, so it is skipped when the action can answer on its own -- which it
             // cannot if its emulator is unsupported, or if it names no profile for the handler to
-            // take the core from.
+            // take the core from. A platform two mappings cover records whichever import ran last,
+            // which says nothing about this game, so its mapping is not consulted at all.
             if (fromAction?.Profile == null || _handlers.Find(fromAction.Emulator) == null)
             {
                 var mapping = _romM.MappingFor(game);
-                if (mapping != null)
+                if (mapping != null && !Settings.HasRivalMapping(mapping))
                 {
                     candidates.Add(new SaveEmulatorCandidate
                     {

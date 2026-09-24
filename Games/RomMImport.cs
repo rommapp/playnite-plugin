@@ -70,8 +70,7 @@ namespace RomM.Games
 
             // Only mappings the import controller will actually run count: one it skips as
             // misconfigured writes nothing, so it cannot fight this one over the actions.
-            _platformHasRivalMapping = plugin.Settings?.Mappings?
-                .Count(m => m.Enabled && m.IsImportable && m.RomMPlatformId == mapping.RomMPlatformId) > 1;
+            _platformHasRivalMapping = plugin.Settings?.HasRivalMapping(mapping) == true;
 
             _mapped = new AppliedPlayAction(mapping.EmulatorId, mapping.EmulatorProfileId);
         }
@@ -480,9 +479,16 @@ namespace RomM.Games
             if (action == null || _platformHasRivalMapping)
                 return false;
 
+            Func<string> actionEmulatorName = () =>
+                _plugin.Playnite.Database.Emulators?.Get(action.EmulatorId)?.Name;
+
+            // Already in step. It only becomes ours to record if it was ours before: a user who set
+            // this emulator themselves and then pointed the mapping at the same one still owns it,
+            // and must not have it repointed when the mapping moves on.
             if (RomMPlayAction.Matches(action, _mapped))
             {
-                result = _mapped;
+                if (RomMPlayAction.IsUnedited(action, applied, actionEmulatorName))
+                    result = _mapped;
                 return false;
             }
 
@@ -492,9 +498,6 @@ namespace RomM.Games
             // user picked for this one game as a mapping edit, so it is left alone.
             if (applied.EmulatorId == Guid.Empty && action.EmulatorId == _mapped.EmulatorId)
                 return false;
-
-            Func<string> actionEmulatorName = () =>
-                _plugin.Playnite.Database.Emulators?.Get(action.EmulatorId)?.Name;
 
             if (!RomMPlayAction.IsUnedited(action, applied, actionEmulatorName))
             {

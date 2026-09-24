@@ -41,16 +41,51 @@ namespace RomM.Tests
             Assert.NotNull(resolution.Handler);
         }
 
-        // The reported bug: the action is a snapshot from import, so a mapping later repointed at
-        // RetroArch has to be consulted rather than the sync giving up on the stale emulator.
+        // The action is what launches, so syncing the mapping's emulator in its place would download
+        // where the launched emulator never reads. It is reported as unsupported, naming the
+        // mapping's emulator so the user knows what to point the action at.
         [Fact]
-        public void The_mapping_is_used_when_the_play_actions_emulator_is_unsupported()
+        public void The_mapping_does_not_replace_an_unsupported_play_action_emulator()
         {
             var fromMapping = RetroArch();
 
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
                 FromAction(Dolphin()),
+                FromMapping(fromMapping),
+            });
+
+            Assert.Equal("Dolphin", resolution.Emulator?.Name);
+            Assert.Null(resolution.Handler);
+            Assert.Same(fromMapping, resolution.PassedOverMappingEmulator);
+        }
+
+        // Nor does it replace a supported one the user chose.
+        [Fact]
+        public void The_mapping_is_not_passed_over_when_the_action_names_the_same_emulator()
+        {
+            var id = Guid.NewGuid();
+
+            var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
+            {
+                FromAction(RetroArch(id)),
+                FromMapping(RetroArch(id)),
+            });
+
+            Assert.False(resolution.FromMapping);
+            Assert.Null(resolution.PassedOverMappingEmulator);
+        }
+
+        // With no emulator on the action there is nothing launched to contradict, so the mapping
+        // is the best answer there is.
+        [Fact]
+        public void The_mapping_is_used_when_the_play_action_names_no_emulator()
+        {
+            var fromMapping = RetroArch();
+
+            var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
+            {
+                FromAction(null),
                 FromMapping(fromMapping),
             });
 
@@ -62,7 +97,7 @@ namespace RomM.Tests
         // Reported as unsupported rather than as "no emulator": the two need different advice, and
         // the emulator named is the one the user would go looking for.
         [Fact]
-        public void No_supported_candidate_reports_the_first_emulator_as_unsupported()
+        public void An_unsupported_play_action_emulator_is_reported_as_unsupported()
         {
             var resolution = SaveEmulatorResolver.Resolve(Handlers, new[]
             {
@@ -72,6 +107,7 @@ namespace RomM.Tests
 
             Assert.Equal("Dolphin", resolution.Emulator?.Name);
             Assert.Null(resolution.Handler);
+            Assert.Null(resolution.PassedOverMappingEmulator);
         }
 
         [Fact]

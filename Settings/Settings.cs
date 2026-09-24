@@ -279,6 +279,14 @@ namespace RomM.Settings
         /// <summary>The mapping with this id, or null. The link a game keeps to its mapping.</summary>
         internal EmulatorMapping MappingById(Guid id) => Mappings?.FirstOrDefault(x => x.MappingId == id);
 
+        /// <summary>
+        /// Whether another mapping the importer will actually run covers the same RomM platform.
+        /// Both walk the same ROMs and each records itself as the ROM's mapping, so for such a
+        /// platform the sidecar's mapping is only whichever pass ran last.
+        /// </summary>
+        internal bool HasRivalMapping(EmulatorMapping mapping) =>
+            mapping != null && Mappings?.Count(m => m.Enabled && m.IsImportable && m.RomMPlatformId == mapping.RomMPlatformId) > 1;
+
         public List<RomMPlatform> RomMPlatforms
         {
             get => _romMPlatforms;
