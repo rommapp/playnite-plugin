@@ -277,5 +277,24 @@ namespace RomM.Tests
             Assert.False(rev.DownloadAsArchive);
             Assert.Equal("game.gba", rev.PlayableFile);
         }
+
+        [Fact]
+        public void Pre_upgrade_multi_file_sidecar_still_downloads_as_archive()
+        {
+            // Written before DownloadAsArchive existed: the flag is absent and must not read as false.
+            var rev = Newtonsoft.Json.JsonConvert.DeserializeObject<RomMRevision>(
+                "{\"Id\":41,\"FileName\":\"Final Fantasy VII\",\"HasMultipleFiles\":true}");
+
+            Assert.True(rev.DownloadAsArchive);
+        }
+
+        [Fact]
+        public void Pre_upgrade_single_file_sidecar_stays_a_single_download()
+        {
+            var rev = Newtonsoft.Json.JsonConvert.DeserializeObject<RomMRevision>(
+                "{\"Id\":32,\"FileName\":\"game.gba\",\"HasMultipleFiles\":false}");
+
+            Assert.False(rev.DownloadAsArchive);
+        }
     }
 }

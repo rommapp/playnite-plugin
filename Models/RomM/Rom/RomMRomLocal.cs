@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 
 namespace RomM.Models.RomM.Rom
 {
@@ -28,7 +29,7 @@ namespace RomM.Models.RomM.Rom
         // or DLC beside it as a *single* file -- the game is the only file at the folder's root -- yet
         // the folder still has to be fetched whole. Keeping the two apart is what lets a genuine
         // multi-file ROM go on exposing every extracted file as a playable disc while these do not.
-        // Absent from sidecars written before this existed, where it reads back as false.
+        // Absent from sidecars written before this existed; see OnDeserialized.
         public bool DownloadAsArchive { get; set; }
 
         // The file to launch, relative to the ROM folder: the file inside the extracted folder for an
@@ -37,6 +38,17 @@ namespace RomM.Models.RomM.Rom
 
         public string DownloadURL { get; set; }
         public bool IsSelected { get; set; }
+
+        // A sidecar written before DownloadAsArchive existed reads it back as false, which would stop
+        // a ROM imported by an earlier version from being treated as the archive it still downloads
+        // as. A ROM RomM itself calls multi-file has always been fetched whole, so the flag is
+        // restored here, once, for every reader, until the next library update rewrites the sidecar.
+        [OnDeserialized]
+        internal void OnDeserialized(StreamingContext context)
+        {
+            if (HasMultipleFiles)
+                DownloadAsArchive = true;
+        }
     }
 
     public class RomMRomLocal

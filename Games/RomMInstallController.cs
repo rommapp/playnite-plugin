@@ -48,12 +48,8 @@ namespace RomM.Games
             // IsInstalled detection lines up.
             var installDir = RomMInstallPaths.InstallDir(dstPath, _gameData.FolderName, _gameData.FileName);
 
-            // A sidecar written before DownloadAsArchive existed reads it back as false, so the flag
-            // alone would stop a ROM imported by an earlier version from being treated as the archive
-            // it still downloads as. A ROM RomM itself calls multi-file has always been fetched whole,
-            // which makes the two the same thing here and keeps such a ROM extracting until the next
-            // library update rewrites its sidecar.
-            var downloadsArchive = _gameData.DownloadAsArchive || _gameData.HasMultipleFiles;
+            // Pre-upgrade sidecars are normalised on load (RomMRevision.OnDeserialized).
+            var downloadsArchive = _gameData.DownloadAsArchive;
 
             // Not _gameData.Mapping.InstallFlat directly: a ROM fetched as a whole folder keeps its
             // own folder even under flat. Must stay the same call the importer makes, or the install

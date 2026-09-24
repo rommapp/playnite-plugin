@@ -165,5 +165,34 @@ namespace RomM.Tests
         [InlineData("anything", "")]
         public void IsInside_is_false_when_a_path_is_missing(string root, string path)
             => Assert.False(RomMInstallPaths.IsInside(root, path));
+
+        [Fact]
+        public void An_old_flat_folder_under_a_repointed_parent_is_shared()
+        {
+            // The mapping moved from roms/snes (flat) to its parent roms: the old platform folder now
+            // sits inside the destination, but every other flat SNES game still records it as theirs.
+            var parent = Path.Combine(Path.GetTempPath(), "roms");
+            var oldFlat = Path.Combine(parent, "snes");
+
+            Assert.True(RomMInstallPaths.IsInside(parent, oldFlat));
+            Assert.True(RomMInstallPaths.IsClaimedByAnother(oldFlat, new[] { oldFlat + Path.DirectorySeparatorChar }));
+        }
+
+        [Fact]
+        public void A_folder_holding_another_games_install_is_shared()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "roms", "snes");
+
+            Assert.True(RomMInstallPaths.IsClaimedByAnother(dir, new[] { Path.Combine(dir, "Other Game") }));
+        }
+
+        [Fact]
+        public void A_games_own_folder_is_not_shared()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "roms", "snes");
+            var own = Path.Combine(root, "Sample Game");
+
+            Assert.False(RomMInstallPaths.IsClaimedByAnother(own, new[] { root, Path.Combine(root, "Other Game"), null, "" }));
+        }
     }
 }

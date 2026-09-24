@@ -2,6 +2,7 @@
 using Playnite.SDK.Plugins;
 using RomM.Settings;
 using System.IO;
+using System.Linq;
 using System.Windows;
 
 namespace RomM.Games
@@ -29,7 +30,14 @@ namespace RomM.Games
             // installed, and a ROM fetched as a whole folder keeps a folder of its own even when the
             // mapping asks for flat. Anything else shares its directory with other games, or no longer
             // sits under the mapping, and only the files registered as its ROMs may be removed.
-            if (RomMInstallPaths.IsInside(_mapping.DestinationPathResolved, installDir))
+            // A directory another game also installs into is shared however it sits, and so is
+            // anything reached without a mapping (sidecar gone, mapping removed).
+            var otherInstallDirs = _romM.Playnite.Database.Games
+                .Where(g => g.Id != Game.Id)
+                .Select(g => PlaynitePath.Resolve(_romM.Playnite, g.InstallDirectory));
+
+            if (RomMInstallPaths.IsInside(_mapping?.DestinationPathResolved, installDir)
+                && !RomMInstallPaths.IsClaimedByAnother(installDir, otherInstallDirs))
             {
                 if (new DirectoryInfo(installDir).Exists)
                 {
@@ -40,7 +48,7 @@ namespace RomM.Games
                     _romM.Playnite.Dialogs.ShowMessage($"\"{Game.Name}\" folder could not be found. Marking as uninstalled.", "Game not found", MessageBoxButton.OK);
                 }
             }
-            else
+            else if (Game.Roms != null)
             {
                 foreach (var RomFile in Game.Roms)
                 {
@@ -50,7 +58,7 @@ namespace RomM.Games
                 }
             }
 
-            Game.Roms.Clear();
+            Game.Roms?.Clear();
             InvokeOnUninstalled(new GameUninstalledEventArgs());
         }
     }

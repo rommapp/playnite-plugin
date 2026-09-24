@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -42,7 +43,7 @@ namespace RomM.Games
             var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var destination = Path.GetFullPath(Path.Combine(fullRoot, Contained(relativePath)));
 
-            if (!destination.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            if (!IsInside(fullRoot, destination))
                 throw new ArgumentException($"Path escapes the install directory: {relativePath}");
 
             return destination;
@@ -104,6 +105,24 @@ namespace RomM.Games
 
             return normalizedPath.Length > normalizedRoot.Length
                    && normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Whether some other game's install directory is installDir itself or lies inside it -- the
+        // folder every flat-installed game on a platform shares, or one that a simple single file and
+        // a same-named folder ROM both derive. IsInside alone cannot tell such a folder from a game's
+        // own: a mapping repointed to the parent of its old flat folder ("D:\Roms\SNES" -> "D:\Roms")
+        // puts that old platform folder inside the new destination, and deleting it would take every
+        // ROM still in it.
+        public static bool IsClaimedByAnother(string installDir, IEnumerable<string> otherInstallDirs)
+        {
+            if (string.IsNullOrEmpty(installDir) || otherInstallDirs == null)
+                return false;
+
+            var normalized = NormalizeDirectory(installDir);
+            return otherInstallDirs.Any(other =>
+                !string.IsNullOrEmpty(other)
+                && (string.Equals(NormalizeDirectory(other), normalized, StringComparison.OrdinalIgnoreCase)
+                    || IsInside(installDir, other)));
         }
 
         private static string NormalizeDirectory(string path)
