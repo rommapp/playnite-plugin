@@ -20,7 +20,7 @@ namespace RomM.Games
         {
             get
             {
-                return Settings.SettingsViewModel.Instance.Mappings.FirstOrDefault(m => m.MappingId == MappingId);
+                return Settings.SettingsViewModel.Instance.MappingById(MappingId);
             }
         }
 

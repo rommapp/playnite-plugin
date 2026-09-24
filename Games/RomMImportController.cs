@@ -59,7 +59,7 @@ namespace RomM.Games
                     break;
 
                 // A mapping with no emulator/profile is genuinely unconfigured — skip quietly.
-                if (mapping.Emulator == null || mapping.EmulatorProfile == null)
+                if (!mapping.HasEmulatorProfile)
                 {
                     Logger.Warn($"[Import Controller] Emulator {mapping.MappingId} is misconfigured, skipping.");
                     continue;
@@ -70,7 +70,7 @@ namespace RomM.Games
                 // is carried over. Give the user an actionable message instead of a cryptic
                 // "-1 not found". The <= 0 check covers both the unset RomMPlatformId (-1) and the
                 // empty default RomMPlatform (Id 0).
-                if (mapping.RomMPlatformId <= 0 || mapping.RomMPlatform == null || mapping.RomMPlatform.Id <= 0)
+                if (!mapping.HasRomMPlatform)
                 {
                     var name = !string.IsNullOrWhiteSpace(mapping.MappingName)
                         ? mapping.MappingName

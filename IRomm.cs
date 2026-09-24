@@ -17,5 +17,12 @@ namespace RomM
         string GetPluginUserDataPath();
         RomMRom FetchRom(string romId);
 
+        /// <summary>
+        /// The emulator mapping a game was imported under, from its ROM sidecar, or null when the
+        /// sidecar or the mapping is gone. Unlike the game's play action this follows the mapping
+        /// as the user edits it, because every import rewrites the sidecar.
+        /// </summary>
+        Settings.EmulatorMapping MappingFor(Game game);
+
     }
 }

@@ -116,6 +116,13 @@ namespace RomM
     #region Helper functions
         public string CombineUrl(string baseUrl, string relativePath) => RomMUrl.Combine(baseUrl, relativePath);
 
+        /// <summary>The ROM sidecar for a game, or null when it is missing or unreadable.</summary>
+        internal RomMRomLocal LoadGameData(Game game) =>
+            RomMGameData.Load(ROMDataPath, game?.GameId, Logger, game?.Name);
+
+        public EmulatorMapping MappingFor(Game game) =>
+            Settings?.MappingById(LoadGameData(game)?.MappingID ?? Guid.Empty);
+
         public RomMRom FetchRom(string romId)
         {
             string romUrl = CombineUrl(Settings.RomMHost, $"api/roms/{romId}");
@@ -253,7 +260,7 @@ namespace RomM
                         {
                             if (RomMGameId.TryParse(item.GameId, out int _, out var sha1))
                             {
-                                var romDataFile = $"{ROMDataPath}{sha1}.json";
+                                var romDataFile = RomMGameData.PathFor(ROMDataPath, sha1);
                                 if (File.Exists(romDataFile))
                                 {
                                     File.Delete(romDataFile);
@@ -355,30 +362,21 @@ namespace RomM
                     });
                 }
 
-                string romDataFile = $"{ROMDataPath}{sha1}.json";
-                if (Settings.MergeRevisions && File.Exists(romDataFile) && game.IsInstalled)
+                if (Settings.MergeRevisions && game.IsInstalled)
                 {
-                    try
+                    var gameData = RomMGameData.LoadBySha1(ROMDataPath, sha1, Logger, out _, game.Name);
+                    if (gameData?.ROMVersions?.Count > 1)
                     {
-                        string json = File.ReadAllText(romDataFile);
-                        var gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
-                        if(gameData.ROMVersions.Count > 1)
+                        gameMenuItems.Add(new GameMenuItem
                         {
-                            gameMenuItems.Add(new GameMenuItem
+                            //MenuSection = "@",
+                            Description = "Switch ROM Version!",
+                            Action = (gameMenuItem) =>
                             {
-                                //MenuSection = "@",
-                                Description = "Switch ROM Version!",
-                                Action = (gameMenuItem) =>
-                                {
-                                    Playnite.InstallGame(args.Games.First().Id);
-                                }
-                            });
-                        }
+                                Playnite.InstallGame(args.Games.First().Id);
+                            }
+                        });
                     }
-                    catch (Exception)
-                    {
-                        Logger.Error($"{args.Games.First().Name} GameID is malformed or json file is corrupted!");
-                    } 
                 }
             }
             return gameMenuItems;
@@ -402,7 +400,7 @@ namespace RomM
                 else
                 {
                     // Pull game file from RomM data directory
-                    if (!RomMGameId.TryParse(gameID, out int _, out string romMSHA1) || !File.Exists($"{ROMDataPath}{romMSHA1}.json"))
+                    if (!RomMGameId.TryParse(gameID, out int _, out string romMSHA1))
                     {
                         Logger.Error($"{args.Game.Name} GameID is malformed!");
                         romData.Id = (int)InstallStatus.Cancelled;
@@ -410,19 +408,10 @@ namespace RomM
                         yield break;
                     }
 
-                    try
+                    gameData = RomMGameData.LoadBySha1(ROMDataPath, romMSHA1, Logger, out _, args.Game.Name);
+                    if (gameData?.ROMVersions == null || gameData.ROMVersions.Count == 0)
                     {
-                        string json = File.ReadAllText($"{ROMDataPath}{romMSHA1}.json");
-                        gameData = JsonConvert.DeserializeObject<RomMRomLocal>(json);
-                    }
-                    catch (Exception)
-                    {
-                        Logger.Error($"{args.Game.Name} GameID is malformed or {romMSHA1} json file is corrupted!");
-                        romData.Id = (int)InstallStatus.Cancelled;
-                    }
-
-                    if (romData.Id == (int)InstallStatus.Cancelled || gameData?.ROMVersions == null || gameData.ROMVersions.Count == 0)
-                    {
+                        Logger.Error($"{args.Game.Name} has no usable ROM data file; run update game library before installing!");
                         romData.Id = (int)InstallStatus.Cancelled;
                         yield return new RomMInstallController(args.Game, this, romData);
                         yield break;
@@ -431,7 +420,7 @@ namespace RomM
                     // Set ROM data to base ROM
                     romData = GameInstallInfo.From(
                         gameData.ROMVersions[0],
-                        Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID));
+                        Settings.MappingById(gameData.MappingID));
 
                     // If Siblings are available prompt user with version selection
                     if (Settings.MergeRevisions && gameData.ROMVersions?.Count > 1)
@@ -485,7 +474,7 @@ namespace RomM
                         gameData.ROMVersions[0].IsSelected = true;
                     }
 
-                    File.WriteAllText($"{ROMDataPath}{romMSHA1}.json", JsonConvert.SerializeObject(gameData));
+                    RomMGameData.Save(ROMDataPath, romMSHA1, gameData);
                 }
 
                 yield return new RomMInstallController(args.Game, this, romData);
@@ -495,23 +484,7 @@ namespace RomM
         {
             if (args.Game.PluginId == Id)
             {
-                EmulatorMapping mapping = null;
-
-                try
-                {
-                    var splitID = args.Game.GameId.Split(':');
-                    string sidecarPath = $"{ROMDataPath}{splitID[1]}.json";
-                    if (File.Exists(sidecarPath))
-                    { 
-                            var existingJson = File.ReadAllText(sidecarPath);
-                            var localROM = JsonConvert.DeserializeObject<RomMRomLocal>(existingJson);
-                            mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == localROM.MappingID);
-                    }
-                }
-                catch (Exception)
-                {
-                    Logger.Error($"{args.Game.Name} GameID is malformed or json file is corrupted!");
-                }
+                EmulatorMapping mapping = MappingFor(args.Game);
 
                 if (mapping == null)
                     yield return null;
@@ -664,14 +637,15 @@ namespace RomM
                         DownloadQueueController?.Cancel(newGame.Id);
                     }
                 
+                    // The importer wrote this change itself; don't push it back. Consumed whether or not
+                    // sync is on, so a suppression set while it is off cannot swallow a later real edit.
+                    if (ignoredGameIds.TryRemove(newGame.Id, out byte _))
+                    {
+                        continue;
+                    }
+
                     if (Settings.KeepRomMSynced == true)
                     {
-                        // The importer wrote the server's own values into this game; don't push them back.
-                        if (ignoredGameIds.TryRemove(newGame.Id, out byte _))
-                        {
-                            continue;
-                        }
-
                         if(!RomMGameId.TryParse(newGame.GameId, out int romMId, out string _))
                         {
                             Logger.Error($"{newGame.Name} GameID is malformed!");
