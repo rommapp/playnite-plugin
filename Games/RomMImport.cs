@@ -212,8 +212,9 @@ namespace RomM.Games
             // the extras it carries are not scattered across the platform folder.
             var flatLayout = RomMInstallPaths.UsesFlatLayout(
                 _mapping.InstallFlat,
-                baseRevision?.DownloadAsArchive ?? false,
-                baseRevision?.HasMultipleFiles ?? false);
+                RomMInstallPaths.IsSingleRomInFolder(
+                    baseRevision?.DownloadAsArchive ?? false,
+                    baseRevision?.HasMultipleFiles ?? false));
 
             var gameInstallDir = flatLayout ? rootInstallDir : RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
             var pathToGame = flatLayout ? $"{rootInstallDir}\\{fileName}" : RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);

@@ -33,7 +33,7 @@ namespace RomM.Games
             // A directory another game also installs into is shared however it sits, and so is
             // anything reached without a mapping (sidecar gone, mapping removed).
             var otherInstallDirs = _romM.Playnite.Database.Games
-                .Where(g => g.Id != Game.Id)
+                .Where(g => g.Id != Game.Id && !string.IsNullOrEmpty(g.InstallDirectory))
                 .Select(g => PlaynitePath.Resolve(_romM.Playnite, g.InstallDirectory));
 
             if (RomMInstallPaths.IsInside(_mapping?.DestinationPathResolved, installDir)

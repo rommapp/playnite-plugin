@@ -40,7 +40,7 @@ namespace RomM.Games
             if (string.IsNullOrEmpty(relativePath))
                 throw new ArgumentException("Archive entry has no name, refusing to extract it.");
 
-            var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var fullRoot = Path.GetFullPath(root);
             var destination = Path.GetFullPath(Path.Combine(fullRoot, Contained(relativePath)));
 
             if (!IsInside(fullRoot, destination))
@@ -82,8 +82,13 @@ namespace RomM.Games
         //
         // The importer and the install controller both ask here, so the path one computes cannot
         // drift from the other's -- they have to agree or IsInstalled detection stops matching.
-        public static bool UsesFlatLayout(bool installFlat, bool downloadAsArchive, bool hasMultipleFiles)
-            => installFlat && !(downloadAsArchive && !hasMultipleFiles);
+        public static bool UsesFlatLayout(bool installFlat, bool singleRomInFolder)
+            => installFlat && !singleRomInFolder;
+
+        // A folder fetched whole for a ROM RomM still calls single-file (see
+        // RomMRevision.DownloadAsArchive): one playable file, plus extras that are not ROMs.
+        public static bool IsSingleRomInFolder(bool downloadAsArchive, bool hasMultipleFiles)
+            => downloadAsArchive && !hasMultipleFiles;
 
         // Whether path sits strictly inside root, ignoring a trailing separator and case.
         //
@@ -100,11 +105,7 @@ namespace RomM.Games
             if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(path))
                 return false;
 
-            var normalizedRoot = NormalizeDirectory(root);
-            var normalizedPath = NormalizeDirectory(path);
-
-            return normalizedPath.Length > normalizedRoot.Length
-                   && normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            return StartsWithDirectory(NormalizeDirectory(path), NormalizeDirectory(root));
         }
 
         // Whether some other game's install directory is installDir itself or lies inside it -- the
@@ -119,11 +120,16 @@ namespace RomM.Games
                 return false;
 
             var normalized = NormalizeDirectory(installDir);
-            return otherInstallDirs.Any(other =>
-                !string.IsNullOrEmpty(other)
-                && (string.Equals(NormalizeDirectory(other), normalized, StringComparison.OrdinalIgnoreCase)
-                    || IsInside(installDir, other)));
+            return otherInstallDirs
+                .Where(other => !string.IsNullOrEmpty(other))
+                .Select(NormalizeDirectory)
+                .Any(other => string.Equals(other, normalized, StringComparison.OrdinalIgnoreCase)
+                              || StartsWithDirectory(other, normalized));
         }
+
+        // Both arguments already normalised.
+        private static bool StartsWithDirectory(string path, string root)
+            => path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
         private static string NormalizeDirectory(string path)
         {

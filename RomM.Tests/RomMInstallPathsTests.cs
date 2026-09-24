@@ -121,7 +121,8 @@ namespace RomM.Tests
             bool installFlat, bool downloadAsArchive, bool hasMultipleFiles, bool expected)
             => Assert.Equal(
                 expected,
-                RomMInstallPaths.UsesFlatLayout(installFlat, downloadAsArchive, hasMultipleFiles));
+                RomMInstallPaths.UsesFlatLayout(
+                    installFlat, RomMInstallPaths.IsSingleRomInFolder(downloadAsArchive, hasMultipleFiles)));
 
         [Fact]
         public void A_directory_under_the_destination_belongs_to_the_game()
