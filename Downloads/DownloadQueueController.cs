@@ -178,7 +178,7 @@ namespace RomM.Downloads
 
             // Extract if needed (we treat extract as 0..100 in its own bar)
             // Don't extract archives when install flat is enabled
-            if (req.HasMultipleFiles || (req.AutoExtract && IsFileCompressed(req.GamePath) && !req.InstallFlat))
+            if (req.DownloadAsArchive || (req.AutoExtract && IsFileCompressed(req.GamePath) && !req.InstallFlat))
             {
                 item.SetStatus(DownloadStatus.Extracting, "Extracting...");
                 Logger.Info($"Extracting {req.GamePath}...");

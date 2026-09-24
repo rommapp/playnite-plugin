@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -39,10 +40,10 @@ namespace RomM.Games
             if (string.IsNullOrEmpty(relativePath))
                 throw new ArgumentException("Archive entry has no name, refusing to extract it.");
 
-            var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var fullRoot = Path.GetFullPath(root);
             var destination = Path.GetFullPath(Path.Combine(fullRoot, Contained(relativePath)));
 
-            if (!destination.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            if (!IsInside(fullRoot, destination))
                 throw new ArgumentException($"Path escapes the install directory: {relativePath}");
 
             return destination;
@@ -65,5 +66,84 @@ namespace RomM.Games
         // <install dir>/<file name>, using the folder-aware install dir.
         public static string GamePath(string rootInstallDir, string folderName, string fileName)
             => Path.Combine(InstallDir(rootInstallDir, folderName, fileName), Contained(fileName));
+
+        // Whether an install lays a ROM's files straight into the mapping's folder, the way "install
+        // flat" asks, or gives the game a folder of its own.
+        //
+        // A ROM fetched as a whole folder brings its own subfolders (patch/, dlc/) with it, so it
+        // cannot go flat: extraction would scatter them across the platform folder, where the patch/
+        // of every game would merge into a single one, and a flat uninstall -- which removes only the
+        // files registered as the game's ROMs -- would leave them behind. Those ROMs keep a folder of
+        // their own even when the mapping asks for flat; a single file still installs flat, which is
+        // what the setting is for.
+        //
+        // ROMs RomM itself calls multi-file stay on the flat path they already take: moving them
+        // would strand installations whose paths were recorded the old way.
+        //
+        // The importer and the install controller both ask here, so the path one computes cannot
+        // drift from the other's -- they have to agree or IsInstalled detection stops matching.
+        public static bool UsesFlatLayout(bool installFlat, bool singleRomInFolder)
+            => installFlat && !singleRomInFolder;
+
+        // A folder fetched whole for a ROM RomM still calls single-file (see
+        // RomMRevision.DownloadAsArchive): one playable file, plus extras that are not ROMs.
+        public static bool IsSingleRomInFolder(bool downloadAsArchive, bool hasMultipleFiles)
+            => downloadAsArchive && !hasMultipleFiles;
+
+        // Whether path sits strictly inside root, ignoring a trailing separator and case.
+        //
+        // Uninstall removes a directory only when it can show the directory belongs to one game, and
+        // this is that proof. Two cases fail it, both of which must keep their files rather than lose
+        // a folder: a game installed flat, whose install directory *is* the mapping's folder, shared
+        // with every other game on the platform; and an install directory that no longer sits under
+        // the mapping at all, because the destination was repointed after the game was installed --
+        // there the stale path is the previous platform folder, and deleting it would take every ROM
+        // in it. Asking how the game was actually installed also survives the setting being toggled
+        // afterwards, which the mapping's own flag does not.
+        public static bool IsInside(string root, string path)
+        {
+            if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(path))
+                return false;
+
+            return StartsWithDirectory(NormalizeDirectory(path), NormalizeDirectory(root));
+        }
+
+        // Whether some other game's install directory is installDir itself or lies inside it -- the
+        // folder every flat-installed game on a platform shares, or one that a simple single file and
+        // a same-named folder ROM both derive. IsInside alone cannot tell such a folder from a game's
+        // own: a mapping repointed to the parent of its old flat folder ("D:\Roms\SNES" -> "D:\Roms")
+        // puts that old platform folder inside the new destination, and deleting it would take every
+        // ROM still in it.
+        public static bool IsClaimedByAnother(string installDir, IEnumerable<string> otherInstallDirs)
+        {
+            if (string.IsNullOrEmpty(installDir) || otherInstallDirs == null)
+                return false;
+
+            var normalized = NormalizeDirectory(installDir);
+            return otherInstallDirs
+                .Where(other => !string.IsNullOrEmpty(other))
+                .Select(NormalizeDirectory)
+                .Any(other => string.Equals(other, normalized, StringComparison.OrdinalIgnoreCase)
+                              || StartsWithDirectory(other, normalized));
+        }
+
+        // Both arguments already normalised.
+        private static bool StartsWithDirectory(string path, string root)
+            => path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+        private static string NormalizeDirectory(string path)
+        {
+            try
+            {
+                path = Path.GetFullPath(path);
+            }
+            catch (Exception)
+            {
+                // A path the filesystem will not resolve is compared as it arrived rather than
+                // throwing: this only decides which uninstall branch runs.
+            }
+
+            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
     }
 }

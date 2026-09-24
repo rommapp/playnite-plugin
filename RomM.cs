@@ -429,15 +429,9 @@ namespace RomM
                     }
 
                     // Set ROM data to base ROM
-                    romData = new GameInstallInfo
-                    {
-                        Id = gameData.ROMVersions[0].Id,
-                        FileName = gameData.ROMVersions[0].FileName,
-                        FolderName = gameData.ROMVersions[0].FolderName,
-                        HasMultipleFiles = gameData.ROMVersions[0].HasMultipleFiles,
-                        DownloadURL = gameData.ROMVersions[0].DownloadURL,
-                        Mapping = Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID)
-                    };
+                    romData = GameInstallInfo.From(
+                        gameData.ROMVersions[0],
+                        Settings.Mappings.FirstOrDefault(x => x.MappingId == gameData.MappingID));
 
                     // If Siblings are available prompt user with version selection
                     if (Settings.MergeRevisions && gameData.ROMVersions?.Count > 1)
@@ -480,11 +474,7 @@ namespace RomM
 
 
                             var selectedrevision = VersionSelectorControl.RomVersions.First(x => x.IsSelected);
-                            romData.Id = selectedrevision.Id;
-                            romData.FileName = selectedrevision.FileName;
-                            romData.FolderName = selectedrevision.FolderName;
-                            romData.HasMultipleFiles = selectedrevision.HasMultipleFiles;
-                            romData.DownloadURL = selectedrevision.DownloadURL;
+                            romData = GameInstallInfo.From(selectedrevision, romData.Mapping);
                             
                             gameData.ROMVersions = VersionSelectorControl.RomVersions.ToList();
 

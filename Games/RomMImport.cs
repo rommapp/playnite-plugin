@@ -190,15 +190,13 @@ namespace RomM.Games
             // not the display Name. Using Name drops the extension and can include characters that
             // don't match the installed file, breaking IsInstalled detection and the play path.
             //
-            // For folder-based ROMs we point at a real file inside the ROM's folder (fs_name):
-            //   - nested single file: the one file in the folder,
-            //   - multiple files: the primary file (the download descriptor's FileName is the folder
-            //     name / archive base, which is not itself a real file, so use the primary file here).
+            // The factory already resolved which file that is, so the install path and the download
+            // descriptor cannot drift apart: for a folder download it is the primary file inside the
+            // ROM's folder (FileName there is the folder / archive base, not a real file), and for a
+            // single-file download it is the downloaded file itself.
             var baseRevision = BuildRevision(ROM);
             var folderName = baseRevision?.FolderName;
-            var playableFile = ROM.HasMultipleFiles
-                ? RomMRevisionFactory.RelativeFilePath(RomMRevisionFactory.SelectPrimaryFile(ROM.Files), folderName)
-                : baseRevision?.FileName;
+            var playableFile = baseRevision?.PlayableFile;
             // With no file list, fs_name still beats the extensionless display Name.
             var fileName = !string.IsNullOrEmpty(playableFile) ? playableFile
                 : !string.IsNullOrEmpty(ROM.FileName) ? ROM.FileName
@@ -210,8 +208,16 @@ namespace RomM.Games
                 return null;
             }
 
-            var gameInstallDir = _mapping.InstallFlat ? rootInstallDir : RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
-            var pathToGame = _mapping.InstallFlat ? $"{rootInstallDir}\\{fileName}" : RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
+            // A ROM fetched as a whole folder keeps a folder of its own even under install flat, so
+            // the extras it carries are not scattered across the platform folder.
+            var flatLayout = RomMInstallPaths.UsesFlatLayout(
+                _mapping.InstallFlat,
+                RomMInstallPaths.IsSingleRomInFolder(
+                    baseRevision?.DownloadAsArchive ?? false,
+                    baseRevision?.HasMultipleFiles ?? false));
+
+            var gameInstallDir = flatLayout ? rootInstallDir : RomMInstallPaths.InstallDir(rootInstallDir, folderName, fileName);
+            var pathToGame = flatLayout ? $"{rootInstallDir}\\{fileName}" : RomMInstallPaths.GamePath(rootInstallDir, folderName, fileName);
 
             var status = _plugin.Playnite.Database.CompletionStatuses.Get(StatusID);
             var completionStatusProperty = status != null ? new MetadataNameProperty(status.Name) : null;
