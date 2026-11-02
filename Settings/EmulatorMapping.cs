@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Playnite.SDK.Models;
 using Playnite.SDK;
 using System;
@@ -44,6 +44,8 @@ namespace RomM.Settings
         private string _destinationPath = "";
         [JsonIgnore]
         private bool _installFlat = false;
+        [JsonIgnore]
+        private bool? _mergeRevisionsOverride = null;
 
         public EmulatorMapping(List<RomMPlatform> romMPlatforms)
         {
@@ -264,6 +266,17 @@ namespace RomM.Settings
             set
             {
                 _installFlat = value;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>Per-mapping override for merging ROM revisions. Null inherits the global setting.</summary>
+        public bool? MergeRevisionsOverride
+        {
+            get => _mergeRevisionsOverride;
+            set
+            {
+                _mergeRevisionsOverride = value;
                 OnPropertyChanged();
             }
         }

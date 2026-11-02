@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
@@ -128,7 +128,7 @@ namespace RomM.Games
                     UpdatedOldGameID(ROM);
 
                     // Merging revisions: drop the games for siblings we're folding into the main entry.
-                    if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)
+                    if (_plugin.Settings.ShouldMergeRevisions(_mapping.MappingId) && ROM.Siblings?.Count > 0)
                     {
                         if (CheckForMainSibling(ROM) == MainSibling.Other || ROM.Processed)
                         {
@@ -418,7 +418,7 @@ namespace RomM.Games
             toSave.ROMVersions.Add(baseROM);
 
             // Save sibling data
-            if (_plugin.Settings.MergeRevisions && ROM.Siblings?.Count > 0)
+            if (_plugin.Settings.ShouldMergeRevisions(_mapping.MappingId) && ROM.Siblings?.Count > 0)
             {
                 foreach (var sibling in ROM.Siblings)
                 {

@@ -362,10 +362,10 @@ namespace RomM
                     });
                 }
 
-                if (Settings.MergeRevisions && game.IsInstalled)
+                if (game.IsInstalled)
                 {
                     var gameData = RomMGameData.LoadBySha1(ROMDataPath, sha1, Logger, out _, game.Name);
-                    if (gameData?.ROMVersions?.Count > 1)
+                    if (gameData?.ROMVersions?.Count > 1 && Settings.ShouldMergeRevisions(gameData.MappingID))
                     {
                         gameMenuItems.Add(new GameMenuItem
                         {
@@ -423,7 +423,7 @@ namespace RomM
                         Settings.MappingById(gameData.MappingID));
 
                     // If Siblings are available prompt user with version selection
-                    if (Settings.MergeRevisions && gameData.ROMVersions?.Count > 1)
+                    if (Settings.ShouldMergeRevisions(gameData.MappingID) && gameData.ROMVersions?.Count > 1)
                     {
 
                         RomMVersionSelector VersionSelectorControl = new RomMVersionSelector(gameData.ROMVersions);

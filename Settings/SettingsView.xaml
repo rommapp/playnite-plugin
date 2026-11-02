@@ -1,4 +1,4 @@
-<UserControl ClipToBounds="True"
+﻿<UserControl ClipToBounds="True"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -231,6 +231,7 @@
                                             <CheckBox Content="Auto-extract" Margin="0,0,16,0" IsChecked="{Binding AutoExtract, Mode=TwoWay}" ToolTip="Extract ROMs stored on the server as Rar, Zip, Tar, 7z, GZip, or BZip2." />
                                             <CheckBox Content="Install Flat" Margin="0,0,16,0" IsChecked="{Binding InstallFlat, Mode=TwoWay}" ToolTip="Will download ROMs into the Path/ instead of Path/Gamename/" />
                                             <CheckBox Content="Prefer .m3u" IsChecked="{Binding UseM3U, Mode=TwoWay}" ToolTip="Use the .m3u file for multi-file ROMs when the emulator supports it." />
+                                            <CheckBox Content="Merge ROM revisions" IsThreeState="True" IsChecked="{Binding MergeRevisionsOverride, Mode=TwoWay}" ToolTip="Checked: merge revisions. Unchecked: do not merge. Indeterminate: use the global setting." />
                                         </StackPanel>
 
                                         <Label Grid.Row="5" Grid.Column="0" Content="Mapping ID" Style="{StaticResource FieldLabel}" Foreground="DimGray" FontSize="11" />
@@ -278,8 +279,9 @@
                         <TextBlock Text="Enable game scanning in fullscreen mode" TextWrapping="Wrap" />
                     </CheckBox>
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding MergeRevisions, Mode=TwoWay}">
-                        <TextBlock Text="Merge ROM revisions" TextWrapping="Wrap" />
+                        <TextBlock Text="Merge ROM revisions (global default)" TextWrapping="Wrap" />
                     </CheckBox>
+                    <TextBlock Margin="0,0,0,8" Foreground="Gray" Text="Per-mapping setting: checked = on, unchecked = off, indeterminate = use the global default." TextWrapping="Wrap" />
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding KeepDeletedGames, Mode=TwoWay}">
                         <TextBlock Text="Keep games deleted from the RomM server" TextWrapping="Wrap" />
                     </CheckBox>
