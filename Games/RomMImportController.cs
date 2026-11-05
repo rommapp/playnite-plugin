@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Playnite.SDK;
 using Playnite.SDK.Models;
@@ -65,21 +65,19 @@ namespace RomM.Games
                     continue;
                 }
 
-                // No RomM platform selected. This is the common state right after upgrading from a
-                // pre-0.6 version, where the old platform mapping is dropped and no RomM platform id
-                // is carried over. Give the user an actionable message instead of a cryptic
-                // "-1 not found". The <= 0 check covers both the unset RomMPlatformId (-1) and the
-                // empty default RomMPlatform (Id 0).
-                if (!mapping.HasRomMPlatform)
+                // RomMPlatform itself is not persisted (it is a JsonIgnore property); the stable
+                // value that is persisted is RomMPlatformId. Resolve that ID against the fresh API
+                // platform list before importing. This also makes mappings created by Massive Import
+                // work correctly after Playnite/plugin restart, without depending on AvailablePlatforms
+                // having already been populated in memory.
+                if (mapping.RomMPlatformId <= 0)
                 {
                     var name = !string.IsNullOrWhiteSpace(mapping.MappingName)
                         ? mapping.MappingName
                         : (mapping.Emulator?.Name ?? "a mapping");
-                    // Stable per-mapping id so repeated imports dedupe instead of stacking.
                     _plugin.Playnite.Notifications.Add(
                         $"{_plugin.Id}-platform-unset-{mapping.MappingId}",
-                        $"The RomM platform for \"{name}\" is not set. This can happen after upgrading the plugin. " +
-                        "Open RomM settings, select the emulator mapping, choose its RomM platform, then run Update Game Library again.",
+                        $"The RomM platform for \"{name}\" is not set. Open RomM settings, select the emulator mapping, choose its RomM platform, then run Update Game Library again.",
                         NotificationType.Error);
                     continue;
                 }
@@ -87,9 +85,15 @@ namespace RomM.Games
                 RomMPlatform apiPlatform = apiPlatforms.FirstOrDefault(p => p.Id == mapping.RomMPlatformId);
                 if (apiPlatform == null)
                 {
-                    _plugin.Playnite.Notifications.Add(_plugin.Id.ToString(), $"Platform {mapping.RomMPlatform.PlayniteName} with ID {mapping.RomMPlatformId} not found in RomM, skipping.", NotificationType.Error);
+                    _plugin.Playnite.Notifications.Add(
+                        _plugin.Id.ToString(),
+                        $"Platform with RomM ID {mapping.RomMPlatformId} was not found in RomM, skipping.",
+                        NotificationType.Error);
                     continue;
                 }
+
+                // Rehydrate the non-persisted platform object from the authoritative API response.
+                mapping.RomMPlatform = apiPlatform;
 
                 // Pull data from server
                 // Could be made async, but when testing (4.7.0) found a performance degradation

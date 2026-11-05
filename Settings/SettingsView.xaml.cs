@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using Playnite.SDK;
@@ -7,6 +7,7 @@ using QRCoder;
 
 using RomM.Models.RomM;
 using RomM.Models.RomM.Platform;
+using RomM.Games;
 
 using System;
 using System.Collections.Generic;
@@ -86,6 +87,293 @@ namespace RomM.Settings
         private void Click_AddMapping(object sender, RoutedEventArgs e)
         {
             SettingsViewModel.Instance.Mappings.Add(new EmulatorMapping(SettingsViewModel.Instance.RomMPlatforms));
+        }
+
+        private async void Click_MassiveImport(object sender, RoutedEventArgs e)
+        {
+            SettingsViewModel.Instance.Notify = false;
+
+            try
+            {
+                // Always refresh the RomM platform list so the dialog represents the current server state.
+                HttpResponseMessage response = await HttpClientSingleton.Instance.GetAsync(
+                    $"{SettingsViewModel.Instance.RomMHost}/api/platforms");
+                response.EnsureSuccessStatusCode();
+
+                string body = await response.Content.ReadAsStringAsync();
+                var platforms = JsonConvert.DeserializeObject<List<RomMPlatform>>(body) ?? new List<RomMPlatform>();
+                SettingsViewModel.Instance.RomMPlatforms = platforms;
+
+                var existingPlatformIds = new HashSet<int>(
+                    SettingsViewModel.Instance.Mappings
+                        .Where(m => m.RomMPlatformId > 0)
+                        .Select(m => m.RomMPlatformId));
+
+                var dialog = new Window
+                {
+                    Title = "RomM Massive Import",
+                    Width = 620,
+                    Height = 700,
+                    MinWidth = 500,
+                    MinHeight = 450,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = Window.GetWindow(this),
+                    ResizeMode = ResizeMode.CanResize
+                };
+
+                // The settings view is hosted inside Playnite's themed visual tree, while this
+                // dynamically-created Window is not. Copy the actual theme resources from the
+                // settings view into the dialog so DynamicResource lookup cannot fall back to
+                // WPF defaults (which caused white text on a white background).
+                ApplyPlayniteTheme(dialog);
+
+                var rootPanel = new DockPanel { Margin = new Thickness(14) };
+                rootPanel.SetResourceReference(Control.BackgroundProperty, "PopupBackgroundBrush");
+
+                var description = new TextBlock
+                {
+                    Text = "Select the RomM platforms for which you want to create disabled mappings. " +
+                           "The RomM folder name is appended to the root path.",
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                description.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                DockPanel.SetDock(description, Dock.Top);
+                rootPanel.Children.Add(description);
+
+                const string defaultRootPath = "{PlayniteDir}\\RomM";
+                var rootPathPanel = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+                rootPathPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                rootPathPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var rootPathLabel = new TextBlock
+                {
+                    Text = "Root path:",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 10, 0)
+                };
+                rootPathLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                rootPathPanel.Children.Add(rootPathLabel);
+
+                var rootPathTextBox = new TextBox
+                {
+                    Text = defaultRootPath,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    ToolTip = "The selected RomM platform folder name will be appended to this path."
+                };
+                rootPathTextBox.SetResourceReference(Control.BackgroundProperty, "TextBoxBackgroundBrush");
+                rootPathTextBox.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+                rootPathTextBox.SetResourceReference(Control.BorderBrushProperty, "PopupBorderBrush");
+                Grid.SetColumn(rootPathTextBox, 1);
+                rootPathPanel.Children.Add(rootPathTextBox);
+                DockPanel.SetDock(rootPathPanel, Dock.Top);
+                rootPanel.Children.Add(rootPathPanel);
+
+                var selectAll = new CheckBox
+                {
+                    Content = "Select all",
+                    Margin = new Thickness(8, 2, 8, 10),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                selectAll.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+
+                var list = new ListBox
+                {
+                    BorderThickness = new Thickness(1),
+                    Padding = new Thickness(4),
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+                list.SetResourceReference(Control.BackgroundProperty, "PopupBackgroundBrush");
+                list.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+                list.SetResourceReference(Control.BorderBrushProperty, "PopupBorderBrush");
+
+                var selectableChecks = new List<CheckBox>();
+
+                foreach (var platform in platforms
+                    .Where(p => p.RomCount > 0)
+                    .OrderBy(p => p.PlayniteName))
+                {
+                    bool alreadyMapped = existingPlatformIds.Contains(platform.Id);
+
+                    var check = new CheckBox
+                    {
+                        Content = $"{platform.PlayniteName}  ({platform.RomCount:N0} games)",
+                        Tag = platform,
+                        IsEnabled = !alreadyMapped,
+                        IsChecked = false,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        ToolTip = alreadyMapped
+                            ? "A mapping for this RomM platform already exists."
+                            : $"RomM folder name: {platform.FsSlug}"
+                    };
+                    check.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+
+                    if (!alreadyMapped)
+                        selectableChecks.Add(check);
+
+                    if (alreadyMapped)
+                    {
+                        check.Content = $"{platform.PlayniteName}  ({platform.RomCount:N0} games)  [Already mapped]";
+                    }
+
+                    list.Items.Add(new ListBoxItem
+                    {
+                        Content = check,
+                        Padding = new Thickness(6, 5, 6, 5)
+                    });
+                }
+
+                selectAll.IsEnabled = selectableChecks.Count > 0;
+                selectAll.Checked += (_, __) =>
+                {
+                    foreach (var check in selectableChecks)
+                        check.IsChecked = true;
+                };
+                selectAll.Unchecked += (_, __) =>
+                {
+                    foreach (var check in selectableChecks)
+                        check.IsChecked = false;
+                };
+
+                DockPanel.SetDock(selectAll, Dock.Top);
+                rootPanel.Children.Add(selectAll);
+
+                var buttons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(0, 10, 8, 8)
+                };
+
+                var cancel = new Button
+                {
+                    Content = "Cancel",
+                    Padding = new Thickness(16, 5, 16, 5),
+                    Margin = new Thickness(0, 0, 8, 0),
+                    IsCancel = true
+                };
+                cancel.SetResourceReference(Control.BackgroundProperty, "PopupBackgroundBrush");
+                cancel.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+                cancel.SetResourceReference(Control.BorderBrushProperty, "PopupBorderBrush");
+                cancel.Click += (_, __) => dialog.DialogResult = false;
+
+                var import = new Button
+                {
+                    Content = "Create mappings",
+                    Padding = new Thickness(16, 5, 16, 5),
+                    IsDefault = true
+                };
+                import.SetResourceReference(Control.BackgroundProperty, "PopupBackgroundBrush");
+                import.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+                import.SetResourceReference(Control.BorderBrushProperty, "PopupBorderBrush");
+                import.Click += (_, __) => dialog.DialogResult = true;
+
+                buttons.Children.Add(cancel);
+                buttons.Children.Add(import);
+                DockPanel.SetDock(buttons, Dock.Bottom);
+                rootPanel.Children.Add(buttons);
+
+                // The last DockPanel child fills the remaining space. Add the list last so
+                // the bottom buttons keep their natural height and remain visible.
+                DockPanel.SetDock(list, Dock.Top);
+                rootPanel.Children.Add(list);
+
+                dialog.Content = rootPanel;
+
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                var selected = list.Items
+                    .Cast<ListBoxItem>()
+                    .Select(item => item.Content as CheckBox)
+                    .Where(check => check?.IsChecked == true)
+                    .Select(check => check.Tag as RomMPlatform)
+                    .Where(platform => platform != null)
+                    .ToList();
+
+                if (selected.Count == 0)
+                {
+                    SettingsViewModel.Instance.UpdateNotificationBar("No RomM platforms selected.", true);
+                    return;
+                }
+
+                string basePath = rootPathTextBox.Text?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(basePath))
+                {
+                    SettingsViewModel.Instance.UpdateNotificationBar("Root path cannot be empty.", true);
+                    return;
+                }
+
+                basePath = basePath.TrimEnd('\\', '/');
+                int created = 0;
+
+                foreach (var platform in selected)
+                {
+                    if (SettingsViewModel.Instance.Mappings.Any(m => m.RomMPlatformId == platform.Id))
+                        continue;
+
+                    string destinationPath = $"{basePath}\\{platform.FsSlug}";
+                    string resolvedDestinationPath = PlaynitePath.Resolve(
+                        SettingsViewModel.Instance.PlayniteAPI,
+                        destinationPath);
+
+                    Directory.CreateDirectory(resolvedDestinationPath);
+
+                    var mapping = new EmulatorMapping(platforms)
+                    {
+                        Enabled = false,
+                        RomMPlatformId = platform.Id,
+                        RomMPlatform = platform,
+                        DestinationPath = destinationPath
+                    };
+
+                    // Emulator, emulator profile and Playnite platform intentionally remain empty.
+                    SettingsViewModel.Instance.Mappings.Add(mapping);
+                    created++;
+                }
+
+                SettingsViewModel.Instance.UpdateNotificationBar(
+                    created > 0
+                        ? $"{created} disabled mapping(s) created."
+                        : "No new mappings were created.",
+                    created == 0);
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger().Error($"RomM - massive import failed: {ex}");
+                SettingsViewModel.Instance.UpdateNotificationBar(
+                    $"Massive import failed: {ex.Message}", true);
+            }
+        }
+
+        private void ApplyPlayniteTheme(Window dialog)
+        {
+            string[] resourceKeys =
+            {
+                "PopupBackgroundBrush",
+                "PopupBorderBrush",
+                "TextBrush",
+                "SecondaryTextBrush",
+                "TextBoxBackgroundBrush",
+                "ButtonStyle"
+            };
+
+            foreach (string key in resourceKeys)
+            {
+                object resource = TryFindResource(key);
+                if (resource != null)
+                    dialog.Resources[key] = resource;
+            }
+
+            // Some Playnite themes do not expose a dedicated TextBox background brush.
+            // In that case use the background from the themed TextBox style, if available.
+            if (!dialog.Resources.Contains("TextBoxBackgroundBrush"))
+            {
+                var themedTextBox = new TextBox();
+                object textBoxBackground = themedTextBox.TryFindResource("TextBoxBackgroundBrush");
+                if (textBoxBackground != null)
+                    dialog.Resources["TextBoxBackgroundBrush"] = textBoxBackground;
+            }
         }
 
         private void Click_Delete(object sender, RoutedEventArgs e)

@@ -89,6 +89,12 @@ namespace RomM
         public RomM(IPlayniteAPI api) : base(api)
         {
             Playnite = api;
+
+            // Playnite may request plugin settings before OnApplicationStarted.
+            // Initialize the settings model here so GetSettings() always returns
+            // a valid instance during first-run/plugin discovery.
+            Settings = new SettingsViewModel(this, this);
+
             Properties = new LibraryPluginProperties
             {
                 HasSettings = true,
@@ -204,8 +210,6 @@ namespace RomM
 
             if (!Directory.Exists($"{ROMDataPath}"))
                 Directory.CreateDirectory($"{ROMDataPath}");
-
-            Settings = new SettingsViewModel(this, this);
 
             if (Settings.UseBasicAuth && !string.IsNullOrEmpty(Settings.RomMUsername) && !string.IsNullOrEmpty(Settings.RomMPassword))
             {

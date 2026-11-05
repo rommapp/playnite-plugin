@@ -118,7 +118,9 @@ namespace RomM.Settings
                         _emulatorProfileId = null;
                         OnPropertyChanged(nameof(EmulatorProfile));
                     }
-                    RomMPlatform = new RomMPlatform();
+                    // RomM platform is independent from the selected emulator. Do not clear it
+                    // when an emulator is selected or changed; this is especially important for
+                    // mappings created by Massive Import, where the platform is assigned first.
                     MappingName = value.Name;
                     OnPropertyChanged();
                 } 

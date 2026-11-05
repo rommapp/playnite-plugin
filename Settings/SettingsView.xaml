@@ -211,6 +211,7 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
 
                                         <Label Grid.Row="0" Grid.Column="0" Content="Emulator" Style="{StaticResource FieldLabel}" />
@@ -231,12 +232,12 @@
                                             <CheckBox Content="Auto-extract" Margin="0,0,16,0" IsChecked="{Binding AutoExtract, Mode=TwoWay}" ToolTip="Extract ROMs stored on the server as Rar, Zip, Tar, 7z, GZip, or BZip2." />
                                             <CheckBox Content="Install Flat" Margin="0,0,16,0" IsChecked="{Binding InstallFlat, Mode=TwoWay}" ToolTip="Will download ROMs into the Path/ instead of Path/Gamename/" />
                                             <CheckBox Content="Prefer .m3u" IsChecked="{Binding UseM3U, Mode=TwoWay}" ToolTip="Use the .m3u file for multi-file ROMs when the emulator supports it." />
-                                            <CheckBox Content="Merge ROM revisions" IsThreeState="True" IsChecked="{Binding MergeRevisionsOverride, Mode=TwoWay}" ToolTip="Checked: merge revisions. Unchecked: do not merge. Indeterminate: use the global setting." />
                                         </StackPanel>
+                                        <CheckBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,8" Content="Merge ROM revisions" IsThreeState="True" IsChecked="{Binding MergeRevisionsOverride, Mode=TwoWay}" ToolTip="Checked: merge revisions. Unchecked: do not merge. Indeterminate: use the global setting." />
 
-                                        <Label Grid.Row="5" Grid.Column="0" Content="Mapping ID" Style="{StaticResource FieldLabel}" Foreground="DimGray" FontSize="11" />
-                                        <TextBox Grid.Row="5" Grid.Column="1" VerticalAlignment="Center" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="DimGray" FontSize="11" Text="{Binding MappingId, Mode=OneWay}" />
-                                        <Button Grid.Row="5" Grid.Column="2" Content="Remove" Padding="10,2" Foreground="#E53935" Tag="{Binding}" ToolTip="Delete mapping" Click="Click_Delete" />
+                                        <Label Grid.Row="6" Grid.Column="0" Content="Mapping ID" Style="{StaticResource FieldLabel}" Foreground="DimGray" FontSize="11" />
+                                        <TextBox Grid.Row="6" Grid.Column="1" VerticalAlignment="Center" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="DimGray" FontSize="11" Text="{Binding MappingId, Mode=OneWay}" />
+                                        <Button Grid.Row="6" Grid.Column="2" Content="Remove" Padding="10,2" Foreground="#E53935" Tag="{Binding}" ToolTip="Delete mapping" Click="Click_Delete" />
                                     </Grid>
                                 </Expander>
                             </DataTemplate>
@@ -244,7 +245,10 @@
                     </ItemsControl>
 
                     <Grid Margin="0,4,0,0">
-                        <Button Content="Add mapping" Click="Click_AddMapping" HorizontalAlignment="Left" Padding="12,4" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button Content="Add mapping" Click="Click_AddMapping" Padding="12,4" />
+                            <Button Content="Massive import" Click="Click_MassiveImport" Margin="8,0,0,0" Padding="12,4" ToolTip="Create disabled mappings for multiple RomM platforms at once." />
+                        </StackPanel>
                         <Button Content="Sync RomM platforms" Click="Click_PullPlatforms" HorizontalAlignment="Right" Padding="12,4" />
                     </Grid>
 
