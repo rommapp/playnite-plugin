@@ -97,8 +97,14 @@ namespace RomM.Downloads
             {
                 task.status = UnifiedDownloadStatus.Error;
                 plugin.Logger.Error(ex, "Could not queue RomM download in Unified Download Manager.");
-                if (Guid.TryParse(task.gameID, out var id) && requests.TryGetValue(id, out var request))
-                    request.OnFailed?.Invoke(ex);
+                if (Guid.TryParse(task.gameID, out var id))
+                {
+                    // The task never reached UDM's queue, so drop the persisted record too.
+                    requests.TryGetValue(id, out var request);
+                    requests.Remove(id);
+                    try { File.Delete(RecordPath(id)); } catch { }
+                    request?.OnFailed?.Invoke(ex);
+                }
             }
         }
 
@@ -127,8 +133,9 @@ namespace RomM.Downloads
             if (args.PropertyName != nameof(UnifiedDownload.status) || task.status != UnifiedDownloadStatus.Canceled)
                 return;
             // Playnite cancellation changes the status directly, whereas UDM's own UI invokes
-            // OnCancelDownload. Handle both paths; cleanup below is idempotent.
-            if (Guid.TryParse(task.gameID, out var id) && !running.Contains(id))
+            // OnCancelDownload. Handle both paths; cleanup is idempotent and, for a running
+            // transfer, OnCancelDownload waits for the worker to stop before cleaning up.
+            if (Guid.TryParse(task.gameID, out _))
             {
                 try { await OnCancelDownload(task); }
                 catch (Exception ex) { plugin.Logger.Error(ex, "Could not cancel RomM download."); }
@@ -187,7 +194,7 @@ namespace RomM.Downloads
                 {
                     task.activity = item.StatusText;
                     task.elapsed = watch.Elapsed;
-                    task.progress = item.IsIndeterminate ? 0 : item.ProgressValue / item.ProgressMaximum * 100;
+                    task.progress = item.IsIndeterminate || item.ProgressMaximum <= 0 ? 0 : item.ProgressValue / item.ProgressMaximum * 100;
                     if (item.Status == DownloadStatus.Downloading)
                     {
                         task.downloadSizeBytes = item.IsIndeterminate ? 0 : item.ProgressMaximum;
@@ -224,7 +231,12 @@ namespace RomM.Downloads
                     task.status = UnifiedDownloadStatus.Error;
                     task.activity = ex.Message;
                     plugin.Logger.Error(ex, "RomM download failed.");
-                    if (request != null) request.OnFailed?.Invoke(ex);
+                    if (request != null)
+                    {
+                        // Match the built-in queue: don't leave a partial transfer behind.
+                        await Task.Run(() => installer.TryCleanupPartialInstall(request));
+                        request.OnFailed?.Invoke(ex);
+                    }
                     else
                     {
                         var game = plugin.Playnite.Database.Games[id];
