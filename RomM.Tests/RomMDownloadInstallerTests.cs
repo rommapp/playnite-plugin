@@ -73,6 +73,21 @@ namespace RomM.Tests
         }
 
         [Fact]
+        public async Task CancellationWhileBuildingRomListDoesNotSignalInstalled()
+        {
+            using (var client = Client(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[] { 1 }) }))
+            using (var cts = new CancellationTokenSource())
+            {
+                var request = Request();
+                var installed = false;
+                request.BuildRoms = () => { cts.Cancel(); return new List<Playnite.SDK.Models.GameRom>(); };
+                request.OnInstalled = _ => installed = true;
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new RomMDownloadInstaller(client).DownloadAndInstall(Item(cts), request));
+                Assert.False(installed);
+            }
+        }
+
+        [Fact]
         public async Task FailedHttpRequestDoesNotSignalInstalled()
         {
             using (var client = Client(() => new HttpResponseMessage(HttpStatusCode.Unauthorized)))

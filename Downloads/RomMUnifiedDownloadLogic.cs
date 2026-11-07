@@ -256,6 +256,7 @@ namespace RomM.Downloads
                 task.gracefulCts?.Cancel();
                 await completion.Task;
             }
+            if (task.status == UnifiedDownloadStatus.Completed) return;
             if (!cleaned.Add(id)) return;
             if (File.Exists(RecordPath(id)))
             {

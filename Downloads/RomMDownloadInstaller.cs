@@ -113,6 +113,7 @@ namespace RomM.Downloads
 
             // Build rom list + signal installed
             var roms = req.BuildRoms != null ? req.BuildRoms() : null;
+            ct.ThrowIfCancellationRequested();
 
             req.OnInstalled?.Invoke(new GameInstalledEventArgs(new GameInstallationData
             {
