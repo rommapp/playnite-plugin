@@ -32,6 +32,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
@@ -42,6 +43,9 @@
       <Link>Linked\Models\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Compile>
     <Compile Include="..\PluginVersion.cs" Link="Linked\PluginVersion.cs" />
+    <Compile Include="..\Downloads\RomMDownloadInstaller.cs" Link="Linked\Downloads\RomMDownloadInstaller.cs" />
+    <Compile Include="..\Downloads\DownloadRequest.cs" Link="Linked\Downloads\DownloadRequest.cs" />
+    <Compile Include="..\Downloads\DownloadQueueItem.cs" Link="Linked\Downloads\DownloadQueueItem.cs" />
     <Compile Include="..\Games\RomMGameId.cs" Link="Linked\Games\RomMGameId.cs" />
     <Compile Include="..\Games\RomMGameInfo.cs" Link="Linked\Games\RomMGameInfo.cs" />
     <Compile Include="..\Games\RomMMetadataMapper.cs" Link="Linked\Games\RomMMetadataMapper.cs" />
@@ -74,3 +78,4 @@
   </ItemGroup>
 
 </Project>
+

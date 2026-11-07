@@ -291,6 +291,9 @@
                     <Label Content="Installation" Style="{StaticResource SectionHeader}" />
                     <Separator Margin="0,4,0,10" />
 
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding UseUnifiedDownloadManager, Mode=TwoWay}"
+                              Content="Use Unified Download Manager when installed"
+                              ToolTip="Install the Unified Download Manager add-on to manage RomM downloads alongside other libraries. Otherwise RomM uses its built-in queue." />
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding NotifyOnInstallComplete, Mode=TwoWay}">
                         <TextBlock Text="Notify when a game install completes" TextWrapping="Wrap" />
                     </CheckBox>
@@ -329,3 +332,4 @@
         </Grid>
     </DockPanel>
 </UserControl>
+

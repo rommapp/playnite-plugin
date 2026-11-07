@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
@@ -39,6 +39,26 @@ namespace RomM.Games
                 return;
             }   
 
+            var req = CreateDownloadRequest();
+            try
+            {
+                if (_romM is RomM plugin && plugin.UnifiedDownloads.IsAvailable)
+                {
+                    plugin.UnifiedDownloads.Enqueue(req, _gameData);
+                }
+                else
+                {
+                    _romM.DownloadQueueController.Enqueue(req);
+                }
+            }
+            catch (Exception ex)
+            {
+                req.OnFailed?.Invoke(ex);
+            }
+        }
+
+        internal DownloadRequest CreateDownloadRequest()
+        {
             var dstPath = _gameData.Mapping?.DestinationPathResolved
                 ?? throw new Exception("Mapped emulator data cannot be found, try removing and re-adding.");
 
@@ -139,16 +159,19 @@ namespace RomM.Games
                 },
 
                 // Callbacks into Playnite install pipeline
-                OnInstalled = installedArgs =>
+                OnInstalled = installedArgs => _romM.Playnite.MainView.UIDispatcher.Invoke(() =>
                 {
                     var game = _romM.Playnite.Database.Games[Game.Id];
+                    game.InstallDirectory = installedArgs.InstalledInfo.InstallDirectory;
+                    game.Roms = installedArgs.InstalledInfo.Roms;
+                    game.IsInstalling = false;
                     game.IsInstalled = true;
                     _romM.Playnite.Database.Games.Update(game);
 
                     InvokeOnInstalled(installedArgs);
-                },
+                }),
 
-                OnCanceled = () =>
+                OnCanceled = () => _romM.Playnite.MainView.UIDispatcher.Invoke(() =>
                 {
                     var game = _romM.Playnite.Database.Games[Game.Id];
                     game.IsInstalling = false;
@@ -156,21 +179,22 @@ namespace RomM.Games
                     _romM.Playnite.Database.Games.Update(game);
 
                     InvokeOnInstallationCancelled(new GameInstallationCancelledEventArgs());
-                },
+                }),
 
-                OnFailed = ex =>
+                OnFailed = ex => _romM.Playnite.MainView.UIDispatcher.Invoke(() =>
                 {
                     _romM.Playnite.Notifications.Add(
                         Game.GameId,
                         $"Failed to download {Game.Name}.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
                         NotificationType.Error);
 
-                    Game.IsInstalling = false;
-                }
+                    var game = _romM.Playnite.Database.Games[Game.Id];
+                    game.IsInstalling = false;
+                    _romM.Playnite.Database.Games.Update(game);
+                })
             };
 
-            // Enqueue (non-blocking)
-            _romM.DownloadQueueController.Enqueue(req);
+            return req;
         }
 
         private void CancelInstall()
@@ -240,3 +264,4 @@ namespace RomM.Games
         }
     }
 }
+

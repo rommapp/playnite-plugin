@@ -23,6 +23,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using UnifiedDownloadManagerApiNS.Interfaces;
 
 namespace RomM
 {
@@ -54,7 +55,7 @@ namespace RomM
         public static JsonSerializer Instance { get; } = new JsonSerializer();
     }
 
-    public class RomM : LibraryPlugin, IRomM
+    public class RomM : LibraryPlugin, IRomM, IUnifiedDownloadProvider
     {
         private const string s_pluginName = "RomM";
 
@@ -73,6 +74,8 @@ namespace RomM
         public MetadataProperty Source { get; private set; }
 
         public DownloadQueueController DownloadQueueController { get; private set; }
+        public IUnifiedDownloadLogic UnifiedDownloadLogic { get; set; }
+        internal RomMUnifiedDownloadLogic UnifiedDownloads => (RomMUnifiedDownloadLogic)UnifiedDownloadLogic;
         internal RomMDownloadsSidebarItem DownloadsSidebar { get; private set; }
         private readonly DownloadQueueViewModel downloadsVm;
 
@@ -104,6 +107,7 @@ namespace RomM
 
             // Limit to 10 concurrent downloads for the moment
             DownloadQueueController = new DownloadQueueController(Playnite, downloadsVm, maxConcurrent: 10);
+            UnifiedDownloadLogic = new RomMUnifiedDownloadLogic(this);
 
             // Initialise the sidebar only in desktop mode
             if (API.Instance.ApplicationInfo.Mode == ApplicationMode.Desktop)
@@ -218,6 +222,7 @@ namespace RomM
             
             Playnite.UriHandler.RegisterSource("romm", HandleRommUri);
             Source = SourceName;
+            UnifiedDownloads.Restore();
 
             // Portable path fix: expand "{PlayniteDir}" to absolute paths in DB on startup
             if (Playnite.Paths.IsPortable)
@@ -341,7 +346,7 @@ namespace RomM
 
         public override IEnumerable<SidebarItem> GetSidebarItems()
         {
-            if (DownloadsSidebar != null)
+            if (DownloadsSidebar != null && !UnifiedDownloads.IsAvailable)
             {
                 yield return DownloadsSidebar;
             }
@@ -384,6 +389,9 @@ namespace RomM
 
         public override IEnumerable<InstallController> GetInstallActions(GetInstallActionsArgs args)
         {
+            if (UnifiedDownloads.HasPending(args.Game.Id))
+                yield break;
+
             if (args.Game.PluginId == Id)
             {
                 string gameID = args.Game.GameId;
@@ -632,8 +640,9 @@ namespace RomM
                     }
 
                     // This is the cancel signal
-                    if (oldGame.IsInstalling && !newGame.IsInstalling)
+                    if (oldGame.IsInstalling && !newGame.IsInstalling && !newGame.IsInstalled)
                     {
+                        UnifiedDownloads.Cancel(newGame.Id);
                         DownloadQueueController?.Cancel(newGame.Id);
                     }
                 

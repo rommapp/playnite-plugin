@@ -241,6 +241,7 @@ namespace RomM.Settings
  
         public bool ScanGamesInFullScreen { get; set; } = false;
         public bool NotifyOnInstallComplete { get; set; } = false;
+        public bool UseUnifiedDownloadManager { get; set; } = true;
         public bool KeepRomMSynced { get; set; } = false;
 
         // Save sync (RetroArch saves <-> RomM server). DeviceId is assigned by the server on first
@@ -341,6 +342,7 @@ namespace RomM.Settings
                 KeepRomMSynced = savedSettings.KeepRomMSynced;
                 ScanGamesInFullScreen = savedSettings.ScanGamesInFullScreen;
                 NotifyOnInstallComplete = savedSettings.NotifyOnInstallComplete;
+                UseUnifiedDownloadManager = savedSettings.UseUnifiedDownloadManager;
                 Use7z = savedSettings.Use7z;
                 PathTo7z = savedSettings.PathTo7z;
                 MergeRevisions = savedSettings.MergeRevisions;
@@ -655,3 +657,4 @@ namespace RomM.Settings
         }
     }
 }
+

@@ -8,6 +8,17 @@ Windows VM (see below); the plugin cannot run natively on macOS or Linux.
 The CI build (`.github/workflows/build.yml` / `pr-build.yml`) is the source of truth
 for how the extension is compiled and packaged.
 
+## Download integration checks (Windows)
+
+- With UDM absent (and with the RomM option disabled), install and cancel using the built-in queue.
+- With UDM installed, queue multiple RomM games alongside another library's download; verify ordering,
+  progress, archive extraction and final launch paths.
+- Pause during transfer and extraction, resume, and verify the final files. Transfers restart on resume.
+- Cancel both a running and a queued entry; remove paused/error entries. Check Playnite's installing
+  state clears and another game in a flat install folder remains untouched.
+- Restart Playnite with queued/paused entries and resume them without selecting the ROM again.
+- Test 401, server disconnect, changed host/mapping and retry; no failed job should be marked installed.
+
 ## Windows
 
 > _TODO: native Windows setup instructions._
@@ -111,3 +122,4 @@ confirm **Settings → Drives** has a CD/DVD drive pointing at the ISO.
 
 Once Windows is installed and boots from the virtual disk, **eject the ISO** (Settings →
 Drives → clear it) so it stops offering "press any key to boot from CD" on every restart.
+
