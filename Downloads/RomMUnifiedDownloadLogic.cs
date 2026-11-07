@@ -23,6 +23,7 @@ namespace RomM.Downloads
         private readonly RomMDownloadInstaller installer = new RomMDownloadInstaller(HttpClientSingleton.Instance);
         private readonly Dictionary<Guid, DownloadRequest> requests = new Dictionary<Guid, DownloadRequest>();
         private readonly HashSet<Guid> running = new HashSet<Guid>();
+        private readonly Dictionary<Guid, TaskCompletionSource<bool>> stopped = new Dictionary<Guid, TaskCompletionSource<bool>>();
 
         internal RomMUnifiedDownloadLogic(RomM plugin) { this.plugin = plugin; }
 
@@ -161,6 +162,8 @@ namespace RomM.Downloads
         {
             var id = Guid.Parse(task.gameID);
             if (!running.Add(id)) throw new InvalidOperationException("This RomM download is already running.");
+            var completion = new TaskCompletionSource<bool>();
+            stopped[id] = completion;
             DownloadRequest request = null;
             var watch = Stopwatch.StartNew();
             using (var cts = CancellationTokenSource.CreateLinkedTokenSource(
@@ -223,7 +226,9 @@ namespace RomM.Downloads
                 finally
                 {
                     running.Remove(id);
+                    stopped.Remove(id);
                     task.downloadSpeedBytes = 0;
+                    completion.TrySetResult(true);
                 }
             }
         }
@@ -233,7 +238,11 @@ namespace RomM.Downloads
             if (task.status == UnifiedDownloadStatus.Completed) return;
             // Use the original paths for cleanup even if the mapping/server has since changed.
             var id = Guid.Parse(task.gameID);
-            if (running.Contains(id)) return;
+            if (stopped.TryGetValue(id, out var completion))
+            {
+                task.gracefulCts?.Cancel();
+                await completion.Task;
+            }
             if (File.Exists(RecordPath(id)))
             {
                 var record = JsonConvert.DeserializeObject<UnifiedInstallRecord>(File.ReadAllText(RecordPath(id)));

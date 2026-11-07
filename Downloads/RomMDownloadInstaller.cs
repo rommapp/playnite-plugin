@@ -181,7 +181,7 @@ namespace RomM.Downloads
 
             ct.ThrowIfCancellationRequested();
             using (Process process = Process.Start(startInfo))
-            { 
+            {
                 using (ct.Register(() =>
                 {
                     try { if (!process.HasExited) process.Kill(); }
