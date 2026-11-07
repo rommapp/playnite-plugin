@@ -29,9 +29,7 @@ This plugin allows you to import your RomM library into Playnite. It queries the
 
 To install and configure the RomM Playnite plugin, check out the [Installation Guide][docs-installation-guide]
 
-# Contributing
-
-## Unified Download Manager
+# Unified Download Manager
 
 Install the [Unified Download Manager add-on](https://github.com/hawkeye116477/playnite-unifiedDownloadManager-plugin)
 to manage RomM downloads alongside other supported Playnite libraries. RomM uses it automatically
@@ -42,6 +40,8 @@ UDM handles queue controls and progress; RomM still handles authentication, arch
 ROM selection and installation. Queue entries can be resumed after restarting Playnite.
 Pausing keeps the entry, but resuming/retrying currently **restarts the transfer from the beginning**.
 Remove a queued entry before changing its ROM version, RomM server or installation folder.
+
+# Contributing
 
 
 To contribute to RomM Playnite plugin, please check [Contribution Guide](./CONTRIBUTING.md)

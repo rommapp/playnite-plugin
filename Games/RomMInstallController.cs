@@ -163,7 +163,7 @@ namespace RomM.Games
                 {
                     var game = _romM.Playnite.Database.Games[Game.Id];
                     game.InstallDirectory = installedArgs.InstalledInfo.InstallDirectory;
-                    game.Roms = installedArgs.InstalledInfo.Roms;
+                    game.Roms = new System.Collections.ObjectModel.ObservableCollection<GameRom>(installedArgs.InstalledInfo.Roms ?? new List<GameRom>());
                     game.IsInstalling = false;
                     game.IsInstalled = true;
                     _romM.Playnite.Database.Games.Update(game);

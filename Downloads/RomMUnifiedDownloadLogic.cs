@@ -23,6 +23,7 @@ namespace RomM.Downloads
         private readonly RomMDownloadInstaller installer = new RomMDownloadInstaller(HttpClientSingleton.Instance);
         private readonly Dictionary<Guid, DownloadRequest> requests = new Dictionary<Guid, DownloadRequest>();
         private readonly HashSet<Guid> running = new HashSet<Guid>();
+        private readonly HashSet<Guid> cleaned = new HashSet<Guid>();
         private readonly Dictionary<Guid, TaskCompletionSource<bool>> stopped = new Dictionary<Guid, TaskCompletionSource<bool>>();
 
         internal RomMUnifiedDownloadLogic(RomM plugin) { this.plugin = plugin; }
@@ -52,7 +53,12 @@ namespace RomM.Downloads
 
             var manager = Manager;
             var oldTask = manager.GetTask(request.GameId.ToString(), plugin.Id.ToString());
-            if (oldTask != null) manager.RemoveTask(oldTask);
+            if (oldTask != null)
+            {
+                oldTask.PropertyChanged -= TaskChanged;
+                manager.RemoveTask(oldTask);
+            }
+            cleaned.Remove(request.GameId);
 
             var record = new UnifiedInstallRecord
             {
@@ -101,7 +107,12 @@ namespace RomM.Downloads
         {
             if (Manager?.Downloads == null) return;
             foreach (var task in Manager.Downloads.Where(t => t.pluginId == plugin.Id.ToString()))
+            {
+                // No worker survives a Playnite restart, including after a crash.
+                if (task.status == UnifiedDownloadStatus.Running || task.status == UnifiedDownloadStatus.Queued)
+                    task.status = UnifiedDownloadStatus.Paused;
                 Observe(task);
+            }
         }
 
         private void Observe(UnifiedDownload task)
@@ -115,8 +126,8 @@ namespace RomM.Downloads
             var task = (UnifiedDownload)sender;
             if (args.PropertyName != nameof(UnifiedDownload.status) || task.status != UnifiedDownloadStatus.Canceled)
                 return;
-            // UDM calls OnCancelDownload for running jobs, but canceling a queued/paused job only
-            // changes its status. Handle that case here as well.
+            // Playnite cancellation changes the status directly, whereas UDM's own UI invokes
+            // OnCancelDownload. Handle both paths; cleanup below is idempotent.
             if (Guid.TryParse(task.gameID, out var id) && !running.Contains(id))
             {
                 try { await OnCancelDownload(task); }
@@ -162,6 +173,7 @@ namespace RomM.Downloads
         {
             var id = Guid.Parse(task.gameID);
             if (!running.Add(id)) throw new InvalidOperationException("This RomM download is already running.");
+            cleaned.Remove(id);
             var completion = new TaskCompletionSource<bool>();
             stopped[id] = completion;
             DownloadRequest request = null;
@@ -194,6 +206,7 @@ namespace RomM.Downloads
                     task.status = UnifiedDownloadStatus.Running;
                     var game = plugin.Playnite.Database.Games[id];
                     game.IsInstalling = true;
+                    task.installSizeBytes = game.InstallSize ?? 0;
                     plugin.Playnite.Database.Games.Update(game);
                     await Task.Run(() => installer.DownloadAndInstall(item, request));
                     task.status = UnifiedDownloadStatus.Completed;
@@ -243,6 +256,7 @@ namespace RomM.Downloads
                 task.gracefulCts?.Cancel();
                 await completion.Task;
             }
+            if (!cleaned.Add(id)) return;
             if (File.Exists(RecordPath(id)))
             {
                 var record = JsonConvert.DeserializeObject<UnifiedInstallRecord>(File.ReadAllText(RecordPath(id)));
@@ -272,6 +286,7 @@ namespace RomM.Downloads
             }
             var id = Guid.Parse(task.gameID);
             requests.Remove(id);
+            cleaned.Remove(id);
             var path = RecordPath(id);
             if (File.Exists(path)) File.Delete(path);
         }
