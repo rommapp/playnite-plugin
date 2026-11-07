@@ -38,6 +38,8 @@ the built-in queue instead. UDM is optional.
 
 UDM handles queue controls and progress; RomM still handles authentication, archive extraction,
 ROM selection and installation. Queue entries can be resumed after restarting Playnite.
+UDM currently runs one download at a time across all libraries, whereas the built-in queue
+downloads several RomM games in parallel.
 Pausing keeps the entry, but resuming/retrying currently **restarts the transfer from the beginning**.
 Remove a queued entry before changing its ROM version, RomM server or installation folder.
 
